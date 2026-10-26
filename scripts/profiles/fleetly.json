@@ -1,17 +1,7 @@
 {
   "name": "fleetly",
-  "note": "fleetly console（~/workspace/qiulin/fleetly/console）——shadcn 全量 token（Tailwind v4）",
+  "note": "fleetly console（~/workspace/qiulin/fleetly/console）——2026-10-26 起采纳 demo 视觉：demo token 体系（bg/panel/panel-2/line/fg/muted/accent/ok/warn/err/chart-*）已在消费方 styles.css @theme 原生定义，tokenMap 恒等（不再映射 shadcn 方言）",
   "cnImport": "@/lib/utils",
   "cnNote": "消费方 cn 实现是 npm 包 cn；src/lib/utils.ts 已建 shim 转发（两世界单源），块统一 @/lib/utils",
-  "tokenMap": {
-    "text-muted": "text-muted-foreground",
-    "bg-panel": "bg-card",
-    "bg-panel-2": "bg-muted/50",
-    "border-line": "border-border",
-    "divide-line": "divide-border",
-    "text-fg": "text-foreground",
-    "text-err": "text-[var(--status-danger)]",
-    "bg-err": "bg-[var(--status-danger)]",
-    "border-err": "border-[var(--status-danger)]"
-  }
+  "tokenMap": {}
 }
