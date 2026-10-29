@@ -4,9 +4,11 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  type AnyRouter,
   RouterProvider,
 } from "@tanstack/react-router";
 import { act, render, type RenderOptions } from "@testing-library/react";
+import type { RouteComponent } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 import type { ResourceScope } from "../kernel";
 import { ResourceScopeProvider } from "../react/scope";
@@ -19,7 +21,58 @@ import type { QuerySearchSchema } from "../schema";
  * Provider 包装）在此单源：useCollection 系绑定需要全部三上下文，缺一即假绿。
  * mock 面建议从"数据源"上移到"resource 动词"（defineResource 的 collection/
  * commands 覆写）——本 harness 不绑 mock 方案。
+ *
+ * createTestRouter：多路由测试路由器工厂（导航目标注册——命令 onSettled
+ * navigate 未注册目标会因 not-found rejection 时序漂移，§12.3 实咬）；
+ * renderWithKit 是其上的单路由 + 三 Provider 一体接线形态。
  */
+
+export interface TestRouteSpec {
+  /** 路由路径（支持 $param 段，值由 initial.path 给出） */
+  path: string;
+  component: RouteComponent;
+  /** 给定时接线 validateSearch（与真实路由同路） */
+  searchSchema?: QuerySearchSchema;
+}
+
+export interface CreateTestRouterOptions {
+  routes: ReadonlyArray<TestRouteSpec>;
+  /** 初始位置；缺省首条路由 path + 空 search */
+  initial?: { path?: string; search?: Record<string, unknown> };
+}
+
+export function createTestRouter(options: CreateTestRouterOptions): AnyRouter {
+  const rootRoute = createRootRoute();
+  const routes = options.routes.map((spec) =>
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: spec.path,
+      component: spec.component,
+      ...(spec.searchSchema
+        ? {
+            validateSearch: ((input: unknown) =>
+              spec.searchSchema!.toSearchSchema()["~standard"].validate(input).value) as never,
+          }
+        : {}),
+    }),
+  );
+  const routeTree = rootRoute.addChildren(routes);
+  // initialEntries 只收字符串——按 TanStack 默认 search 方言（每值 JSON 编码）
+  // 自拼 query 串，与真实 URL 解析同路（数组=单键 JSON、数字不落字符串）。
+  const first = options.routes[0];
+  const location = options.initial?.path ?? first?.path ?? "/";
+  const search = options.initial?.search ?? {};
+  const qs = Object.entries(search)
+    .filter(([, v]) => v !== undefined)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(JSON.stringify(v))}`)
+    .join("&");
+  return createRouter({
+    routeTree,
+    history: createMemoryHistory({
+      initialEntries: [location + (qs ? `?${qs}` : "")],
+    }),
+  });
+}
 
 export interface RenderWithKitOptions extends Omit<RenderOptions, "wrapper"> {
   /** 挂载 ui 的路由路径（默认 "/"；支持 $param 段，值由 pathname 给出） */
@@ -48,36 +101,22 @@ export async function renderWithKit(
   const { searchSchema, search, scope, ...renderOptions } = options;
   const initialSearch = search ?? {};
 
-  const validateSearch = searchSchema
-    ? ((input: unknown) =>
-        searchSchema.toSearchSchema()["~standard"].validate(input).value) as never
-    : undefined;
-
-  const rootRoute = createRootRoute({ validateSearch });
-  const pageRoute = createRoute({
-    getParentRoute: () => rootRoute,
-    path,
-    component: () => (
-      <ResourceScopeProvider value={scope ?? {}}>
-        <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
-      </ResourceScopeProvider>
-    ),
-  });
-  const routeTree = rootRoute.addChildren([pageRoute]);
-  // initialEntries 只收字符串——按 TanStack 默认 search 方言（每值 JSON 编码）
-  // 自拼 query 串，与真实 URL 解析同路（数组=单键 JSON、数字不落字符串）。
-  const qs = Object.entries(initialSearch)
-    .filter(([, v]) => v !== undefined)
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(JSON.stringify(v))}`)
-    .join("&");
-  const router = createRouter({
-    routeTree,
-    history: createMemoryHistory({
-      initialEntries: [path + (qs ? `?${qs}` : "")],
-    }),
+  const router = createTestRouter({
+    routes: [
+      {
+        path,
+        component: () => (
+          <ResourceScopeProvider value={scope ?? {}}>
+            <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+          </ResourceScopeProvider>
+        ),
+        ...(searchSchema ? { searchSchema } : {}),
+      },
+    ],
+    initial: { search: initialSearch },
   });
 
-  const rendered = render(<RouterProvider router={router} />, renderOptions);
+  render(<RouterProvider router={router} />, renderOptions);
   // RouterProvider 首提交异步——冲刷到稳定再交还断言（torchwood TestRouter 同坑）
   await act(async () => {});
 

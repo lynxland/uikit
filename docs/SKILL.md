@@ -45,6 +45,20 @@ function WidgetsPage() {
 - "URL + schema 默认值"即真相；翻页=push（历史栈即分页栈），过滤/排序=replace+回第一页。
 - 四态（loading/empty/error/success）由 ListPage 切换；你只写 success 态的 children。
 - 预取：`collectionQueryOptions(resource, query)` 进 route loader 的 `ensureQueryData` + `Link preload="intent"`。
+- **validateSearch 无损**：schema 外的键（tab/自定义参数）缺省透传存活——双 schema 挂同一路由直接组合
+  两个 `toSearchSchema().validate` 返回值，零手写合并器；严格丢弃需显式 `toSearchSchema({ unknownKeys: "drop" })`。
+
+## 伴读数据（无 URL 的读）
+
+```tsx
+// 壳层组件 / 表单下拉 / 统计条——不进 URL、不受列表页 q/page/cursor 影响
+const data = useCollectionData(resource, { scope?, size?, window?, refetchInterval?, enabled?, retry? });
+// window: "all" = 整取方言全量行（clientCollection）；rows 直出（status/total/isFetching/refetch 同备）
+```
+
+- 禁为伴读再包一层 useCollection 空路由或手写 `.data?.rows` 解包——`useCollectionData` 就是该形态。
+- **多集合同路由**（双列表/多 tab）：`collectionQuerySchema({ namespace: "tasks", ... })` 显式开启——
+  URL 键带扁平前缀（`tasks.q` / `tasks.page`），与 `schedules.q` 并存互不携带；缺省 off（存量 URL 零变化）。
 
 ## 详情 / 自定义内容页
 
@@ -141,6 +155,37 @@ const sub = useSubscription(eventsStream, { cursor: anchor ?? undefined, getCurs
   ——页面崩溃兜底（数据面错误走 ListPage 四态，别混）。Retry 恢复语义归页面（如先清失败参数
   再 reset）。demo `routes/boom.tsx`（`?fail=1` 注入崩溃）。
 
+## 测试配方（/testing 出口）
+
+```tsx
+import { createTestRouter, renderWithKit } from "@lynx-go/uikit-core/testing";
+
+// 单路由 + Query/Router/Scope 三上下文一体接线（useCollection 系绑定缺一即假绿）
+const r = await renderWithKit(<MyPage />, {
+  path: "/widgets",
+  searchSchema: widgetsSearch,      // 与真实 validateSearch 同路归一
+  search: { q: "web" },
+  scope: { projectId: "p1" },       // 挂 ResourceScopeProvider
+});
+expect(r.getSearch().q).toBe("web");// 断言读解析后的 search 对象（非原始 query 串）
+// r.queryClient：同键断言/失效观察入口
+
+// 多路由（命令 onSettled navigate 的目标必须注册——未注册会因 not-found rejection 时序漂移）
+const router = createTestRouter({
+  routes: [
+    { path: "/items/$id", component: DetailPage, searchSchema: detailSearch },
+    { path: "/items", component: ListPage },
+  ],
+  initial: { path: "/items", search: { q: "x" } },
+});
+render(<RouterProvider router={router} />, { wrapper: QueryClientProvider });
+```
+
+- mock 面从"数据源"上移到"resource 动词"（defineResource 的 collection/commands 覆写）；
+  `mockCollection`/`mockFetchAll`（延迟/失败注入/行替换）是现成驱动。
+- 命令测试断言失效：`r.queryClient.getQueryState(key)?.isInvalidated`（键经
+  `collectionQueryOptions(...).queryKey` 单源取，勿手拼）。
+
 ## 反模式（必读）
 
 1. 禁给块传 url/resource 让它自己拉数——块只消费 `list` 句柄。
@@ -175,6 +220,8 @@ const sub = useSubscription(eventsStream, { cursor: anchor ?? undefined, getCurs
 
 ## 适配器作者
 
-见 docs/design.md §2（契约签名）、§5（Effect 缝隙）、§5.2（protojson 配方：int64 双策略/枚举全名/repeated 序列化/零值缺席）、§5.1（401 闭环管线次序）、§5.3 实现期裁决（订阅引擎分诊矩阵）。核心入口：`createHttp({ onUnauthorized })`、`defineResource`、`clientCollection(fetchAll)`、`mockCollection`、`ndjsonTransport`/`sseTransport`（终态判据 isEnded/endEvent 归你的适配器）、`mockTransport`（测试/demo 帧流）、`createSubscriptionEngine`（命令式消费，quickstart 直开 Transport `for await` 亦可）。
+见 docs/design.md §2（契约签名）、§5（Effect 缝隙）、§5.2（protojson 配方：int64 双策略/枚举全名/repeated 序列化/零值缺席）、§5.1（401 闭环管线次序）、§5.3 实现期裁决（订阅引擎分诊矩阵）。核心入口：`createHttp({ onUnauthorized })`、`defineResource`、`clientCollection(fetchAll)`、`restCollection`/`restRecord`（REST-over-fetch 工厂：path 回调组 URL + 信封展平 + 404 空态（`notFound: "null"`）+ 错误收敛内置，fetch 可注入——bring-your-own-fetch 是主干）、`mockCollection`、`ndjsonTransport`/`sseTransport`（终态判据 isEnded/endEvent 归你的适配器）、`mockTransport`（测试/demo 帧流）、`createSubscriptionEngine`（命令式消费，quickstart 直开 Transport `for await` 亦可）。
+
+命令的 scope 同源（M2）：descriptor 声明 `scopeOf: (input) => ({ projectId, appId })`——引擎把同一份 scope 喂 `run(ctx)` 与失效匹配（投影匹配：读资源声明的 scope 键集逐键相等即命中）；工厂命令的身份从闭包迁入 input 或 scopeOf 派生，调用点零手传 scope。声明了 scope 键的资源命令，显式传 scope 必须覆盖全部声明键（partial 编译红）。
 
 keyset（服务端 token）方言的完整实装范本：torchwood 批 A 的 audit-logs 切片（design.md §12.2 实现期回写）——`window.cursor → page_token`、`order.dir → 枚举名`、谓词白名单展开、`Page → Segment`、消费方 axios 失败在适配器收敛 ApiError、URL 存绝对时刻。两个易咬点：schema 不设 defaultOrder（排序三态要能落回服务端默认序）；TanStack 把数组 search 值 JSON 编码，断言读解析后对象不读原始 query 串。

@@ -165,7 +165,7 @@ describe("restRecord（与 restCollection 同构）", () => {
 
   it("headers 回调每次请求调用（会话/scope 头注入位）", async () => {
     // Response 体单次可读——每次调用产新实例
-    const fetchMock = vi.fn(async () => jsonResponse(200, { id: "a" }));
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => jsonResponse(200, { id: "a" }));
     const headers = vi.fn(() => ({ "X-Project": "p1" }));
     const record = restRecord({ path: (id) => `/t/${id}`, headers, fetch: fetchMock });
     await record("a", {});

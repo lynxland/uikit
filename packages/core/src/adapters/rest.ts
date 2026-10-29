@@ -22,7 +22,7 @@ interface RestBaseOptions {
   fetch?: FetchLike;
 }
 
-export interface RestCollectionOptions<T> extends RestBaseOptions {
+export interface RestCollectionOptions extends RestBaseOptions {
   path: (ctx: ResourceScope) => string;
   /** 响应体 → 行数组（信封键展平）；缺省 body 直收（数组）或 body.rows。undefined/null 行过滤内置 */
   envelope?: (body: unknown) => unknown[];
@@ -34,7 +34,7 @@ export interface RestCollectionOptions<T> extends RestBaseOptions {
   notFound?: "null";
 }
 
-export interface RestRecordOptions<T> extends RestBaseOptions {
+export interface RestRecordOptions extends RestBaseOptions {
   path: (id: string, ctx: ResourceScope) => string;
   /** 响应体 → 记录；缺省 body 直收（信封键展平：body.item 等在此声明） */
   envelope?: (body: unknown) => unknown;
@@ -95,9 +95,7 @@ function defaultNextCursor(body: unknown): string | undefined {
  * Segment 字段：rows 经 envelope；total/nextCursor 有默认抽取（body.total /
  * body.nextCursor），方言键名经同名选项覆写。
  */
-export function restCollection<T>(
-  options: RestCollectionOptions<T>,
-): (query: CollectionQuery, ctx: ResourceScope, signal?: AbortSignal) => Promise<Segment<T>> {
+export function restCollection<T>(options: RestCollectionOptions): (query: CollectionQuery, ctx: ResourceScope, signal?: AbortSignal) => Promise<Segment<T>> {
   const envelope = options.envelope ?? defaultEnvelope;
   const totalOf = options.total ?? defaultTotal;
   const nextCursorOf = options.nextCursor ?? defaultNextCursor;
@@ -125,9 +123,7 @@ export function restCollection<T>(
  * restRecord —— record 适配器工厂（与 restCollection 同构）。
  * notFound: "null" 时返回 Promise<T | null>——资源类型声明为 Resource<T | null> 即空态直出。
  */
-export function restRecord<T>(
-  options: RestRecordOptions<T>,
-): (id: string, ctx: ResourceScope, signal?: AbortSignal) => Promise<T | null> {
+export function restRecord<T>(options: RestRecordOptions): (id: string, ctx: ResourceScope, signal?: AbortSignal) => Promise<T | null> {
   const unwrap = options.envelope ?? ((body: unknown) => body);
   return async (id, ctx, signal) => {
     const url = buildUrl(options.baseUrl, options.path(id, ctx), options.params?.(id, ctx));
