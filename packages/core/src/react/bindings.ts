@@ -146,16 +146,8 @@ export function useCollection<T, ID, C extends CommandsRecord<ID>, S extends Sub
     return true;
   };
   const reset = () => {
-    searchPatch(
-      {
-        q: undefined,
-        filter: undefined,
-        sort: undefined,
-        cursor: undefined,
-        page: undefined,
-      },
-      { replace: true },
-    );
+    // 全清补丁由 schema 单源（namespace 形态下键带前缀——手写键清单会漏）
+    searchPatch(options.search.resetPatch(), { replace: true });
   };
 
   const rows = result.data?.rows ?? EMPTY_ROWS;

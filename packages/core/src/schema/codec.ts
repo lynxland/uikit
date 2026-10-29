@@ -30,6 +30,13 @@ export interface QuerySchemaSpec {
   /** 默认 20 */
   defaultSize?: number;
   defaultOrder?: ReadonlyArray<Order>;
+  /**
+   * URL 键命名空间（M1）：缺省 off（存量 URL 零变化）；多集合同路由显式开启后，
+   * 本 schema 的全部 URL 键带扁平前缀（`tasks.q` / `tasks.page`）——各持各键、
+   * 互不携带；TanStack 序列化为普通字符串键（非嵌套对象）。禁止含 "."（键归属
+   * 以前缀判定）。
+   */
+  namespace?: string;
 }
 
 /** URL 中的扁平参数形状（human-readable）。未知键（消费方自定义参数）缺省透传。 */
@@ -94,6 +101,16 @@ export interface QuerySearchSchema {
 
 export function collectionQuerySchema(spec: QuerySchemaSpec = {}): QuerySearchSchema {
   const defaultSize = spec.defaultSize ?? 20;
+  if (spec.namespace !== undefined && spec.namespace.includes(".")) {
+    throw new Error(
+      `@lynx-go/uikit-core: namespace "${spec.namespace}" must not contain "." (URL key ownership is prefix-based)`,
+    );
+  }
+  // M1 namespace：URL 键的扁平前缀（缺省空 = 存量无前缀形态）。
+  // encode/patch/toSearchSchema/resetPatch 读写**物理键**（带前缀）；
+  // encodePredicate 保持逻辑形状（q/filter），由调用侧落物理键。
+  const prefix = spec.namespace ? `${spec.namespace}.` : "";
+  const key = (name: string): string => `${prefix}${name}`;
   const defaults: CollectionQuery = {
     window: { size: defaultSize },
     ...(spec.defaultOrder ? { order: spec.defaultOrder } : {}),
@@ -155,11 +172,12 @@ export function collectionQuerySchema(spec: QuerySchemaSpec = {}): QuerySearchSc
 
   function decodePredicate(params: FlatSearchParams): Predicate | undefined {
     const parts: Predicate[] = [];
-    if (params.q !== undefined) {
-      const text = textPredicate(spec.text ?? [], params.q);
+    const q = params[key("q")];
+    if (typeof q === "string") {
+      const text = textPredicate(spec.text ?? [], q);
       if (text) parts.push(text);
     }
-    for (const entry of params.filter ?? []) {
+    for (const entry of (params[key("filter")] as ReadonlyArray<string> | undefined) ?? []) {
       const leaf = parseFilterEntry(entry);
       if (leaf) parts.push(leaf);
     }
@@ -171,11 +189,12 @@ export function collectionQuerySchema(spec: QuerySchemaSpec = {}): QuerySearchSc
   // ---- 窗口 <-> 键 ----
 
   function decodeWindow(params: FlatSearchParams): QueryWindow {
-    const size = positiveInt(params.size) ?? defaultSize;
-    if (params.cursor !== undefined && params.cursor !== "") {
-      return { size, cursor: params.cursor };
+    const size = positiveInt(params[key("size")]) ?? defaultSize;
+    const cursor = params[key("cursor")];
+    if (typeof cursor === "string" && cursor !== "") {
+      return { size, cursor };
     }
-    const page = positiveInt(params.page);
+    const page = positiveInt(params[key("page")]);
     if (page !== undefined && page > 1) {
       return { size, range: { offset: (page - 1) * size } };
     }
@@ -185,39 +204,42 @@ export function collectionQuerySchema(spec: QuerySchemaSpec = {}): QuerySearchSc
   // ---- 归一化（validateSearch 用；容忍脏输入，绝不 throw） ----
   // M3：缺省 passthrough——未知键原样保留（tab/消费方自定义参数不再被静默删除）；
   // 归一化处理过的自有键（含无效条目、默认值等价形态）不透传回填。严格丢弃为显式选项。
+  // M1：自有键 = 带命名空间前缀的物理键；其他命名空间/无前缀的键对本 schema 是未知键（透传）。
 
-  const OWNED_KEYS = new Set(["q", "filter", "sort", "cursor", "page", "size"]);
+  const ownedKeys = new Set(["q", "filter", "sort", "cursor", "page", "size"].map(key));
 
   function normalize(input: unknown, unknownKeys: UnknownKeysMode = "passthrough"): FlatSearchParams {
     const raw = (input ?? {}) as Record<string, unknown>;
     const out: FlatSearchParams = {};
-    if (typeof raw.q === "string" && raw.q.trim() !== "") out.q = raw.q;
-    const filter = toArray(raw.filter).filter((e) => parseFilterEntry(e) !== null);
-    if (filter.length > 0) out.filter = filter;
-    const sort = toArray(raw.sort).filter((e) => {
+    const q = raw[key("q")];
+    if (typeof q === "string" && q.trim() !== "") out[key("q")] = q;
+    const filter = toArray(raw[key("filter")]).filter((e) => parseFilterEntry(e) !== null);
+    if (filter.length > 0) out[key("filter")] = filter;
+    const sort = toArray(raw[key("sort")]).filter((e) => {
       const i = e.indexOf(":");
       if (i < 0) return false;
       return e.slice(i + 1) === "asc" || e.slice(i + 1) === "desc";
     });
-    if (sort.length > 0) out.sort = sort;
-    if (typeof raw.cursor === "string" && raw.cursor !== "") out.cursor = raw.cursor;
-    const page = positiveInt(raw.page);
-    if (page !== undefined && page > 1) out.page = page;
-    const size = positiveInt(raw.size);
-    if (size !== undefined && size !== defaultSize) out.size = size;
+    if (sort.length > 0) out[key("sort")] = sort;
+    const cursor = raw[key("cursor")];
+    if (typeof cursor === "string" && cursor !== "") out[key("cursor")] = cursor;
+    const page = positiveInt(raw[key("page")]);
+    if (page !== undefined && page > 1) out[key("page")] = page;
+    const size = positiveInt(raw[key("size")]);
+    if (size !== undefined && size !== defaultSize) out[key("size")] = size;
     if (unknownKeys === "passthrough") {
-      for (const [key, value] of Object.entries(raw)) {
+      for (const [k, value] of Object.entries(raw)) {
         if (value === undefined) continue;
-        if (key in out) continue;
-        if (OWNED_KEYS.has(key)) continue; // 自有键以归一化结果为准（无效条目不回填）
-        out[key] = value;
+        if (k in out) continue;
+        if (ownedKeys.has(k)) continue; // 自有键以归一化结果为准（无效条目不回填）
+        out[k] = value;
       }
     }
     return out;
   }
 
   function decodeOrders(params: FlatSearchParams): ReadonlyArray<Order> | undefined {
-    const orders = (params.sort ?? [])
+    const orders = ((params[key("sort")] as ReadonlyArray<string> | undefined) ?? [])
       .map((e) => {
         const i = e.indexOf(":");
         const field = e.slice(0, i);
@@ -244,12 +266,17 @@ export function collectionQuerySchema(spec: QuerySchemaSpec = {}): QuerySearchSc
       };
     },
     encode(query: CollectionQuery): FlatSearchParams {
-      const flat: FlatSearchParams = { ...encodePredicate(query.predicate) };
-      if (query.order?.length) flat.sort = query.order.map((o) => `${o.field}:${o.dir}`);
+      // 物理键（带命名空间前缀）——encode 即 URL 面
+      const flat: FlatSearchParams = {};
+      const encoded = encodePredicate(query.predicate);
+      if (encoded.q !== undefined) flat[key("q")] = encoded.q;
+      if (encoded.filter !== undefined) flat[key("filter")] = encoded.filter;
+      if (query.order?.length) flat[key("sort")] = query.order.map((o) => `${o.field}:${o.dir}`);
       const w = query.window;
-      flat.size = w.size;
-      if (w.cursor !== undefined) flat.cursor = w.cursor;
-      else if (w.range && w.range.offset > 0) flat.page = Math.floor(w.range.offset / w.size) + 1;
+      flat[key("size")] = w.size;
+      if (w.cursor !== undefined) flat[key("cursor")] = w.cursor;
+      else if (w.range && w.range.offset > 0)
+        flat[key("page")] = Math.floor(w.range.offset / w.size) + 1;
       return flat;
     },
     decode(params: unknown): CollectionQuery {
@@ -268,34 +295,40 @@ export function collectionQuerySchema(spec: QuerySchemaSpec = {}): QuerySearchSc
         // 清除时必须显式 q/filter = undefined：函数式 search 是 {...prev, ...patch}
         // 展开，缺席的键会让旧值存活（Clear 后 URL 残留 q——fleetly 试点实咬）。
         const flat = encodePredicate(part.predicate ?? undefined);
-        out.q = flat.q;
-        out.filter = flat.filter;
-        out.cursor = undefined; // 换谓词回第一页
-        out.page = undefined;
+        out[key("q")] = flat.q;
+        out[key("filter")] = flat.filter;
+        out[key("cursor")] = undefined; // 换谓词回第一页
+        out[key("page")] = undefined;
       }
       if ("order" in part) {
         const order = part.order ?? [];
-        if (order.length > 0) out.sort = order.map((o) => `${o.field}:${o.dir}`);
-        else out.sort = undefined;
-        out.cursor = undefined; // 换向回第一页（keyset 游标与方向耦合）
-        out.page = undefined;
+        if (order.length > 0) out[key("sort")] = order.map((o) => `${o.field}:${o.dir}`);
+        else out[key("sort")] = undefined;
+        out[key("cursor")] = undefined; // 换向回第一页（keyset 游标与方向耦合）
+        out[key("page")] = undefined;
       }
       if (part.window) {
         const w = part.window;
-        if ("size" in w) out.size = w.size;
+        if ("size" in w) out[key("size")] = w.size;
         if (w.cursor !== undefined) {
-          out.cursor = w.cursor;
-          out.page = undefined;
+          out[key("cursor")] = w.cursor;
+          out[key("page")] = undefined;
         } else if (w.range) {
-          out.page = Math.floor(w.range.offset / w.size) + 1;
-          out.cursor = undefined;
+          out[key("page")] = Math.floor(w.range.offset / w.size) + 1;
+          out[key("cursor")] = undefined;
         }
       }
       return out;
     },
     resetPatch(): FlatPatch {
       // 全部自有键显式 undefined（函数式 search 展开清值——缺席则旧值存活）
-      return { q: undefined, filter: undefined, sort: undefined, cursor: undefined, page: undefined };
+      return {
+        [key("q")]: undefined,
+        [key("filter")]: undefined,
+        [key("sort")]: undefined,
+        [key("cursor")]: undefined,
+        [key("page")]: undefined,
+      };
     },
   };
 }

@@ -197,3 +197,83 @@ describe("M3 normalize 无损（缺省 passthrough，严格丢弃为显式选项
     expect(next.tab).toBe("t"); // 非自有键不受影响
   });
 });
+
+describe("M1 namespace（URL 键命名空间：多集合同路由各持各键）", () => {
+  const tasks = collectionQuerySchema({
+    namespace: "tasks",
+    text: ["title"],
+    filters: [{ field: "priority", op: "eq" }],
+    defaultSize: 5,
+  });
+
+  it("encode → decode 往返走扁平前缀键（tasks.q / tasks.page），与无前缀键零冲突", () => {
+    const query = tasks.decode({
+      "tasks.q": "deploy",
+      "tasks.filter": ["priority:eq:high"],
+      "tasks.page": 2,
+      // 同路由另一集合的键 + 消费方自定义键——本 schema 视为未知键，互不携带
+      "schedules.q": "cron",
+      tab: "list",
+    });
+    expect(query.predicate).toBeDefined();
+    expect(query.window).toEqual({ size: 5, range: { offset: 5 } });
+    const flat = tasks.encode(query);
+    expect(flat["tasks.q"]).toBe("deploy");
+    expect(flat["tasks.filter"]).toEqual(["priority:eq:high"]);
+    expect(flat["tasks.page"]).toBe(2);
+    expect("schedules.q" in flat).toBe(false);
+    expect("q" in flat).toBe(false); // 无前缀 q 不是本 schema 的输出
+  });
+
+  it("toSearchSchema validate：自有前缀键归一，其余键（他命名空间/自定义）透传", () => {
+    const ss = tasks.toSearchSchema();
+    const out = ss["~standard"].validate({
+      "tasks.q": "web",
+      "tasks.page": 1, // 默认值等价 → 归一省略
+      "tasks.filter": ["bad"],
+      "schedules.q": "cron",
+      "schedules.page": 3,
+      q: "legacy-plain", // 无前缀 q 对本 schema 是未知键 → 透传
+      tab: "board",
+    });
+    expect(out.value).toEqual({
+      "tasks.q": "web",
+      "schedules.q": "cron",
+      "schedules.page": 3,
+      q: "legacy-plain",
+      tab: "board",
+    });
+  });
+
+  it("patch/resetPatch 输出物理前缀键（含显式清除）", () => {
+    const patch = tasks.patch({
+      predicate: { field: "priority", op: "eq", value: "low" },
+    });
+    expect(patch).toMatchObject({
+      "tasks.filter": ["priority:eq:low"],
+      "tasks.cursor": undefined,
+      "tasks.page": undefined,
+    });
+    const reset = tasks.resetPatch();
+    expect(reset).toEqual({
+      "tasks.q": undefined,
+      "tasks.filter": undefined,
+      "tasks.sort": undefined,
+      "tasks.cursor": undefined,
+      "tasks.page": undefined,
+    });
+    // 展开语义：清 own 键，他命名空间键存活
+    const next = { "tasks.q": "x", "schedules.q": "cron", ...reset };
+    expect(next["tasks.q"]).toBeUndefined();
+    expect(next["schedules.q"]).toBe("cron");
+  });
+
+  it("缺省 off：无前缀形态零变化（存量 URL 兼容）", () => {
+    const plain = collectionQuerySchema({ text: ["name"], defaultSize: 8 });
+    expect(plain.encode(plain.decode({ q: "web", page: 2 }))).toEqual({ q: "web", page: 2, size: 8 });
+  });
+
+  it("namespace 含 \".\" 直接抛错（键归属以前缀判定）", () => {
+    expect(() => collectionQuerySchema({ namespace: "a.b" })).toThrow();
+  });
+});

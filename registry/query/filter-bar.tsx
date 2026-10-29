@@ -1,6 +1,6 @@
 import { textPredicate, type Predicate } from "@lynx-go/uikit-core/kernel";
 import type { CollectionHandle } from "@lynx-go/uikit-core/react";
-import { filterValues, predicateOf } from "@lynx-go/uikit-core/schema";
+import { filterLeaves, filterValues, predicateOf } from "@lynx-go/uikit-core/schema";
 import type { FilterFieldDef, QuerySearchSchema } from "@lynx-go/uikit-core/schema";
 import { Search, X } from "lucide-react";
 import { useState } from "react";
@@ -23,9 +23,14 @@ export interface FilterBarProps<T> {
 
 export function FilterBar<T>({ list, schema, textPlaceholder }: FilterBarProps<T>) {
   const spec: ReadonlyArray<FilterFieldDef> = schema.spec.filters ?? [];
-  const [text, setText] = useState(() =>
-    typeof schema.encode(list.query).q === "string" ? (schema.encode(list.query).q as string) : "",
-  );
+  // 初始文本经谓词纯函数层回读（namespace 形态下 encode 输出物理前缀键，不可直读）
+  const textFields = new Set(schema.spec.text ?? []);
+  const [text, setText] = useState(() => {
+    const leaf = filterLeaves(list.query.predicate).find(
+      (l) => l.op === "contains" && textFields.has(l.field as string) && typeof l.value === "string",
+    );
+    return typeof leaf?.value === "string" ? leaf.value : "";
+  });
   // 读路径：单值投影收窄到 spec 字段（过滤下拉即单值）
   const values = filterValues(list.query.predicate);
   const selects: Record<string, string | undefined> = {};
