@@ -1060,3 +1060,43 @@ torchwood ui-kit 全量改造（§12.9）收尾后的消费侧审查：三轴并
 - **挂账两件（触发即拆）**：② `kernel` → 独立包——触发 = 非 React 消费方出现（服务端共享 ApiError/CommandResult/CollectionQuery 契约类型、codegen、第二前端框架）；届时 kernel-only 消费者免装 effect（dependencies 唯一运行时依赖）。③ `schema` → 独立包——触发 = 服务端要解析/校验 CollectionQuery 线格式（"URL 即真相"的另一半消费者）。
 - **永不拆清单**：adapters+react 不拆对——订阅引擎（退避归零、runForEach+Queue.offer）与 useSubscription/useInvalidateOnFrame 帧语义是同一次裁决的两侧，拆开 = 版本对齐税；registry 永不进 npm 包（拷贝制分发是 §12 核心裁决，打包 = 推翻）；mock/mockTransport 留 adapters（demo 活文档与消费方 stub 驱动，非纯 dev-time 工具）。
 - **拆包通用成本（任一触发时认账）**：registry-build 的 CORE_PACKAGE 单源变多源；workspace 版本同步与发版节奏翻倍；消费方 import 再改一轮（torchwood 59 文件前车之鉴）。
+
+### 12.11 F1 数据面机制批：M1-M4 + M10（2026-10-29，fleetly 采纳复盘 M1-M10 驱动）
+
+来源：docs/2026-10-27-fleetly-adoption-retro.md（v4）机制缺口 M1-M10 的首批（F1 批组：消灭量最大——19 伴读钩子/38 解包/8 合并体/24 资源文件样板/2 bug 类）。六项开放问题已在 retro §7 用户裁定（namespace off+扁平前缀 / 投影匹配唯一 / ApiError 类化——M9 属 F2 / path 回调 / 亮档进 demo——M6 属 F3 / lint 三类全扫——M7 属 F3），本批消费其中四项裁决。裁决先行、逐项「根因→机制→验收」，实现期回写如下。
+
+**M1 读模型分层**（URL 绑定是可选层，不是读原语的属性）：
+- 落地面：`useCollectionData(resource, {scope?, predicate?, order?, size?, window?: QueryWindow | "all", staleTime?, refetchInterval?, enabled?, retry?, keepPrevious?})`（/react）——data 层零 URL、rows 直出；`useCollection` 重构为 data 层之上的装配（search 解码 + 写入契约 setter），语义不变；`useRecord` options 扩 refetchInterval/enabled/retry；`QueryEngineOptions`（三个 queryOptions 工厂）增 retry 直通。
+- 全量行访问取 `window: "all"` 侧（retro M1.3 的「fullRows 或 window:"all"」二选一裁决）：归一为超大 size 窗口，clientCollection 天然支持、无需适配器协议改动；total 附带。
+- namespace：`collectionQuerySchema({namespace: "tasks"})`（缺省 off，存量 URL 零变化）——encode/patch/toSearchSchema/resetPatch 读写**物理键**（tasks.q 扁平前缀，TanStack 序列化为普通字符串键）；decode 只读本命名空间键，他命名空间/无前缀键经 M3 passthrough 存活（namespace 依赖无损编解码，两机制咬合）。新增 `resetPatch()`（全清补丁单源——手写键清单在前缀形态下会漏）。
+- 实现期细节：FilterBar 初始文本改经谓词纯函数层回读（filterLeaves——encode 输出物理键不可直读，块对 namespace 透明）；`run` 的入参不注解会破坏 defineResource 的 C 推断（上下文敏感跳过——既有行为，本批测试实证，SKILL 适配器册无感）。
+- demo 消费面：/collections 双列表路由（tasks.q 与 schedules.q 并存互不携带 + 深链还原 + e2e 3 条）+ 统计条伴读点（window:"all" 全量行，列表过滤不影响）。
+
+**M2 命令-失效 scope 同源**（三份真源收敛为一份）：
+- `CommandDescriptor.scopeOf?: (input) => ResourceScope`；引擎在 **mutationFn 内**解析 `effectiveScope = options.scope ?? descriptor.scopeOf?.(input) ?? （声明采纳的 ResourceScopeProvider context）?? {}`，**同一份**既喂 `run(ctx)` 又喂失效匹配（就地失效——并发 mutation 各自携带不错位；context 采纳位次在 scopeOf 之后是本批实现裁决：descriptor 作者的显式派生强于环境注入，0.2.1 的声明采纳契约保持不破）。
+- `selectorMatches` 改**投影匹配为唯一语义**：比较轴 = 读键所属资源声明的 scope 键集（查询键新增第 4 段 scopeKeys），声明键上逐键相等即命中；命令 scope 携带声明外的多余键不阻断（fleetly git-hook 三写场景：scope {projectId, appId} 命中声明 ["projectId"] 的项目级读键）。未声明资源与旧形键宽容降级为键全集相等（等价旧全等——迁移期手工 setQueryData 不咬）。旧整对象全等不保留（retro §7-2 裁决：过宽=廉价 refetch / 漏失效=bug）。
+- 类型执法落「**传了就必须完整**」：defineResource 以 const 泛型把 spec.scope 字面量元组线程进 `__scopeKeys`；useCommand/useCommandForm 对声明了 scope 键的 descriptor，显式传入的 scope 必须覆盖全部声明键（partial/空对象编译红）。省略不报错——scopeOf/Provider 解析链是既有契约（retro 验收「零手传 scope 下绿」与 0.2.1 声明采纳的合并解释；若省略也红则 Provider 形态消亡，与验收矛盾）。
+- breaking：查询键形 `[kind, name, scope, scopeKeys, ...detail]`（record id 移至第 5 段）——手工拼键/断言键形状的消费方需跟进；投影匹配放宽（原全等 miss 的失效现在命中）。
+- 测试：投影矩阵（宽/窄/未声明/旧形键）+ 钩子级零手传 scope 命中声明资源读键 + `@ts-expect-error` 编译锚。
+
+**M3 search 编解码无损**：
+- 根因面实证：TanStack validateSearch 对输出是 spread-merge（未提及键存活），但 `search.strict` 的 fromSearch 路径**从零重建**（validatedSearch 从 {} 起）+ 消费方组合 validator 以 normalize 输出为基底——有损 normalize 在这些路径静默吞键（fleetly 8 路由手写合并体的根因）。
+- 落地面：normalize 缺省 passthrough（未知键原样保留、任意 JSON 值形态、幂等；自有键以归一化结果为准，无效条目/默认值等价形态不回填；undefined 值键不透传——TanStack 序列化语义）；严格丢弃降为显式 `toSearchSchema({unknownKeys: "drop"})`。FlatSearchParams 增索引签名（透传键类型面宽容）。
+- breaking：validate 输出含未知键——依赖「归一化即丢弃」的消费方需显式 drop。
+
+**M4 REST 适配工厂**：
+- `restCollection({path: (ctx) => string, envelope?, params?, total?, nextCursor?, notFound?, baseUrl?, headers?, fetch?})` 与 `restRecord`（path 收 `(id, ctx)`）同构——path 回调起步（retro §7-4：fan-out/动态 query/条件段回调零歧义全覆盖，模板插值糖后置）。
+- **零 Effect**（bring-your-own-fetch 主干——fleetly 全程未用 createHttp 实证；layer-check 下 rest.ts 无 effect import）；fetch 注入点缺省 globalThis.fetch；abort 放行（取消不是失败）；2xx 非 JSON → ApiError.decode。
+- 错误收敛单源抽出 `adapters/api-error.ts`（statusToApiError/extractErrorMessage/buildUrl）——http 管线与 rest 工厂共用同一 Response→ApiError 映射；QueryParams 放宽 undefined 值（条件参数常态，buildUrl 跳过）。
+- 信封默认 body 直收/body.rows + undefined/null 行过滤内置；total/nextCursor 默认抽 body.total/body.nextCursor 可覆写；`notFound: "null"`——record 404→null / collection 404→空段。
+- options 接口去泛型（T 只在工厂签名——幻影类型参数是 noUnusedLocals 违例源，§12.1 修复 #1 同类）。
+
+**M10 测试契约**：
+- 修复 /testing 出口 noUnusedLocals 违例（'rendered' 未读——消费方严格 tsc 下 /testing 不可用的根因）；**core tsconfig 增 noUnusedLocals/noUnusedParameters**——源码分发下消费方严格 flags 穿透检查 kit 源，本仓 typecheck 门以同等严格度前置拦截（「CI 纳入消费方严格度矩阵」的落地形态；本批新增面 rest.ts 的幻影 T 即被此门抓获）。
+- 新增 `createTestRouter({routes, initial})`（多路由测试路由器工厂——命令 onSettled navigate 的目标注册单源，§12.3 时序漂移坑的机制化）；renderWithKit 重构为其上的单路由 + Query/Router/Scope 三 Provider 形态。SKILL.md 增测试配方节 + 伴读数据/namespace/无损编解码/scopeOf 各条目。
+
+**验收与门禁**：`pnpm check` 全绿（layer-check + typecheck（严格度加严）+ size-check 20.9 kB ≤ 35 kB + 138 单测 + devtool）；demo e2e 28/28（新增 collections 3 条：键隔离/深链还原/伴读全量行）。版本面 0.4.0 候选（本批不发版——发版与 fleetly 回流另批）。
+
+**breaking 清单（0.4.0）**：① M2 投影匹配放宽 + 查询键形变更（scopeKeys 第 4 段，record id 第 5 段）；② M3 normalize 缺省 passthrough（validate 输出含未知键）；③ M10 core tsconfig 严格度加严只影响贡献方；QueryParams 放宽 undefined 为非破坏加宽。消费方升级面：手工拼 kit 键的测试需改用 collectionQueryOptions().queryKey 单源；依赖 normalize 丢键的路由需显式 unknownKeys:"drop"。
+
+**fleetly 回流预期**（升级 0.4.0 后可退役的消费方补丁对照）：19 伴读钩子 + 38 处 `.data?.rows` 解包 → useCollectionData 直消费；8 合并路由 validateSearch → 双 schema validate 组合或 namespace 形态；providers-view 裸 useQuery（30s 轮询）→ useRecord {query:{refetchInterval}}；kit/http.ts 微工厂 + 逐资源 fetch 样板（18 文件 toApiError 收敛）→ restCollection/restRecord；4 处 404→null 手写分支 → notFound:"null"；git hook 三写等手传 scope 补丁 → descriptor.scopeOf + 投影匹配（app-settings/panels 两测试锚零手传 scope 转绿）；backups 全量统计退场 → window:"all"。M5-M9（Transport 工厂/错误类化/token 单源/块契约）与 F4（漂移执法）不在本批。

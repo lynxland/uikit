@@ -8,8 +8,9 @@
 packages/core   @lynx-go/uikit-core（npm）
   src/kernel    元概念契约+纯代数（零依赖、零 react）
   src/schema    CollectionQuery URL 编解码（实测零 effect import，分层允许；公开面零 effect/schema 泄漏）
-  src/adapters  http 管线/订阅引擎（Effect 内部）/ndjson+sse transport/evaluate/clientCollection/mock/mockTransport
+  src/adapters  http 管线/订阅引擎（Effect 内部）/ndjson+sse transport/evaluate/clientCollection/rest 工厂（零 Effect；错误收敛与 http 单源于 api-error.ts）/mock/mockTransport
   src/react     绑定 hooks + queryOptions（禁 import effect，目录级 layer-check）
+  src/testing   测试 harness（renderWithKit/createTestRouter——与运行面同契约级别维护）
 registry/       UI 块五族（values/query/command/subscription/shell），shadcn 拷贝制分发
 apps/demo       活文档：每个配方一个可运行页面，mockResource 驱动
 docs/           design.md / SKILL.md / llms.txt

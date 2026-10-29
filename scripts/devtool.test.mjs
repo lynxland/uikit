@@ -102,28 +102,25 @@ test("头生成：无警告面时不出现手工区", () => {
   assert.doesNotMatch(header, /手工步骤/);
 });
 
-test("profile 完备性：键 ⊆ 源词表；核心 7 形双 console 全映射；warn/ok/accent 是警告面", () => {
+test("profile 完备性：键 ⊆ 源词表；torchwood 核心 7 形全映射；fleetly 恒等化；warn/ok/accent 是警告面", () => {
   const CORE = ["text-muted", "bg-panel", "bg-panel-2", "border-line", "divide-line", "text-fg", "text-err"];
   for (const name of ["fleetly", "torchwood"]) {
     const { tokenMap } = loadProfile(name);
     for (const key of Object.keys(tokenMap)) {
       assert.ok(SOURCE_VOCAB.includes(key), `${name}: 映射键 ${key} 不在源词表（防拼写假映射）`);
     }
-    for (const token of CORE) {
-      assert.ok(tokenMap[token], `${name}: 核心 token ${token} 未映射`);
+    for (const warnish of ["text-warn", "bg-ok", "text-accent"]) {
+      assert.ok(!(warnish in tokenMap), `${name}: ${warnish} 应留警告面（每块语境判断）`);
     }
   }
   const torchwood = loadProfile("torchwood").tokenMap;
+  for (const token of CORE) {
+    assert.ok(torchwood[token], `torchwood: 核心 token ${token} 未映射`);
+  }
   assert.equal(torchwood["text-err"], "text-destructive");
   assert.equal(torchwood["bg-panel-2"], "bg-muted");
-  const fleetly = loadProfile("fleetly").tokenMap;
-  assert.equal(fleetly["text-err"], "text-[var(--status-danger)]");
-  assert.equal(fleetly["bg-panel-2"], "bg-muted/50");
-  for (const name of ["fleetly", "torchwood"]) {
-    for (const warnish of ["text-warn", "bg-ok", "text-accent"]) {
-      assert.ok(!(warnish in loadProfile(name).tokenMap), `${name}: ${warnish} 应留警告面（每块语境判断）`);
-    }
-  }
+  // fleetly 恒等化（8a5cdfe）：消费方已采纳 demo 视觉，tokenMap 为空（源方言原样保留）
+  assert.deepEqual(loadProfile("fleetly").tokenMap, {});
 });
 
 test("registry.json 依赖收敛：无 workspace:/catalog: 协议泄漏，core 单源", () => {
@@ -134,7 +131,10 @@ test("registry.json 依赖收敛：无 workspace:/catalog: 协议泄漏，core �
     assert.doesNotMatch(dep, /workspace:/, `协议泄漏：${dep}`);
     assert.doesNotMatch(dep, /catalog:/, `协议泄漏：${dep}`);
   }
-  assert.ok(deps.has("@lynx-go/uikit-core@^0.3"));
+  // core 依赖单源随版本走（major.minor range 从 package.json 推导——版本升级不再漏改此断言）
+  const coreVersion = JSON.parse(readFileSync(join(root, "packages/core/package.json"), "utf8")).version;
+  const [major, minor] = coreVersion.split(".");
+  assert.ok(deps.has(`@lynx-go/uikit-core@^${major}.${minor}`), `core 依赖单源 ^${major}.${minor}`);
   const kitCount = items.filter((it) =>
     it.dependencies.filter((d) => d.startsWith("@lynx-go/uikit-core")).length > 1,
   );
@@ -175,7 +175,7 @@ test("CLI 端到端：copy 真块到临时目录（映射+头+警告面+不覆�
     }
     assert.ok(refused, "重复拷贝应拒绝（--force 例外）");
 
-    // 3) fleetly profile 差异实证（text-err → status var）
+    // 3) fleetly 恒等化实证：tokenMap 空 → 源方言原样保留（text-err 不改写）
     execFileSync(
       process.execPath,
       ["scripts/devtool.mjs", "copy", "values/states", "--to", tmp, "--profile", "fleetly", "--force"],
@@ -183,8 +183,8 @@ test("CLI 端到端：copy 真块到临时目录（映射+头+警告面+不覆�
     );
     const states = readFileSync(join(tmp, "components", "kit", "values", "states.tsx"), "utf8");
     const statesBody = states.slice(states.indexOf("\nimport"));
-    assert.match(statesBody, /text-\[var\(--status-danger\)\]/);
-    assert.doesNotMatch(statesBody, /(?<![\w-])text-err(?![\w-])/);
+    assert.match(statesBody, /(?<![\w-])text-err(?![\w-])/);
+    assert.doesNotMatch(statesBody, /text-\[var\(--status-danger\)\]/);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

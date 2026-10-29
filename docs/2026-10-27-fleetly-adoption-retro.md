@@ -45,6 +45,7 @@ fleetly 侧统计（grep 实测，症状证据）：伴读钩子 19 个同构（
 3. data 层暴露 `fullRows`（clientCollection 方言的全量行）或 `window: "all"`。
 **消灭**：19 伴读钩子、38 解包、8 合并体（配合 M3）、backups 统计退场、providers-view 裸 useQuery。torchwood 26 文件裸 useQuery 面可按同形态收敛。
 **验收**：fleetly 伴读面收缩为 useCollectionData 直消费；双列表路由（tasks/schedules 等）切 namespace 后 tab 互不携带对方 q。
+**落地形态**（2026-10-29，F1 批）：useCollectionData/useRecord 扩齐/window:"all"（retro M1.3 二选一取后者）/namespace 均落地——demo /collections 双列表 + 伴读统计为活文档；细节见 design.md §12.11。
 
 ### M2. 命令-失效 scope 同源：三份真源收敛为一份
 
@@ -56,6 +57,7 @@ fleetly 侧统计（grep 实测，症状证据）：伴读钩子 19 个同构（
 3. 类型执法：descriptor 声明了 scope 键（`__scopeKeys` 在）而调用未获得完整 scope 时编译红。
 **消灭**：手传 scope 补丁类别、「工厂闭包命令需配方文档」的需求（降为普通用法）、读面换轨后桥失效的踩坑面（投影匹配下 invalidates 自动命中）。
 **验收**：fleetly 两处测试锚在零手传 scope 下绿。
+**落地形态**（2026-10-29，F1 批）：scopeOf + mutationFn 内同源解析 + 投影匹配（键形增 scopeKeys 段）+ 「传了就必须完整」类型执法落地；context 采纳位次在 scopeOf 后（0.2.1 契约不破）；见 design.md §12.11。
 
 ### M3. search 编解码无损：normalize 不再吞未知键
 
@@ -63,6 +65,7 @@ fleetly 侧统计（grep 实测，症状证据）：伴读钩子 19 个同构（
 **根因**：normalize 把「本 schema 不认识的键」当成「不存在的键」——有损编解码。
 **机制补全**：normalize 缺省 passthrough（未知键原样保留），严格丢弃作为显式选项。mergeSearch 组合器不再需要（8 处合并体退役）；tab 切换函数式 navigate 是 TanStack 语义，SKILL.md 一句带过。
 **验收**：ModulePage 路由 `validateSearch: tabSearch` + `querySearch` 双 schema 并存直挂（或 M1 namespace 形态），零手写合并。
+**落地形态**（2026-10-29，F1 批）：normalize 缺省 passthrough + 显式 unknownKeys:"drop"；根因面实证（TanStack spread-merge vs search.strict 从零重建）与 demo 双 schema 组合形态见 design.md §12.11。
 
 ### M4. REST 适配工厂：最常见取数形态没有库级原语
 
@@ -71,6 +74,7 @@ fleetly 侧统计（grep 实测，症状证据）：伴读钩子 19 个同构（
 **机制补全**：adapters 增 `restCollection({path: (ctx) => string, envelope, params?, notFound?})` 与 `restRecord` 同构（`notFound: "null"` 选项吞 4 处 404 分支；错误收敛内置）。抽象度克制：path 回调起步，模板插值糖后置。
 **消灭**：kit/http.ts 与逐资源 fetch 样板（预计 fleetly kit 层 −40% 行数）。
 **验收**：fleetly 三域试点改造后样板归零。
+**落地形态**（2026-10-29，F1 批）：restCollection/restRecord 落地（零 Effect、fetch 注入、notFound:"null"、错误收敛抽 api-error.ts 单源与 http 管线共用）；见 design.md §12.11。
 
 ### M5. 订阅参数化用足 + Transport 工厂横切单源
 
@@ -114,6 +118,7 @@ fleetly 侧统计（grep 实测，症状证据）：伴读钩子 19 个同构（
 
 **症状**：`/testing` 出口源码 noUnusedLocals 违例（消费方严格 tsc 不可用）；两消费方各写一份内联最小路由包装（fleetly panels.test / torchwood TestRouter）。
 **机制补全**：修复违例 + 导出 `createTestRouter`/`renderWithKit` + SKILL.md 测试配方节——测试面与运行面同契约级别维护（CI 里 /testing 的编译纳入消费方严格度矩阵）。
+**落地形态**（2026-10-29，F1 批）：违例修复 + createTestRouter 导出 + core tsconfig 常驻 noUnusedLocals/noUnusedParameters（严格度矩阵的前置拦截形态）+ SKILL 测试配方节；见 design.md §12.11。
 
 ## 3. 能力补全与糖（非补丁，保留项）
 
