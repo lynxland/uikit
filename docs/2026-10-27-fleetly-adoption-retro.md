@@ -150,19 +150,18 @@ fleetly 侧统计（grep 实测，症状证据）：伴读钩子 19 个同构（
 
 **回流序**（每批）：uikit 发版 → fleetly 升 core + `devtool diff --all --check`（F4 后由 CI 门执法）→ 本地扩展随对应机制退役（F1 后伴读钩子/合并体退役；F3 后 h-screen/容器/桥退役）→ 门禁 + 现网走查。
 
-## 7. 开放问题（待裁决）
+## 7. 裁决记录（2026-10-27，用户六项全裁）
 
-1. **M1 namespace 缺省**：off 保兼容 / 新路由建议 on？双列表路由的键前缀形态（`tasks.q` 扁平 vs 嵌套对象）。
-2. **M2 投影匹配语义**：命令 scope 在读键声明键集上逐键相等即匹配——是否保留整对象全等为严格模式选项（防过宽失效）。
-3. **M9 立场**：值对象 → 类化的 design.md 裁决（「typed failure 且 Error 兼容」）。
-4. **M4 抽象度**：path 回调起步（本文提案）vs 直接模板插值（`/v1/apps/:appId/…`）。
-5. **M6 demo 亮档切换器**：进（本文提案，亮套需回归面）与否。
-6. **M7 registry lint 强度**：仅扫容器类/基元导入（提案），是否连 h-full/h-dvh 假设一起扫。
-
----
+1. **M1 namespace**：缺省 **off**（存量 URL 零变化），多集合同路由显式传 namespace 开启；键形 = **扁平前缀**（`tasks.q`）——URL 可读可分享、TanStack 序列化为普通字符串键；嵌套对象会 JSON 编码成丑长 URL（否决）。
+2. **M2 匹配语义**：**投影匹配为唯一语义**（命令 scope 在读键声明的键集上逐键相等即命中），不保留整对象全等严格模式——失效成本不对称（过宽=多一次 refetch 廉价 / 漏失效=bug），全等模式无真实用例支撑，单一语义免分叉。
+3. **M9 错误形态**：**ApiError 类化**（`class ApiError extends Error`，kind 判别封闭集保持）；design.md 补记立场裁决「typed failure 且 Error 兼容」——值对象初衷是封闭集可判别而非拒绝 Error 兼容。
+4. **M4 path 形态**：**回调起步**（`(ctx) => string`），模板插值糖后置——真实变体（fan-out/动态 query/条件段）回调零歧义全覆盖，与现有 fetcher 签名同构迁移零重写；模板需 Template Literal Types 深水区且仍需逃生回调两套并存。
+5. **M6 亮档**：**进 demo（带切换器）**——亮套若无消费方则永久漂移；demo 消费包导出物是 M6 的执法机制，亮档不进则不在 dogfood 链；demo 升级双主题走查场对 M7 块契约验证亦有收益。
+6. **M7 lint 强度**：**三类宿主假设全扫**（顶层容器类 / 小控件基元导入 / 高度链依赖）——三类皆实咬过；规则限定「顶层容器节点」防误伤块内合理 padding；layer-check 先例证明仓内 lint 文化可行。
 
 ### 修订记录
 
 - v1（2026-10-27 初稿）：A1-A12 症状清单 + B1-B5 小修 + F1-F3 批组。
 - v2（同日深审）：口径修正（合并路由 14→8；句柄 total 计数在/全量行不可达；legacyKeys 双教训拆分）；新增 useRecord 缺口、错误形转换、运转良好面、routeId 裁决、CI 门建议、torchwood 26 文件坐实。
+- **v4（裁决落档）**：§7 六项开放问题经用户裁定全部采纳推荐项（namespace off+扁平前缀 / 投影匹配唯一 / ApiError 类化 / path 回调 / 亮档进 demo / lint 三类全扫）——转裁决记录，开放问题清零。
 - **v3（机制重审）**：立场修正——v1/v2 近半提案本身是补丁，重构为 M1-M10 机制缺口（映射表见 §0）。新增漏检机制：**M4 REST 适配工厂**（24 资源文件样板）、**M8 vendored 漂移执法**（manifest+CI 门+吸收退役）。补「既有机制未用足」实证：SubscriptionDescriptor 参数化形态（logs nonce 重挂反模式）。原 A1/A3/A4/A8/A10 升格为 M1/M2/M3/M6/M9 机制形态（伴读 API→读模型分层+namespace；scope 文档+lint→同源+投影匹配+类型执法；mergeSearch→无损 normalize；三份 CSS 导出→demo 消费包导出物；错误帮手→ApiError 类化）。A5/A9/A11/toastOnSettled 降级为能力补全/糖（§3）。批组按机制依赖序重排为 F1-F4。
