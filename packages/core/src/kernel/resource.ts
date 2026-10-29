@@ -17,6 +17,13 @@ export type ResourceScope = Readonly<Record<string, string | undefined>>;
 
 export interface CommandDescriptor<Input, Payload, ID = never> {
   run(input: Input, ctx: ResourceScope): Promise<CommandResult<Payload>>;
+  /**
+   * scope 派生声明（M2 命令-失效同源）：从命令入参派生 ResourceScope 的单源。
+   * 引擎按 options.scope ?? scopeOf(input) ?? （声明采纳的 context）?? {} 解析出
+   * effectiveScope——**同一份**既喂 run(ctx) 又喂失效匹配；工厂命令的身份
+   * （projectId/appId 等）从闭包迁入 input 或在此声明派生，调用点零手传 scope。
+   */
+  scopeOf?: (input: Input) => ResourceScope;
   /** ID 类型线程锚：CommandsRecord 依资源 id 类型定位（optional 永不出现，
    *  运行时无形状——发布 .ts 源码时消费方 noUnusedLocals 会穿透检查 kit，
    *  未使用的类型参数必须锚定）。 */
@@ -53,14 +60,16 @@ export interface SubscriptionDescriptor<Params, Frame> {
 
 export type CommandsRecord<ID> = Record<string, CommandDescriptor<any, any, ID>>;
 
-/** defineResource 注入 __resource/legacyKeys/__scopeKeys 后的命令映射（逐键保留具体 Input/Payload 类型） */
-export type AttachedCommands<C> = {
+/** defineResource 注入 __resource/legacyKeys/__scopeKeys 后的命令映射（逐键保留具体 Input/Payload 类型）。
+ *  ScopeKeys 为字面量元组（spec.scope 经 const 推断）——useCommand 的类型执法据此
+ *  要求显式 scope 覆盖全部声明键。 */
+export type AttachedCommands<C, ScopeKeys extends readonly string[] = readonly string[]> = {
   [K in keyof C]: C[K] & {
     __resource?: ResourceName;
     /** defineResource 从 spec.legacyKeys 注入（descriptor 自带优先）；类型面恒可选 */
     legacyKeys?: (scope: ResourceScope) => ReadonlyArray<readonly unknown[]>;
-    /** 资源的 scope 键声明（context 采纳锚）；未声明为 undefined */
-    __scopeKeys?: ReadonlyArray<string>;
+    /** 资源的 scope 键声明（context 采纳锚 + 类型执法轴）；未声明为 undefined */
+    __scopeKeys?: ScopeKeys;
   };
 };
 export type SubsRecord = Record<string, SubscriptionDescriptor<any, any>>;
@@ -103,6 +112,7 @@ export interface Resource<
   ID = string,
   C extends CommandsRecord<ID> = Record<string, never>,
   S extends SubsRecord = Record<string, never>,
+  ScopeKeys extends readonly string[] = readonly string[],
 > {
   readonly name: ResourceName;
   readonly getId?: (row: T) => ID;
@@ -121,7 +131,7 @@ export interface Resource<
     signal?: AbortSignal,
   ) => Promise<ReadonlyArray<T>>;
 
-  readonly commands?: AttachedCommands<C>;
+  readonly commands?: AttachedCommands<C, ScopeKeys>;
   readonly subscriptions?: S;
   /** scoped() 注入的作用域值（内部约定，勿直接读写） */
   readonly __scopeValues?: ResourceScope;
@@ -129,7 +139,8 @@ export interface Resource<
 
 /**
  * 定义一个实体/流族的交互面（三原语各自可选）。
- * 泛型 C/S 逐键保留具体 CommandDescriptor/SubscriptionDescriptor——不被擦成 any。
+ * 泛型 C/S 逐键保留具体 CommandDescriptor/SubscriptionDescriptor——不被擦成 any；
+ * ScopeKeys 以 const 推断字面量元组（spec.scope），供命令绑定的 scope 完整性类型执法。
  *
  * 重载注：commands 在 spec 上出现时返回类型收窄为必填（消消费方 `commands!`——
  * 演示/demo 的 `commands?.` 习惯保留在无 commands 的形态）。
@@ -139,21 +150,26 @@ export function defineResource<
   ID,
   C extends CommandsRecord<ID> = Record<string, never>,
   S extends SubsRecord = Record<string, never>,
+  const ScopeKeys extends readonly string[] = readonly string[],
 >(
-  spec: ResourceSpec<T, ID, C, S> & { commands: C },
-): Resource<T, ID, C, S> & { readonly commands: AttachedCommands<C> };
+  spec: ResourceSpec<T, ID, C, S> & { commands: C; scope?: ScopeKeys },
+): Resource<T, ID, C, S, ScopeKeys> & { readonly commands: AttachedCommands<C, ScopeKeys> };
 export function defineResource<
   T,
   ID,
   C extends CommandsRecord<ID> = Record<string, never>,
   S extends SubsRecord = Record<string, never>,
->(spec: ResourceSpec<T, ID, C, S>): Resource<T, ID, C, S>;
+  const ScopeKeys extends readonly string[] = readonly string[],
+>(
+  spec: ResourceSpec<T, ID, C, S> & { scope?: ScopeKeys },
+): Resource<T, ID, C, S, ScopeKeys>;
 export function defineResource<
   T,
   ID,
   C extends CommandsRecord<ID> = Record<string, never>,
   S extends SubsRecord = Record<string, never>,
->(spec: ResourceSpec<T, ID, C, S>): Resource<T, ID, C, S> {
+  ScopeKeys extends readonly string[] = readonly string[],
+>(spec: ResourceSpec<T, ID, C, S> & { scope?: ScopeKeys }): Resource<T, ID, C, S, ScopeKeys> {
   if (!/^[a-z][a-z0-9-]*$/.test(spec.name)) {
     throw new Error(
       `@lynx-go/uikit-core: resource name "${spec.name}" must be kebab-case (it lives in query keys and URL diagnostics)`,
@@ -171,7 +187,7 @@ export function defineResource<
             __scopeKeys: spec.scope,
           },
         ]),
-      ) as AttachedCommands<C>)
+      ) as AttachedCommands<C, ScopeKeys>)
     : undefined;
   const subscriptions = spec.subscriptions
     ? (Object.fromEntries(
@@ -209,19 +225,29 @@ export async function runCommand<Input, Payload, ID>(
  * scoped 约定（派生，非框架轴）：queryKey 嵌入 scope 段 + 适配器 ctx 注入。
  * 适配器可在 http 实例上把 ctx 注入 header（torchwood X-Torchwood-Project）。
  */
-export function scoped<T, ID, C extends CommandsRecord<ID>, S extends SubsRecord>(
-  resource: Resource<T, ID, C, S>,
+export function scoped<
+  T,
+  ID,
+  C extends CommandsRecord<ID>,
+  S extends SubsRecord,
+  ScopeKeys extends readonly string[] = readonly string[],
+>(
+  resource: Resource<T, ID, C, S, ScopeKeys>,
   values: ResourceScope,
-): Resource<T, ID, C, S> {
+): Resource<T, ID, C, S, ScopeKeys> {
   return {
     ...resource,
     __scopeValues: { ...(resource.__scopeValues ?? {}), ...values },
   };
 }
 
-export function scopeOf<T, ID, C extends CommandsRecord<ID>, S extends SubsRecord>(
-  resource: Resource<T, ID, C, S>,
-): ResourceScope {
+export function scopeOf<
+  T,
+  ID,
+  C extends CommandsRecord<ID>,
+  S extends SubsRecord,
+  ScopeKeys extends readonly string[] = readonly string[],
+>(resource: Resource<T, ID, C, S, ScopeKeys>): ResourceScope {
   return resource.__scopeValues ?? {};
 }
 

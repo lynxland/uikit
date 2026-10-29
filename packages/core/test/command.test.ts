@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
 import type { ApiError, ResourceScope } from "../src/kernel";
-import { defineResource, isApiError, runCommand } from "../src/kernel";
+import {
+  collectionKey,
+  defineResource,
+  isApiError,
+  runCommand,
+  scoped,
+} from "../src/kernel";
 import { invalidateAfterCommand } from "../src/react/command";
 
 const ok = <P>(payload: P) => ({ status: "ok" as const, payload });
@@ -97,7 +103,7 @@ describe("legacyKeys 存量键失效桥（§12.10-②）", () => {
       commands: { save: { run: async () => ok(null) } },
     });
     // kit 键（同资源、同 scope）+ 存量键 + 他 scope 存量键
-    client.setQueryData(["collection", "groups", { projectId: "p1" }, null, null, { size: 20 }], []);
+    client.setQueryData(collectionKey(scoped(groups, { projectId: "p1" }), { window: { size: 20 } }), []);
     client.setQueryData(["groups", "p1"], []);
     client.setQueryData(["memberships", "g-1"], []);
     client.setQueryData(["groups", "p2"], []);
@@ -105,7 +111,10 @@ describe("legacyKeys 存量键失效桥（§12.10-②）", () => {
 
     await invalidateAfterCommand(client, groups.commands.save, { projectId: "p1" });
 
-    expect(client.getQueryState(["collection", "groups", { projectId: "p1" }, null, null, { size: 20 }])?.isInvalidated).toBe(true);
+    expect(
+      client.getQueryState(collectionKey(scoped(groups, { projectId: "p1" }), { window: { size: 20 } }))
+        ?.isInvalidated,
+    ).toBe(true);
     expect(client.getQueryState(["groups", "p1"])?.isInvalidated).toBe(true);
     expect(client.getQueryState(["memberships", "g-1"])?.isInvalidated).toBe(true);
     // scope 相交（kit 键）与闭包精确键（legacy）之外的键不受影响
@@ -119,12 +128,36 @@ describe("legacyKeys 存量键失效桥（§12.10-②）", () => {
       name: "groups",
       commands: { save: { run: async () => ok(null) } },
     });
-    client.setQueryData(["collection", "groups", { projectId: "p2" }, null, null, { size: 20 }], []);
+    client.setQueryData(collectionKey(scoped(groups, { projectId: "p2" }), { window: { size: 20 } }), []);
     await invalidateAfterCommand(client, groups.commands.save, { projectId: "p1" });
     expect(
-      client.getQueryState(["collection", "groups", { projectId: "p2" }, null, null, { size: 20 }])
+      client
+        .getQueryState(collectionKey(scoped(groups, { projectId: "p2" }), { window: { size: 20 } }))
         ?.isInvalidated,
     ).toBe(false);
+  });
+
+  it("invalidateAfterCommand：投影匹配下，声明资源的粗粒度读键被细粒度命令 scope 命中（M2）", async () => {
+    const client = new QueryClient();
+    const projects = defineResource({
+      name: "projects",
+      scope: ["projectId"],
+      commands: { save: { run: async () => ok(null) } },
+    });
+    client.setQueryData(
+      collectionKey(scoped(projects, { projectId: "p1" }), { window: { size: 20 } }),
+      [],
+    );
+    // 旧整对象全等下 miss（命令 scope 多 appId）——投影匹配命中
+    await invalidateAfterCommand(client, projects.commands.save, {
+      projectId: "p1",
+      appId: "a1",
+    });
+    expect(
+      client
+        .getQueryState(collectionKey(scoped(projects, { projectId: "p1" }), { window: { size: 20 } }))
+        ?.isInvalidated,
+    ).toBe(true);
   });
 });
 
@@ -163,5 +196,36 @@ describe("scope 声明注入（§12.10-③：声明 = 参与 scope 线程）", (
     expect(apps.commands.save.__scopeKeys).toEqual(["projectId"]);
     const bare = defineResource({ name: "streams", commands: { go: { run: async () => ok(1) } } });
     expect(bare.commands.go.__scopeKeys).toBeUndefined();
+  });
+});
+
+describe("M2 scopeOf（命令-失效 scope 同源）", () => {
+  it("descriptor.scopeOf 派生的 ctx 喂 run——工厂命令身份从闭包迁入派生声明", async () => {
+    const seen: ResourceScope[] = [];
+    const descriptor = {
+      // 输入携带实体身份（fleetly 三写动词形态：input 原本只有 patch 载荷）
+      scopeOf: (input: { projectId: string; appId: string }) => ({
+        projectId: input.projectId,
+        appId: input.appId,
+      }),
+      run: async (input: { projectId: string; appId: string }, ctx: ResourceScope) => {
+        seen.push(ctx);
+        return ok(input.appId);
+      },
+    };
+    await runCommand(descriptor, { projectId: "p1", appId: "a1" }, { projectId: "p1", appId: "a1" });
+    expect(seen).toEqual([{ projectId: "p1", appId: "a1" }]);
+  });
+
+  it("runCommand 的 ctx 由调用方显式给（命令式编排：调用方持有 input，自行 resolve scopeOf）", async () => {
+    const descriptor = {
+      scopeOf: (id: string) => ({ appId: id }),
+      run: async (id: string, ctx: ResourceScope) => ok({ id, ctx }),
+    };
+    const result = await runCommand(descriptor, "a1", descriptor.scopeOf("a1"));
+    expect(result).toEqual({
+      status: "ok",
+      payload: { id: "a1", ctx: { appId: "a1" } },
+    });
   });
 });

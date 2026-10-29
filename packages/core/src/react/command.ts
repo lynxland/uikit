@@ -16,15 +16,28 @@ import { useContextScope } from "./scope";
  * useCommand —— Command 原语的绑定（问/令/听的"令"）。
  *
  * - rejected/conflict 是**结果**（mutation.data），只有失败（网络/401/解码）走 mutation.error；
+ * - effectiveScope 同源（M2）：options.scope ?? descriptor.scopeOf?.(input) ?? （声明采纳的
+ *   ResourceScopeProvider context）?? {} ——**同一份** scope 既喂 run(ctx) 又喂失效匹配，
+ *   在 mutationFn 内解析并就地失效（并发 mutation 各自携带，不错位）；
  * - ok 后执行失效：descriptor.invalidates 声明优先，缺省 = 同资源全部查询（内置动词默认失效）；
- *   selector 默认与命令 ctx scope 相交（project A 的命令不清 project B 的缓存）；
- *   legacyKeys 桥在此并行执行（存量 react-query 前缀键，迁移期声明面）；
+ *   selector 按读资源声明的 scope 键集投影匹配（keys.ts 单源）；legacyKeys 桥在此并行执行；
  * - treatAs 裁决在 kernel runCommand 单源完成；
- * - scope 省略时取 ResourceScopeProvider 的 context 值；
+ * - 类型执法：descriptor 声明了 scope 键（defineResource 的字面量 __scopeKeys）时，
+ *   **显式传入的** scope 必须覆盖全部声明键（partial 传参编译红）；省略 scope 走
+ *   scopeOf/context 解析链是既有契约（§12.10-③），不因此报错；
  * - 库不内置 toast：onSettled 回调交消费方（sonner 等）。
  */
-export interface UseCommandOptions<Payload> {
-  scope?: ResourceScope;
+
+/** 声明键集为非空 tuple 时要求显式 scope 完整覆盖（M2 类型执法）。 */
+type ScopeOption<Keys extends readonly string[]> = Keys extends readonly [string, ...string[]]
+  ? { [K in Keys[number] & string]: string }
+  : ResourceScope;
+
+export interface UseCommandOptions<
+  Payload,
+  Keys extends readonly string[] = readonly string[],
+> {
+  scope?: ScopeOption<Keys>;
   onSettled?: (result: CommandResult<Payload> | null, failure: ApiError | null) => void;
 }
 
@@ -58,28 +71,36 @@ export function invalidateAfterCommand(
   }
 }
 
-export function useCommand<Input, Payload, ID = never>(
-  descriptor: CommandDescriptor<Input, Payload, ID>,
-  options: UseCommandOptions<Payload> = {},
+export function useCommand<
+  Input,
+  Payload,
+  ID = never,
+  Keys extends readonly string[] | undefined = undefined,
+>(
+  descriptor: CommandDescriptor<Input, Payload, ID> & { __scopeKeys?: Keys },
+  options: UseCommandOptions<Payload, Keys extends readonly string[] ? Keys : readonly string[]> = {},
 ): CommandHandle<Input, Payload> {
   const queryClient = useQueryClient();
-  // scope 缺省链同查询绑定：显式传入 > （descriptor 声明了 scope 键时——
-  // defineResource 注入 __scopeKeys）Provider context > 空。裸 descriptor
-  // 无声明锚，不采纳 context。
+  // scope 缺省链同查询绑定：显式传入 > scopeOf(input) > （descriptor 声明了 scope 键时——
+  // defineResource 注入 __scopeKeys）Provider context > 空。裸 descriptor 无声明锚，
+  // 不采纳 context。
   const contextScope = useContextScope();
-  const scope =
-    options.scope ??
-    (descriptor.__scopeKeys?.length ? contextScope : undefined) ??
-    {};
 
   const mutation = useMutation<CommandResult<Payload>, ApiError, Input>({
-    mutationFn: (input) => runCommand(descriptor, input, scope),
-    onSuccess: (result) => {
+    mutationFn: async (input) => {
+      // M2 同源：同一份 effectiveScope 喂 run(ctx) 与失效匹配；在 mutationFn 内解析
+      // （scopeOf 依赖 input）并就地失效——并发 mutation 各自携带，不错位。
+      const effectiveScope: ResourceScope =
+        options.scope ??
+        descriptor.scopeOf?.(input) ??
+        (descriptor.__scopeKeys?.length ? (contextScope ?? {}) : {});
+      const result = await runCommand(descriptor, input, effectiveScope);
       if (result.status === "ok") {
-        invalidateAfterCommand(queryClient, descriptor, scope);
+        invalidateAfterCommand(queryClient, descriptor, effectiveScope);
       }
-      options.onSettled?.(result, null);
+      return result;
     },
+    onSuccess: (result) => options.onSettled?.(result, null),
     onError: (error) => options.onSettled?.(null, error),
   });
 
@@ -102,18 +123,30 @@ export function useCommand<Input, Payload, ID = never>(
  *   （不进 Query 缓存、卸载即弃）；
  * - 服务端驱动 defaultValues 重播（dirty 不覆盖）由消费方经 key 重挂或 form.reset 实现（后续块内建）。
  */
-export interface UseCommandFormOptions<Input extends object, Payload> {
+export interface UseCommandFormOptions<
+  Input extends object,
+  Payload,
+  Keys extends readonly string[] = readonly string[],
+> extends Omit<UseCommandOptions<Payload, Keys>, "onSettled"> {
   defaultValues: Input;
-  scope?: ResourceScope;
   onSettled?: (result: CommandResult<Payload> | null, failure: ApiError | null) => void;
 }
 
-export function useCommandForm<Input extends object, Payload, ID = never>(
-  descriptor: CommandDescriptor<Input, Payload, ID>,
-  options: UseCommandFormOptions<Input, Payload>,
+export function useCommandForm<
+  Input extends object,
+  Payload,
+  ID = never,
+  Keys extends readonly string[] | undefined = undefined,
+>(
+  descriptor: CommandDescriptor<Input, Payload, ID> & { __scopeKeys?: Keys },
+  options: UseCommandFormOptions<
+    Input,
+    Payload,
+    Keys extends readonly string[] ? Keys : readonly string[]
+  >,
 ) {
   const command = useCommand(descriptor, {
-    scope: options.scope,
+    ...(options.scope !== undefined ? { scope: options.scope } : {}),
     onSettled: options.onSettled,
   });
 
