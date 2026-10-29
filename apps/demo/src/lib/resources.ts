@@ -161,6 +161,74 @@ export function toggleIdentityRole(): "admin" | "viewer" {
   return next;
 }
 
+// ============ namespace 配方（M1：多集合同路由各持各键） ============
+
+export interface Task {
+  id: string;
+  title: string;
+  priority: "low" | "high";
+  done: boolean;
+}
+
+export interface Schedule {
+  id: string;
+  name: string;
+  cadence: "hourly" | "daily" | "weekly";
+}
+
+const TASKS: Task[] = Array.from({ length: 23 }, (_, i) => ({
+  id: `task-${String(i + 1).padStart(2, "0")}`,
+  title: `Task ${String(i + 1).padStart(2, "0")}`,
+  priority: i % 3 === 0 ? "high" : "low",
+  done: i % 4 === 0,
+}));
+
+const CADENCES: Schedule["cadence"][] = ["hourly", "daily", "weekly"];
+const SCHEDULES: Schedule[] = Array.from({ length: 17 }, (_, i) => ({
+  id: `sched-${String(i + 1).padStart(2, "0")}`,
+  name: `Schedule ${String(i + 1).padStart(2, "0")}`,
+  cadence: CADENCES[i % 3]!,
+}));
+
+export const tasksFetchAll = mockFetchAll(TASKS, { latencyMs: 90 });
+export const schedulesFetchAll = mockFetchAll(SCHEDULES, { latencyMs: 90 });
+
+export const tasksResource = defineResource({
+  name: "tasks",
+  getId: (row: Task) => row.id,
+  collection: clientCollection(tasksFetchAll),
+});
+
+export const schedulesResource = defineResource({
+  name: "schedules",
+  getId: (row: Schedule) => row.id,
+  collection: clientCollection(schedulesFetchAll),
+});
+
+/** 双集合同路由：namespace 显式开启——URL 键 tasks.q / schedules.q 并存互不携带 */
+export const tasksSearch = collectionQuerySchema({
+  namespace: "tasks",
+  text: ["title", "id"],
+  filters: [
+    {
+      field: "priority",
+      op: "eq",
+      label: "Priority",
+      options: [
+        { value: "high", label: "High" },
+        { value: "low", label: "Low" },
+      ],
+    },
+  ],
+  defaultSize: 5,
+});
+
+export const schedulesSearch = collectionQuerySchema({
+  namespace: "schedules",
+  text: ["name", "id"],
+  defaultSize: 5,
+});
+
 // ============ search schema（路由与绑定共用同一实例） ============
 
 export const widgetsSearch = collectionQuerySchema({

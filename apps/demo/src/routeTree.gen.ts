@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BoomRouteImport } from './routes/boom'
+import { Route as CollectionsRouteImport } from './routes/collections'
 import { Route as EventsRouteImport } from './routes/events'
 import { Route as LogsRouteImport } from './routes/logs'
 import { Route as OwnersRouteImport } from './routes/owners'
@@ -30,6 +31,11 @@ const IndexRoute = IndexRouteImport.update({
 const BoomRoute = BoomRouteImport.update({
   id: '/boom',
   path: '/boom',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CollectionsRoute = CollectionsRouteImport.update({
+  id: '/collections',
+  path: '/collections',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventsRoute = EventsRouteImport.update({
@@ -86,6 +92,7 @@ const WidgetsKeysetRoute = WidgetsKeysetRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/boom': typeof BoomRoute
+  '/collections': typeof CollectionsRoute
   '/events': typeof EventsRoute
   '/logs': typeof LogsRoute
   '/owners': typeof OwnersRoute
@@ -100,6 +107,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/boom': typeof BoomRoute
+  '/collections': typeof CollectionsRoute
   '/events': typeof EventsRoute
   '/logs': typeof LogsRoute
   '/owners': typeof OwnersRoute
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/boom': typeof BoomRoute
+  '/collections': typeof CollectionsRoute
   '/events': typeof EventsRoute
   '/logs': typeof LogsRoute
   '/owners': typeof OwnersRoute
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/boom'
+    | '/collections'
     | '/events'
     | '/logs'
     | '/owners'
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/boom'
+    | '/collections'
     | '/events'
     | '/logs'
     | '/owners'
@@ -159,6 +170,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/boom'
+    | '/collections'
     | '/events'
     | '/logs'
     | '/owners'
@@ -174,6 +186,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BoomRoute: typeof BoomRoute
+  CollectionsRoute: typeof CollectionsRoute
   EventsRoute: typeof EventsRoute
   LogsRoute: typeof LogsRoute
   OwnersRoute: typeof OwnersRoute
@@ -200,6 +213,13 @@ declare module '@tanstack/react-router' {
       path: '/boom'
       fullPath: '/boom'
       preLoaderRoute: typeof BoomRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collections': {
+      id: '/collections'
+      path: '/collections'
+      fullPath: '/collections'
+      preLoaderRoute: typeof CollectionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/events': {
@@ -278,6 +298,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BoomRoute: BoomRoute,
+  CollectionsRoute: CollectionsRoute,
   EventsRoute: EventsRoute,
   LogsRoute: LogsRoute,
   OwnersRoute: OwnersRoute,

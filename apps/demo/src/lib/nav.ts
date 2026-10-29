@@ -10,6 +10,7 @@ export const nav: NavSection[] = [
     items: [
       { label: "Widgets (client-evaluated)", to: "/widgets" },
       { label: "Widgets (keyset)", to: "/widgets/keyset" },
+      { label: "Two lists (namespace)", to: "/collections" },
       { label: "By owner (reference)", to: "/owners" },
       { label: "Events (backlog × follow)", to: "/events" },
       { label: "Logs (ndjson stream)", to: "/logs" },
