@@ -6,6 +6,8 @@ export {
   type QuerySchemaSpec,
   type QuerySearchSchema,
   type StandardSchemaV1,
+  type ToSearchSchemaOptions,
+  type UnknownKeysMode,
 } from "./codec";
 export {
   eqFilter,

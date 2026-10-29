@@ -32,7 +32,7 @@ export interface QuerySchemaSpec {
   defaultOrder?: ReadonlyArray<Order>;
 }
 
-/** URL 中的扁平参数形状（human-readable）。 */
+/** URL 中的扁平参数形状（human-readable）。未知键（消费方自定义参数）缺省透传。 */
 export interface FlatSearchParams {
   q?: string;
   filter?: ReadonlyArray<string>;
@@ -40,6 +40,16 @@ export interface FlatSearchParams {
   cursor?: string;
   page?: number;
   size?: number;
+  /** 消费方自定义参数（tab 等）——编解码无损（M3 passthrough），类型面宽容 */
+  [key: string]: unknown;
+}
+
+/** toSearchSchema 的未知键处置：passthrough（缺省）= 编解码无损（tab/自定义参数
+ *  存活）；drop = 严格丢弃（旧行为，需显式选择）。 */
+export type UnknownKeysMode = "passthrough" | "drop";
+
+export interface ToSearchSchemaOptions {
+  unknownKeys?: UnknownKeysMode;
 }
 
 export type FlatPatch = Partial<
@@ -68,7 +78,7 @@ const OPERATORS = new Set<string>([
 ]);
 
 export interface QuerySearchSchema {
-  toSearchSchema(): StandardSchemaV1<unknown, FlatSearchParams>;
+  toSearchSchema(options?: ToSearchSchemaOptions): StandardSchemaV1<unknown, FlatSearchParams>;
   encode(query: CollectionQuery): FlatSearchParams;
   decode(params: unknown): CollectionQuery;
   patch(part: {
@@ -76,6 +86,8 @@ export interface QuerySearchSchema {
     order?: ReadonlyArray<Order> | null;
     window?: QueryWindow;
   }): FlatPatch;
+  /** 全清补丁（绑定 reset 用）：本 schema 全部键显式 undefined（函数式展开清值）。 */
+  resetPatch(): FlatPatch;
   readonly defaults: CollectionQuery;
   readonly spec: QuerySchemaSpec;
 }
@@ -171,8 +183,12 @@ export function collectionQuerySchema(spec: QuerySchemaSpec = {}): QuerySearchSc
   }
 
   // ---- 归一化（validateSearch 用；容忍脏输入，绝不 throw） ----
+  // M3：缺省 passthrough——未知键原样保留（tab/消费方自定义参数不再被静默删除）；
+  // 归一化处理过的自有键（含无效条目、默认值等价形态）不透传回填。严格丢弃为显式选项。
 
-  function normalize(input: unknown): FlatSearchParams {
+  const OWNED_KEYS = new Set(["q", "filter", "sort", "cursor", "page", "size"]);
+
+  function normalize(input: unknown, unknownKeys: UnknownKeysMode = "passthrough"): FlatSearchParams {
     const raw = (input ?? {}) as Record<string, unknown>;
     const out: FlatSearchParams = {};
     if (typeof raw.q === "string" && raw.q.trim() !== "") out.q = raw.q;
@@ -189,6 +205,14 @@ export function collectionQuerySchema(spec: QuerySchemaSpec = {}): QuerySearchSc
     if (page !== undefined && page > 1) out.page = page;
     const size = positiveInt(raw.size);
     if (size !== undefined && size !== defaultSize) out.size = size;
+    if (unknownKeys === "passthrough") {
+      for (const [key, value] of Object.entries(raw)) {
+        if (value === undefined) continue;
+        if (key in out) continue;
+        if (OWNED_KEYS.has(key)) continue; // 自有键以归一化结果为准（无效条目不回填）
+        out[key] = value;
+      }
+    }
     return out;
   }
 
@@ -207,13 +231,14 @@ export function collectionQuerySchema(spec: QuerySchemaSpec = {}): QuerySearchSc
   return {
     spec,
     defaults,
-    toSearchSchema() {
+    toSearchSchema(options: ToSearchSchemaOptions = {}) {
+      const mode = options.unknownKeys ?? "passthrough";
       return {
         "~standard": {
           version: 1,
           vendor: "@lynx-go/uikit-core",
           validate(value: unknown) {
-            return { value: normalize(value) };
+            return { value: normalize(value, mode) };
           },
         },
       };
@@ -267,6 +292,10 @@ export function collectionQuerySchema(spec: QuerySchemaSpec = {}): QuerySearchSc
         }
       }
       return out;
+    },
+    resetPatch(): FlatPatch {
+      // 全部自有键显式 undefined（函数式 search 展开清值——缺席则旧值存活）
+      return { q: undefined, filter: undefined, sort: undefined, cursor: undefined, page: undefined };
     },
   };
 }

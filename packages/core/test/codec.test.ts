@@ -124,3 +124,76 @@ describe("collectionQuerySchema toSearchSchema", () => {
     expect(twice).toEqual(once); // 幂等
   });
 });
+
+describe("M3 normalize 无损（缺省 passthrough，严格丢弃为显式选项）", () => {
+  it("未知键原样保留（tab/自定义参数不再被静默删除）——任意 JSON 值形态", () => {
+    const ss = schema.toSearchSchema();
+    const out = ss["~standard"].validate({
+      tab: "settings",
+      q: "web",
+      page: 2,
+      deep: { a: 1 },
+      flag: true,
+      tags: ["x", "y"],
+      num: 7,
+    });
+    expect(out.value).toEqual({
+      tab: "settings",
+      q: "web",
+      page: 2,
+      deep: { a: 1 },
+      flag: true,
+      tags: ["x", "y"],
+      num: 7,
+    });
+    // 幂等：透传键二次 validate 稳定
+    expect(ss["~standard"].validate(out.value)).toEqual(out);
+  });
+
+  it("自有键以归一化结果为准：无效条目/默认值等价形态不透传回填", () => {
+    const ss = schema.toSearchSchema();
+    const out = ss["~standard"].validate({
+      filter: ["bad-entry"],
+      sort: ["name:sideways"],
+      page: 1, // 1-based 首页 = 默认值等价，归一化省略
+      size: 8, // = defaultSize，归一化省略
+      q: "  ", // 空白
+      cursor: "",
+      tab: "x",
+    });
+    expect(out.value).toEqual({ tab: "x" });
+  });
+
+  it("undefined 值的未知键不透传（TanStack 序列化语义：undefined = 删除）", () => {
+    const ss = schema.toSearchSchema();
+    const out = ss["~standard"].validate({ tab: undefined, keep: "y" });
+    expect(out.value).toEqual({ keep: "y" });
+  });
+
+  it("unknownKeys: 'drop' 显式恢复旧行为（严格丢弃）", () => {
+    const ss = schema.toSearchSchema({ unknownKeys: "drop" });
+    const out = ss["~standard"].validate({ tab: "settings", q: "web", junk: 1 });
+    expect(out.value).toEqual({ q: "web" });
+  });
+
+  it("decode 不受透传键影响（只读自有键）", () => {
+    const q = schema.decode({ tab: "settings", q: "web", custom: [1, 2] });
+    expect(q.predicate).toEqual({
+      any: [
+        { field: "name", op: "contains", value: "web" },
+        { field: "description", op: "contains", value: "web" },
+      ],
+    });
+    expect(q.window.size).toBe(8);
+  });
+
+  it("resetPatch：全部自有键显式 undefined（函数式展开清值语义）", () => {
+    const patch = schema.resetPatch();
+    expect(patch).toEqual({ q: undefined, filter: undefined, sort: undefined, cursor: undefined, page: undefined });
+    const next = { q: "x", filter: ["status:eq:running"], sort: ["name:asc"], cursor: "c1", page: 3, tab: "t", ...patch };
+    expect(next.q).toBeUndefined();
+    expect(next.cursor).toBeUndefined();
+    expect(next.page).toBeUndefined();
+    expect(next.tab).toBe("t"); // 非自有键不受影响
+  });
+});
