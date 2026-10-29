@@ -1,146 +1,168 @@
-# fleetly 采纳复盘：摩擦实录与下沉提案
+# fleetly 采纳复盘：机制缺口清单
 
 | 状态 | 日期 | 关联 |
 |---|---|---|
-| 提案（待逐项裁决后进 design.md 批次） | 2026-10-27 | fleetly `74e4aac4..b5a677bb`（uikit 全量换装 31 commits + 1 runbook docs）+ 三轮现网走查 |
+| v3（机制重审版）提案——待逐项裁决后进 design.md 批次 | 2026-10-27 | fleetly `74e4aac4..b5a677bb`（uikit 全量换装 31 commits + 1 docs）+ 三轮现网走查 |
 
-来源：fleetly console 自旧 `@lynx-go/ui-kit@0.1.1` 全量换装 `@lynx-go/uikit-core@0.3.1` + registry 拷贝制块（四批：底座/列表族 14 域/写面 ~74 mutation 位/订阅族与观测面），随后三轮现网走查修复（壳高度、双主题、统一 Layout）。本文是**摩擦清单 → 下沉提案**，作为 uikit 后续批次的需求真源；每项经裁决后按实施批组推进，落地形态以 design.md 对应批次节回写为准。
+来源：fleetly console 自旧 `@lynx-go/ui-kit@0.1.1` 全量换装 `@lynx-go/uikit-core@0.3.1` + registry 拷贝制块（四批：底座 / 列表族 14 域 / 写面 ~74 mutation 位 / 订阅族与观测面），随后三轮现网走查修复。**v3 重审立场**：v1/v2 的 A1-A12 提案近半是症状层补丁（加第二个钩子、加合并器、加文档+lint、加转换帮手——都在机制缺口外围绕行）；本文按「机制上补全缺口」重构为 M1-M10，原 A/B 项全部映射归位，并补入 v1/v2 漏检的两个机制缺口（M4、M8）与一项「既有机制未用足」（M5 附注）。
 
-## 0. 口径与证据
+## 0. 重审结论摘要
 
-fleetly 侧统计（2026-10-27 复盘 grep 实测）：
-
-| 摩擦信号 | 实测 |
+| v1/v2 提案 | 重审归位 |
 |---|---|
-| kit 层伴读钩子（`useXxx` 包装 useQuery+collectionQueryOptions+scoped+固定窗） | **21 个导出**（19 个 kit 资源伴读同构 + 2 个 metrics 序列钩子） |
-| 多 tab 路由手写合并 validateSearch | **8 个路由** |
-| data-table `renderExtraRow` 本地扩展消费点 | 4 文件（tasks runs / users 设密 / github repos / nodes 错误行） |
-| record fetch 手写 `status === 404 → null` | 4 处 |
-| 消费面 `.data?.rows ?? []` 解包 | 38 处 |
-| 宿主路由 `routeId={Route.id}` props 线程 | 18 处 |
-| `new Error(describeApiError(...))` 错误形转换 | 4 处 |
-| readonly rows 边界 `[...x]` 展开 | 3 处 |
+| A1 伴读 API | → **M1 读模型分层**（伴读钩子/解包/全量行/共享键妥协四处症状同根） |
+| A3 scope 相等律 | → **M2 命令-失效 scope 同源**（文档+lint 是补丁；同源+投影匹配+类型执法是机制） |
+| A4 mergeSearch | → **M3 编解码无损**（合并器是给有损 normalize 打的补丁） |
+| （漏检） | + **M4 REST 适配工厂**（24 资源文件手写样板） |
+| A2 Transport 工厂 | → **M5**（并附「SubscriptionDescriptor 既有机制未用足」实证） |
+| A8 主题 CSS 三份导出 | → **M6 token 单源**（三份手维护导出物本身会造新漂移面；dogfood 执法） |
+| A6+A7+A12 块容器/高度/基元 | → **M7 块自足性契约**（三个隐式宿主假设显式化 + registry lint 执法） |
+| （漏检） | + **M8 vendored 漂移执法**（本地扩展机读化 + CI 门 + 吸收退役流程） |
+| A10 错误帮手 | → **M9 错误货币统一**（toDisplayError 转换是补丁；类化是机制） |
+| B1 /testing | → **M10 测试契约** |
+| A5 renderExtraRow / A11 虚拟化 / A9 ResultBox / toastOnSettled | → §3 能力补全与糖（非补丁，保留） |
+| B2/B3/B4/B5 | → §4 小修与指南 |
 
-双消费方对照：torchwood（批 A–D/§12.9）同类摩擦以批注形式引用；不确定处标「待核对」。
+fleetly 侧统计（grep 实测，症状证据）：伴读钩子 19 个同构（kit 层 21 个 use 导出）、`.data?.rows` 解包 38 处、合并 validateSearch 8 路由、renderExtraRow 4 消费点、404→null 手写 4 处、toApiError 收敛样板 18 文件（kit 资源文件 30 个）、`new Error(describeApiError(...))` 转换 4 处、routeId 线程 18 处、readonly 边界展开 3 处、nonce 重挂 1 处。torchwood 侧 routes/components 仍有 26 文件裸 useQuery 面。
 
 ## 1. 运转良好面（明确不动）
 
-- **devtool 拷贝制闭环**：vendored 头（来源版本+适配清单+手工步骤交接单）+ profile 恒等化后零映射拷贝——两消费方一致好评的机制。
-- **labels / describeError / resultAction 注入面**：块不持业务词，fleetly 全程零改块文案。
-- **逃生舱哲学**：块全 part ReactNode + renderExtraRow 型本地扩展点——回流通道（selection 先例）被证明顺畅。
-- **treatAs / legacyKeys 写失效桥**：批2 写面命令化时把存量 react-query 键失效接得干净（读面换轨后桥语义变化见 A3 修正）。
-- **transport 可测性**：全微任务驱动零真实计时器的契约测试模式在两个消费方成立。
-- **offset/keyset 双方言**：fleetly 整取方言全程只用 offset 面，无摩擦。
+- **devtool 拷贝制闭环**：vendored 头（来源版本+适配清单+手工步骤交接单）+ profile 机制。
+- **labels / describeError / resultAction 注入面**：块不持业务词，两消费方零改块文案。
+- **逃生舱哲学**：块全 part ReactNode——selection/renderExtraRow 型扩展点存在本身即是机制（回流通道被证明顺畅）。
+- **treatAs / legacyKeys 写失效桥**（批2 写面接得干净；读面换轨语义见 M2）。
+- **transport 微任务测试模式**、**offset/keyset 双方言**（fleetly 整取方言全程只用 offset 面，无摩擦）。
 
-## 2. 下沉提案 A
+## 2. 机制缺口 M1-M10
 
-### A1. 伴读读数 API（`useCollectionData` / `useRecord` 扩容）——重复量最大项
+### M1. 读模型分层：URL 绑定是可选层，不是读原语的属性
 
-**摩擦**：`useCollection` 绑 URL search（经 `useSearch(strict:false)` 解整个 location 的共享键 q/page/cursor），壳层组件与表单下拉误收它页写入的键（R1 实咬：项目目录窗口被列表页 cursor 污染）。于是所有非列表读面手写三件套 `useQuery + collectionQueryOptions(scoped(...), 固定窗, {refetchInterval})` 再包伴读钩子——**19 个同构钩子、38 处 `.data?.rows` 解包**。另：`useRecord` options 只有 `staleTime`（bindings.ts:198），无 `refetchInterval/enabled`——providers-view 为 30s 轮询被迫落回裸 useQuery；clientCollection 方言全量取数但句柄只暴露当前窗 `rows`（有 `total` 计数、无全量行），backups 页「N healthy」全量统计因此退场。
-**下沉形态**：
-1. react 层新增 `useCollectionData(resource, {scope?, size?, refetchInterval?, enabled?, retry?})` —— 不绑 URL、固定窗、**返回 rows 直出**（含 `status/error/isFetching/refetch`，Segment 不外泄）；
-2. `useRecord` options 扩 `query: {refetchInterval, enabled}`；
-3. clientCollection 方言句柄补全量行访问（`useCollectionData` 加 `fullWindow` 选项或句柄暴露源行）。
-**验收**：fleetly 19 个伴读钩子收缩为直接消费；38 处解包归零；providers-view 轮询回归 useRecord。
-**影响面**：torchwood 同样受益——其 routes/components 仍有 **26 个文件**的裸 useQuery 面（§12.9 遗留 legacy 列表轨 + 伴读未收编部分），伴读 API 落地后其存量面可按同形态收敛。
+**症状**（四处同根）：①`useCollection` 绑 URL search，经 `useSearch(strict:false)` 读整个 location 的共享键（q/page/cursor）——壳层组件与表单下拉误收它页键（R1 实咬：项目目录窗口被列表页 cursor 污染）→ 19 个伴读钩子手写三件套绕行 + 38 处 `.data?.rows` 解包；②**URL 查询命名空间是路由级全局**——多集合同路由必互踩，fleetly「q 跨 tab 持久是接受语义」是给该缺口打的语义补丁（8 路由手写合并体是另一半）；③`useRecord` 无 `refetchInterval/enabled`（options 仅 staleTime，bindings.ts:198）——providers-view 为 30s 轮询落回裸 useQuery；④clientCollection 整取方言下句柄只有当前窗 rows（total 计数有、全量行不可达）——backups 页全量统计退场。
+**根因**：读原语把「取数」与「URL 视图绑定」焊死在一个 API；且 schema 编解码键无归属命名空间。
+**机制补全**：
+1. 拆两层：data 层 `useCollectionData(resource, {scope?, window?, refetchInterval?, enabled?, retry?})` 零 URL、rows 直出；URL 层是 data 层之上的绑定器（现 useCollection 语义不变）。`useRecord` options 扩齐同族 query 面；
+2. `collectionQuerySchema` 增 `namespace?` 选项——编解码键带归属前缀（如 `tasks.q` 或 `t.q`），多集合同路由各持各键，共享/独立成为**显式选择**而非妥协；
+3. data 层暴露 `fullRows`（clientCollection 方言的全量行）或 `window: "all"`。
+**消灭**：19 伴读钩子、38 解包、8 合并体（配合 M3）、backups 统计退场、providers-view 裸 useQuery。torchwood 26 文件裸 useQuery 面可按同形态收敛。
+**验收**：fleetly 伴读面收缩为 useCollectionData 直消费；双列表路由（tasks/schedules 等）切 namespace 后 tab 互不携带对方 q。
 
-### A2. Transport 工厂（`createTransport`）——订阅族三件套
+### M2. 命令-失效 scope 同源：三份真源收敛为一份
 
-**摩擦**：logsTransport/eventsTransport 各手写一遍：push→pull 桥（buffer+notify 唤醒 async generator）、seq 跨重连单调计数（transport 闭包）、closeReason 挂载——含一个真 bug：`Object.assign` 把 closeReason getter 取成静态值，须 `Object.defineProperty` 活 getter（测试抓出）。终态分诊（ended/auth/network）每方言一份。torchwood wsTransport 同款手写（§12.4）。
-**下沉形态**：adapters 层 `createTransport<F>({open, close, classify})` 工厂——消费方只写「开流（收 push 回调与 signal）→ 逐帧 emit → 收口时返回终态分类」三个回调；桥、seq 信封（EventFrame）、closeReason 活 getter、cursor 透传单源。SSE/NDJSON/WS 三个参考实现随工厂落地。
-**验收**：fleetly 两 transport 收缩为 ~30 行方言回调；getter bug 类别消亡。
+**症状**：git hook 三写动词经 `appTabCommands(projectId, appId)` 工厂（id 在闭包不进 scope），`useCommand` 缺省 scope `{}` 与读键 `["record","app-hook",{projectId,appId},"current"]` **整对象 JSON 全等不匹配**（keys.ts:83 `selectorMatches`）——写后读面不刷新（app-settings 测试实咬），消费方逐处手传 scope 补丁。config 详情读面 kit 化换轨后，批2 的 legacyKeys 桥打向已不存在的旧键（panels 测试实咬）——又要补 `invalidates` selector。
+**根因**：失效匹配的 scope 是调用点手工拼装的**第三份真源**（resource.scopeKeys 声明是第二份、读键内嵌是第一份）；匹配语义用整对象全等而非按声明键投影。
+**机制补全**：
+1. descriptor 增 `scopeOf?: (input) => ResourceScope`（工厂命令把身份从闭包迁入 input 或声明派生）；引擎 `effectiveScope = options.scope ?? descriptor.scopeOf?.(input) ?? {}`——同一份 scope 既喂 `run(ctx)` 又喂失效匹配；
+2. `selectorMatches` 按**声明的 scope 键投影**比较（命令 scope 在读键声明的键集上逐键相等即匹配），整对象全等降为严格模式选项；
+3. 类型执法：descriptor 声明了 scope 键（`__scopeKeys` 在）而调用未获得完整 scope 时编译红。
+**消灭**：手传 scope 补丁类别、「工厂闭包命令需配方文档」的需求（降为普通用法）、读面换轨后桥失效的踩坑面（投影匹配下 invalidates 自动命中）。
+**验收**：fleetly 两处测试锚在零手传 scope 下绿。
 
-### A3. 命令失效 scope 相等律——本次唯一 bug 级语义坑
+### M3. search 编解码无损：normalize 不再吞未知键
 
-**摩擦实录（两个独立教训，须分开表述）**：
-1. **selector 与读键 scope 全等才匹配**：git hook 三写动词走 `appTabCommands(projectId, appId)` 工厂（appId 闭包、不进 scope），`useCommand` 缺省 scope `{}` 与读面 record 键 `["record","app-hook",{projectId,appId},"current"]` 不相交——写后读面不刷新（app-settings 测试实咬）。修法=消费方逐处显式传 scope。kernel `selectorMatches` 是 `JSON.stringify` 全等比较（keys.ts:83），无子集/部分匹配。
-2. **legacyKeys 只救仍持旧键的消费方**：config 详情读面 kit 化后键形从 `["resources","config",pid,name]` 变 `["record","config-detail",...]`，批2 埋的 legacy 桥打的是已不存在的旧键——读面换轨后必须给写动词补 `invalidates` selector（panels 测试实咬）。
-**下沉形态**：①kernel 文档显式契约化「命令 scope ⊇ 读键 scope 且全等」；②类型/lint 护栏：descriptor 声明 scope 键（`__scopeKeys` 在）而 `useCommand` 未传 scope 时编译期告警；③「工厂闭包命令」配方进 SKILL.md（含『闭包 id 不进 scope 的后果』反例）。
-**验收**：fleetly 两处测试锚转绿无需逐处手传 scope（或至少编译期可见）。
+**症状**：`toSearchSchema()` 的 normalize 丢未知键——ModulePage 的 tab 键被静默删除，8 路由手写合并形态救回。
+**根因**：normalize 把「本 schema 不认识的键」当成「不存在的键」——有损编解码。
+**机制补全**：normalize 缺省 passthrough（未知键原样保留），严格丢弃作为显式选项。mergeSearch 组合器不再需要（8 处合并体退役）；tab 切换函数式 navigate 是 TanStack 语义，SKILL.md 一句带过。
+**验收**：ModulePage 路由 `validateSearch: tabSearch` + `querySearch` 双 schema 并存直挂（或 M1 namespace 形态），零手写合并。
 
-### A4. 多 tab search 合并（`mergeSearch`）——8 路由同构
+### M4. REST 适配工厂：最常见取数形态没有库级原语
 
-**摩擦**：`toSearchSchema()` 的 normalize 丢未知键（tab 被吃），ModulePage 路由全部手写 `validateSearch: (input) => ({...tabParse(input), ...schema.toSearchSchema()["~standard"].validate(input).value})` + 函数式 tab 切换保 q/分页。
-**下沉形态**：schema 层 `mergeSearch(tab: StandardSchema, query: QuerySearchSchema)` 组合器（或 `toSearchSchema({passthrough: true})`）；tab 函数式切换示例随 SKILL.md。
-**验收**：fleetly 8 路由合并体收缩为一行。
+**症状**：fleetly 30 个 kit 资源文件各自手写「组 URL + 信封键展平 + undefined 行过滤 + toApiError 收敛」（18 文件含 toApiError 样板；kit/http.ts 的 fetchRows/qs 是消费方自制微工厂）；record 面另有 4 处手写 404→null 分支。
+**根因**：REST-over-fetch 是两消费方最常见取数形态，库只给了 clientCollection（求值方言）与 createHttp（可选管线），**适配器本身**（path/信封/空态）无原语。
+**机制补全**：adapters 增 `restCollection({path: (ctx) => string, envelope, params?, notFound?})` 与 `restRecord` 同构（`notFound: "null"` 选项吞 4 处 404 分支；错误收敛内置）。抽象度克制：path 回调起步，模板插值糖后置。
+**消灭**：kit/http.ts 与逐资源 fetch 样板（预计 fleetly kit 层 −40% 行数）。
+**验收**：fleetly 三域试点改造后样板归零。
 
-### A5. data-table `renderExtraRow` 回流
+### M5. 订阅参数化用足 + Transport 工厂横切单源
 
-4 消费点（跨行展开/披露行），本地扩展形态成熟（展开态归页面、块只渲染行）。与 selection 槽同通道回流上游。
+**症状**：①logsTransport/eventsTransport 各手写 push→pull 桥（buffer+notify 唤醒 generator）、seq 跨重连计数、closeReason 挂载——含真 bug 类别（`Object.assign` 把 getter 取成静态值，须 defineProperty，测试抓出）；②logs 页用 **nonce 重挂 transport 实例**实现「Run 定格后重启」（logs.tsx:79-81）——而 kernel 早有 `SubscriptionDescriptor { open(params, ctx): Transport }`（resource.ts:48）参数化机制，未用足。
+**根因**：帧订阅的三个横切无工厂单源；参数化流的第一形态（descriptor）在文档/示例中缺位，消费方自然落进「transport 实例 + 重挂」补丁形态。
+**机制补全**：
+1. adapters 增 `createTransport<F>({open, emit, classify})` 工厂——桥/seq 信封/活 getter 单源，消费方只写「开流→逐帧→收口分类」回调；SSE/NDJSON/WS 三参考实现随工厂落地；
+2. 帧信封 EventFrame（seq/at/payload）进 kernel 为唯一信封（EventFeed/LogViewer 行键统一）；
+3. SKILL.md 钉「参数化流一律 descriptor 形态；nonce 重挂是反模式」——fleetly logs 页改 descriptor 即零新 API。
+**验收**：fleetly 两 transport 收缩为方言回调；logs 页 nonce 退役。
 
-### A6. ListPage/detail-page shell-agnostic 化 + `tabs` 槽
+### M6. token 单源：demo 消费包导出物（dogfood 执法，非 codegen）
 
-**摩擦**：块自带 `max-w-5xl + p-6` 容器与消费方 Layout 体系冲突，fleetly 三轮走查实锤链：列表过窄（用户反馈）→ 流体本地改 → 与 PageFrame 三档宽度不一致（又反馈）→ 最终消费方统一 Layout 裁决（主内容宽度唯一=流体全宽列）。§12.10-⑤ shell-agnostic 提案的实证升级。另：backups 迁移时 PageTabs 只能塞 toolbar 槽（位次凑合）。
-**下沉形态**：块缺省不持宽度/衬垫（消费方 Layout 持有），或 `container={false}` 形态；header 与 toolbar 之间官方 `tabs` 槽。
-**验收**：demo 同步改（demo 自持容器）；fleetly 三个本地扩展退役。
+**症状**：采纳 demo 视觉时消费方整表手抄 token（~40 行 oklch）；纯暗裁决被用户打回后补写亮色派生 + shadcn 别名层（累计 ~200 行消费方持有）。v1 曾提案「导出三份 CSS」——三份手维护导出物会造**第四份漂移面**，本身是补丁。
+**根因**：token 表是 demo 私产（apps/demo/src/styles.css 手维护），包与 demo 无单源关系。
+**机制补全**：token 单源文件移入包内成为导出物（dark/light/shadcn-compat 三产物），**demo 改为 import 包导出物**——dogfood 即执法（导出物与 demo 永远一致，无需生成步骤）。亮档随之获得回归面（demo 增主题切换器）。消费方自定义 token（fleetly 的 `--status-*` 微底/`--brand-gradient`）在 compat 文档写明扩展位。MetricChart 直读 `var(--chart-N)` 属 shadcn 命名，compat 必含 chart 别名。
+**消灭**：消费方手抄表/手写派生/手写别名层。
 
-### A7. AppShell 上游化（`h-screen` + slot 族）
+### M7. 块自足性契约：三个隐式宿主假设显式化 + registry lint 执法
 
-**摩擦**：demo 靠 `html/body/#root{height:100%}` 撑 `h-full`，消费方无此规则 → 侧栏塌成内容高（现网走查「菜单下方缺口」）。fleetly 本地扩展：根 `h-screen overflow-hidden`、NavItem `icon?/disabled?`、NavSection `zone?` 分界、`header?/footer?/topbar?` 槽、`<md` Sheet 移动抽屉（MobileNav）。
-**下沉形态**：`h-screen`（demo 等价无损）与 slot 族/icon/disabled/zone 回流上游；移动抽屉列为开放问题（上游化与否待裁）。
+**症状**：①demo 靠 `html/body/#root{height:100%}` 撑 h-full，消费方无此规则 → 侧栏塌成内容高（现网「菜单下方缺口」）；②块自带 `max-w-5xl + p-6` 容器与消费方 Layout 冲突 → fleetly 三轮走查（过窄→流体改→与 PageFrame 不一致→统一 Layout 裁决）；③块假设 `@/components/ui/select` 是原生包装、0.3.1 data-table 的 selection 用 Base UI 形态 Checkbox——fleetly（Radix 宿主）写两个桥（native-select/checkbox）。另：backups 迁移时 PageTabs 只能塞 toolbar 槽（位次凑合）。
+**根因**：块对宿主环境持有三个**隐式假设**（高度链/容器职责/基元方言），demo 的全局 CSS 与自有基元遮蔽了假设——换宿主即塌。
+**机制补全**：宿主契约三则显式化——①AppShell 自持 `h-dvh` 高度链；②registry 块**零容器类**（顶层宽度/衬垫归宿主 Layout；demo 自持容器；header/toolbar 之间加官方 `tabs` 槽）；③块内小控件**原生元素化**（checkbox/select 不依赖宿主基元——keyset-pagination 0.3 先例推广）。**执法**：uikit 仓内 registry lint（layer-check 同文化）扫块源：禁顶层 `max-w-*`/容器衬垫类、禁小控件从 `@/components/ui` 导入。slot 族（icon/disabled/zone/header/footer/topbar/移动抽屉）随批回流。
+**消灭**：fleetly 三处本地扩展（h-screen/容器改/tabs 槽凑合）与两个基元桥。
 
-### A8. 主题 CSS 资产（`theme-dark.css` / `theme-light.css` / `shadcn-compat.css`）
+### M8. vendored 漂移执法：本地扩展机读化 + 消费方 CI 门 + 吸收退役
 
-**摩擦**：采纳 demo 视觉时消费方手抄整张 token 表（~40 行 oklch）；纯暗裁决被用户打回要双主题后，又手写亮色派生套 + shadcn 别名层（@theme inline 同值异名映射，36 基元零改动换肤的前提）——累计 ~200 行消费方持有。注：MetricChart 直读 `var(--chart-N)` 是 shadcn 命名，compat 层必须含 chart 别名（fleetly 已含）。
-**下沉形态**：uikit 导出三份 CSS：暗（demo 原生）、亮（同族派生：近白底/白 panel/浅灰线、accent 与状态色压深、chart 调暗）、shadcn-compat（demo 词汇→shadcn 词汇别名）。消费方三行 import。**扩展位注明**：消费方自有 token（fleetly 的 `--status-*` 微底族、`--brand-gradient`）不在 demo 词表——compat 文档须写明「自定义 token 由消费方追加」，避免误以为全量接管。
-**开放**：亮色档是否进 demo 走查（建议进，否则亮套无视觉回归面）。
+**症状**：拷贝制的升级防线是空的——本地扩展（renderExtraRow/容器/h-screen）散在 vendor 头注释里不可机读；`devtool diff --all --check` 存在但零消费方在跑（fleetly 升版零防线）。
+**根因**：拷贝制模型只有「拷」的机制，没有「持有期间漂移检测」与「上游吸收后退役」的闭环。
+**机制补全**：①devtool 拷贝时生成机读 manifest（如 `kit/extensions.json`：块名/本地扩展清单/上游版本）；②`devtool diff --all --check` 读 manifest 语义化报告（哪些差异=已登记本地扩展，哪些=未登记漂移）；③消费方 CI 增设该门（fleetly 先行）；④上游吸收某扩展后 manifest 条目转 `adopted`，本地副本删除由 diff --check 执法。
+**消灭**：升级零防线；本地扩展的口头记忆依赖。
 
-### A9. ResultBox 独立导出
+### M9. 错误货币统一：ApiError 类化
 
-保壳换面的复杂表单（DeploySheet 五源）不能迁 Form 内芯，本地复制了 CommandResultBox（rejected 带 code 前缀 / conflict message-first / resultAction 槽）。torchwood documents 批同款先例（§12.5-⑧ resultAction 的回流即源于此）。拆出 form.tsx 内的 ResultBox 为独立导出。
+**症状**：kernel ApiError 是值对象非 Error——任何期望 Error 的通用 UI（domain ErrorState、TanStack 默认渲染）收到对象即 `[object Object]`，fleetly 4 处 `new Error(describeApiError(...))` 转换补丁 + 3 处 readonly 边界展开。
+**根因**：错误货币有两种形态（kernel 封闭集值对象 vs ECMA Error），边界转换落到消费方。
+**机制补全**：`class ApiError extends Error`（kind 判别封闭集保持——「失败=typed failure」立场不变，增 Error 兼容）；`instanceof Error` 全域天然成立。toastOnSettled 保留为糖（§3），toDisplayError 类帮手不再需要。
+**开放**：design.md 的值对象立场是否松动为「typed failure 且 Error 兼容」——需显式裁决记录。
 
-### A10. 错误显示帮手（`toastOnSettled` + `toDisplayError`）
+### M10. 测试契约：harness 属于库
 
-**摩擦**：①toast 单源 helper 每消费方一份（fleetly kit/toast.ts 与 torchwood errors.ts 旁路同构）；②kernel ApiError 是对象非 Error——进通用错误 UI 渲染 `[object Object]`，4 处手写 `new Error(describeApiError(...))` 转换、3 处 readonly rows 边界展开。
-**下沉形态**：core 导出 `toastOnSettled(onOk?)`（结果/失败通道文案注入形）；`toDisplayError(e: ApiError): Error`（或 states 块 ErrorState 文档化「勿喂裸对象 UI」）。**边界注**：`runCommandMapped` 在 fleetly/torchwood 各持一份（fetch/axios 错误体提取各异）——body 薄（~20 行），默认不下沉；若将来下沉则参数化「错误体提取」回调。
+**症状**：`/testing` 出口源码 noUnusedLocals 违例（消费方严格 tsc 不可用）；两消费方各写一份内联最小路由包装（fleetly panels.test / torchwood TestRouter）。
+**机制补全**：修复违例 + 导出 `createTestRouter`/`renderWithKit` + SKILL.md 测试配方节——测试面与运行面同契约级别维护（CI 里 /testing 的编译纳入消费方严格度矩阵）。
 
-### A11. LogViewer 虚拟滚动回流
+## 3. 能力补全与糖（非补丁，保留项）
 
-fleetly 本地实现（@tanstack/react-virtual、measureElement 动态测高、overscan 24、跟随改 scrollToIndex(end)；192 帧 50 行 DOM 实测）。上游源注释本就标「虚拟滚动后置」——直接回流，含跟随语义回归测试。
-
-### A12. 块内小控件原生元素化
-
-**摩擦**：块假设 `@/components/ui/select` 是原生包装（demo 方言），fleetly（Radix compound）撞后写 native-select 桥；0.3.1 上游 data-table 的 selection 用 Base UI 形态 Checkbox（indeterminate/onChange），fleetly 再写 checkbox 桥。keyset-pagination 0.3 已示范原生 select 解耦方言。
-**下沉形态**：filter-bar/pagination 的 Select 与 data-table 的 Checkbox 改原生元素（或 `@/kit` 友好的无基元形态），消费方桥退役。
-**影响面**：torchwood 批 A 裁决 7 曾以 radix 直接待 KeysetPagination——上游化后该裁决面消失。
-
-## 3. 上游小修 B
-
-- **B1** `/testing` 出口源码 noUnusedLocals 违例（消费方严格 tsc 下不可用）；修复后顺手导出 `createTestRouter`（fleetly/panels.test 内联最小路由包装、torchwood TestRouter 各写一份）。
-- **B2** devtool `--dir` 缺省自动探测 `src/components` 布局（fleetly 首拷落错至 `console/components/`）。
-- **B3** `clientCollection` fetch 签名 `(ctx, signal)` 文档钉死（fleetly 首版写成 `(query, ctx)` 即错）；`useRecord` options 表（见 A1）。
-- **B4**（低优先）`legacyKeys(scope)` 拿不到 input id——per-id 桥只能宽前缀；候选：签名扩 `(scope, input)`。
-- **B5** SKILL.md 四则修正：①「bring-your-own-fetch 是主干」——fleetly 全程未用 createHttp（自有 401 闭环资产），clientCollection+裸 fetch 才是常态路径，createHttp 定位为可选件；②「何时不套 useSubscription」——无游标终态快照流（deployment wait）套引擎净 LOC≈0 且错误分诊语义冲突（fleetly 实证保持先例）；③「块采纳地图」——values 族（status-badge/relative-time/copy-button…）与 states 四态、成熟消费方既有 domain 件（fleetly 的 StatusBadge/EmptyState/ErrorState）重叠，fleetly 选择保留 domain 件致两套四态词汇并存——新消费方按「有既有模板层则块按需」指引；④「消费方守卫建议」——fleetly 落了两条消费侧守卫（features/routes 禁裸 useMutation、禁退役 catalog import 复活），可作为采纳指南的守卫配方推荐。
-
-## 4. 留消费方 C（不沉，记录边界）
-
-- **统一 Layout/页面宽度裁决**（A6 的另一半，本就是消费方职责）；亮色派生具体色值（品牌决策，A8 给默认档）。
-- **routeId props 显式线程**（18 处）：考虑过 `useCurrentRouteId()` 语境钩子，否决——显式传参保证 from 与宿主路由一致（多路由复用 feature 时语境钩子会静默错位），保持显式；SKILL.md 加一句说明即可。
-- readonly rows 边界的 `[...x]` 展开（A10 若做 toDisplayError 顺带文档提示，不强制）。
-- 业务语义（E_EVENTS_GONE 补档回退、OCC resultAction 的 reload 编排、审批/披露行文案）。
-- IAB/浏览器走查坑（合成事件不穿透受控组件）——进 SKILL 浏览器验证节，与库无关。
-
-## 5. 实施批组建议
-
-| 批组 | 内容 | 理由 |
+| 项 | 归属 | 说明 |
 |---|---|---|
-| **F1（高优先）** | A1 A2 A3 A4 + B1 B3 | 重复量最大（19 钩子/8 路由/2 transport）+ 唯一 bug 级语义（A3）+ 测试基建 |
-| **F2（契约批）** | A5 A6 A7 A8 + B2 | 块形态/视觉契约变更，需 demo 走查同步（A8 亮档进 demo） |
-| **F3（顺手批）** | A9 A10 A11 A12 + B4 B5 | 独立小件 |
+| data-table `renderExtraRow` | 回流上游 | 4 消费点成熟形态；与 selection 同通道 |
+| LogViewer 虚拟滚动 | 回流上游 | react-virtual/measureElement/scrollToIndex 跟随；192 帧 50 行 DOM 实证 |
+| ResultBox 独立导出 | form 块拆出 | 保壳表单复用结果盒（torchwood documents 先例） |
+| `toastOnSettled(onOk?)` | core 糖 | 结果/失败通道文案注入形（M9 后 Error 兼容，糖更薄） |
+| `useRecord` options 扩容 | M1 组成部分 | refetchInterval/enabled 随读模型分层落 |
 
-**回流序**（每批）：uikit 发版 → fleetly 升 core 版本 + `devtool diff --all --check` 对照 → 本地扩展重落（renderExtraRow/容器/h-screen 三处随对应项退役）→ 门禁 + 现网走查。建议 fleetly CI 增设 `devtool diff --all --check` 漂移门（升版防线，目前零防线）。
+## 4. 小修与指南（非机制层）
 
-## 6. 开放问题（待裁决）
+- devtool `--dir` 缺省自动探测 `src/components` 布局（首拷落错目录实咬）。
+- `clientCollection` fetch 签名 `(ctx, signal)` 文档钉死；SKILL.md 修正三则：bring-your-own-fetch 是主干（fleetly 全程未用 createHttp；clientCollection+裸 fetch 才是常态，M4 落地后原语补齐）、何时不套 useSubscription（无游标终态快照流——deployment wait 保持先例）、块采纳地图（values/states 族与成熟消费方既有 domain 件重叠——fleetly 保留 domain 件致两套四态词汇并存，过渡边界写明）。
+- `legacyKeys(scope)` 拿不到 input id（低优先；M2 落地后桥需求本身收缩）。
+- 消费方守卫配方（禁裸 useMutation/禁退役面复活）进采纳指南。
 
-1. `useCollectionData` 返回形状：rows 直出（本文提案）vs 保留 Segment 字段兼容——直出则 38 处解包归零，但与 useCollection 句柄不对称。
-2. A3 护栏强度：编译期类型约束（强，可能误伤合法的 allScopes 用法）vs lint 规则（弱但可豁免）。
-3. A7 移动抽屉是否上游化（demo 桌面-only，上游化后需 demo 响应式走查）。
-4. A8 亮色档进 demo 与否（建议进：亮套需要视觉回归面）。
-5. A6 shell-agnostic 的默认值取向：块默认裸 + demo 自持容器（推荐）， vs `container` prop 双形态。
+## 5. 留消费方边界（不沉）
+
+- 统一 Layout/页面宽度裁决（M7 的另一半，宿主职责）；亮色派生具体色值（M6 给默认档，品牌微调归消费方）。
+- **routeId 显式线程**（18 处）：否决语境钩子——多路由复用 feature 时会静默错位，保持显式。
+- **ScopeProvider 显式传 scope**：与 routeId 同理保持显式（uikit 已有 Provider 形态，fleetly 选择不用——记录为风格分叉，不升级为库变更）。
+- 业务语义（E_EVENTS_GONE 补档回退、OCC reload 编排、审批/披露文案）；IAB 走查坑（进 SKILL 浏览器验证节）。
+
+## 6. 实施批组（按机制依赖序重排）
+
+| 批组 | 内容 | 依赖与理由 |
+|---|---|---|
+| **F1 数据面机制** | M1 M2 M3 M4 + M10 | kernel/schema/adapters 核心变更；消灭量最大（19 钩子/38 解包/8 合并体/24 文件样板/2 bug 类） |
+| **F2 订阅与错误** | M5 M9 | 独立于 F1；M9 需 design.md 立场裁决先行 |
+| **F3 块契约与资产** | M6 M7 + §3 能力补全随批（renderExtraRow/虚拟化/ResultBox/tabs 槽） | M7 的 demo 容器改造与 M6 token 单源同批（demo styles.css 一次动刀）；亮档进 demo |
+| **F4 漂移执法** | M8 + §4 小修 | 依赖 F3 的本地扩展清单定型（ extensions.json 登记的是最终扩展面） |
+
+**回流序**（每批）：uikit 发版 → fleetly 升 core + `devtool diff --all --check`（F4 后由 CI 门执法）→ 本地扩展随对应机制退役（F1 后伴读钩子/合并体退役；F3 后 h-screen/容器/桥退役）→ 门禁 + 现网走查。
+
+## 7. 开放问题（待裁决）
+
+1. **M1 namespace 缺省**：off 保兼容 / 新路由建议 on？双列表路由的键前缀形态（`tasks.q` 扁平 vs 嵌套对象）。
+2. **M2 投影匹配语义**：命令 scope 在读键声明键集上逐键相等即匹配——是否保留整对象全等为严格模式选项（防过宽失效）。
+3. **M9 立场**：值对象 → 类化的 design.md 裁决（「typed failure 且 Error 兼容」）。
+4. **M4 抽象度**：path 回调起步（本文提案）vs 直接模板插值（`/v1/apps/:appId/…`）。
+5. **M6 demo 亮档切换器**：进（本文提案，亮套需回归面）与否。
+6. **M7 registry lint 强度**：仅扫容器类/基元导入（提案），是否连 h-full/h-dvh 假设一起扫。
 
 ---
 
 ### 修订记录
 
-- v1（2026-10-27 初稿 → 复审后本文）：修正三处初稿口径——合并路由 14→**8**（实测）；「句柄无 total」修正为「**total 计数在、全量行不可达**」（CollectionHandle 有 total 字段）；legacyKeys 语义精确化为**两条独立教训**（scope 全等匹配 + 旧键桥随读面换轨失效，初稿混为一条）。复审新增：A1 并入 useRecord options 缺口与全量行缺口、A10 错误形转换（4 处实测）、§1 运转良好面、§4 routeId 显式线程裁决、B5 SKILL 三则、§5 CI 漂移门建议、§6 开放问题五则。
-- v2（同日深审）：commit 数 33→**31**（+1 docs=32，实测）；A1 影响面以 torchwood **26 文件裸 useQuery 面**坐实（替换原「待核对」）；A8 补消费方自定义 token 扩展位（status 微底/brand-gradient 不属 demo 词表）；A10 补 runCommandMapped 跨仓各一份的边界注（薄、默认不下沉）；B5 ③并入 states 四态与两套四态并存的实证、扩为四则（+消费方守卫配方）。深审否决项：谓词→服务端参数映射配方（torchwood §12.2-3 已在 design.md，仅缺 SKILL 索引——不另立项）。
+- v1（2026-10-27 初稿）：A1-A12 症状清单 + B1-B5 小修 + F1-F3 批组。
+- v2（同日深审）：口径修正（合并路由 14→8；句柄 total 计数在/全量行不可达；legacyKeys 双教训拆分）；新增 useRecord 缺口、错误形转换、运转良好面、routeId 裁决、CI 门建议、torchwood 26 文件坐实。
+- **v3（机制重审）**：立场修正——v1/v2 近半提案本身是补丁，重构为 M1-M10 机制缺口（映射表见 §0）。新增漏检机制：**M4 REST 适配工厂**（24 资源文件样板）、**M8 vendored 漂移执法**（manifest+CI 门+吸收退役）。补「既有机制未用足」实证：SubscriptionDescriptor 参数化形态（logs nonce 重挂反模式）。原 A1/A3/A4/A8/A10 升格为 M1/M2/M3/M6/M9 机制形态（伴读 API→读模型分层+namespace；scope 文档+lint→同源+投影匹配+类型执法；mergeSearch→无损 normalize；三份 CSS 导出→demo 消费包导出物；错误帮手→ApiError 类化）。A5/A9/A11/toastOnSettled 降级为能力补全/糖（§3）。批组按机制依赖序重排为 F1-F4。
