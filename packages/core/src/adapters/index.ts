@@ -1,4 +1,10 @@
 export {
+  buildUrl,
+  extractErrorMessage,
+  type QueryParams,
+  statusToApiError,
+} from "./api-error";
+export {
   clientCollection,
   decodeClientCursor,
   encodeClientCursor,
@@ -11,7 +17,6 @@ export {
   type HttpOptions,
   type HttpRequest,
   NetworkFailure,
-  type QueryParams,
   runApi,
 } from "./http";
 export {
@@ -29,6 +34,13 @@ export {
   mockSeqTransport,
   mockTransport,
 } from "./mock-transport";
+export {
+  type FetchLike,
+  type RestCollectionOptions,
+  type RestRecordOptions,
+  restCollection,
+  restRecord,
+} from "./rest";
 export {
   createSubscriptionEngine,
   type SubscriptionEngine,

@@ -1,5 +1,8 @@
 import { Data, Effect } from "effect";
 import { type ApiError, isApiError } from "../kernel";
+import { buildUrl, statusToApiError, type QueryParams } from "./api-error";
+
+export type { QueryParams } from "./api-error";
 
 /**
  * 缝 1 —— http 管线（Effect 住在缝里，Promise 站在边界上）。
@@ -7,6 +10,7 @@ import { type ApiError, isApiError } from "../kernel";
  * - 网络断层 = typed failure（HttpFailure/NetworkFailure → ApiError），defect 只留程序错误；
  * - runApi 是唯一 Effect→Promise 边界：mapError 归一为 ApiError，defect 包裹上报，interrupt 放行；
  * - 401 闭环：管线内先走 onUnauthorized（单飞由实现方保证），仍失败才以 ApiError.auth 出界。
+ * - Response 状态 → ApiError 的收敛在 api-error.ts 单源（rest 工厂共用）。
  */
 
 export class HttpFailure extends Data.TaggedError("HttpFailure")<{
@@ -20,33 +24,12 @@ export class NetworkFailure extends Data.TaggedError("NetworkFailure")<{
 
 type AdapterFailure = HttpFailure | NetworkFailure;
 
-function extractMessage(body: unknown): string | undefined {
-  if (typeof body === "object" && body !== null) {
-    const record = body as Record<string, unknown>;
-    if (typeof record.message === "string") return record.message;
-    if (typeof record.error === "object" && record.error !== null) {
-      const inner = (record.error as Record<string, unknown>).message;
-      if (typeof inner === "string") return inner;
-    }
-  }
-  return undefined;
-}
-
 function toApiError(failure: AdapterFailure): ApiError {
   switch (failure._tag) {
     case "NetworkFailure":
       return { kind: "network", ...(failure.cause !== undefined ? { cause: failure.cause } : {}) };
-    case "HttpFailure": {
-      const { status, body } = failure;
-      if (status === 401) return { kind: "auth" };
-      if (status === 403) return { kind: "forbidden" };
-      if (status === 404) return { kind: "not-found" };
-      return {
-        kind: "server",
-        status,
-        ...(extractMessage(body) ? { message: extractMessage(body) } : {}),
-      };
-    }
+    case "HttpFailure":
+      return statusToApiError(failure.status, failure.body);
   }
 }
 
@@ -71,30 +54,12 @@ export interface HttpOptions {
   onUnauthorized?: () => void | Promise<void>;
 }
 
-export type QueryParams = Record<string, string | number | boolean | ReadonlyArray<string>>;
-
 export interface HttpRequest {
   params?: QueryParams;
   headers?: Record<string, string>;
   signal?: AbortSignal;
   /** 运行时解码（Effect Schema transform 接入点；缺省直通 as T） */
   decode?: (raw: unknown) => unknown;
-}
-
-function buildUrl(baseUrl: string | undefined, path: string, params?: QueryParams): string {
-  const url = baseUrl ? `${baseUrl}${path}` : path;
-  if (!params) return url;
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined) continue;
-    if (Array.isArray(value)) {
-      for (const item of value) search.append(key, item); // repeated key=a&key=b（gateway 方言）
-    } else {
-      search.append(key, String(value));
-    }
-  }
-  const qs = search.toString();
-  return qs ? `${url}?${qs}` : url;
 }
 
 export function createHttp(options: HttpOptions = {}) {
