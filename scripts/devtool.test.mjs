@@ -3,7 +3,7 @@
 // CLI 端到端（临时目录真拷贝）。
 import { strict as assert } from "node:assert";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -40,7 +40,10 @@ test("token 引擎：不误伤映射目标形（text-muted-foreground 不被二�
 });
 
 test("token 引擎：bg-panel 不命中 bg-panel-2（连字符是 token 内部字符）", () => {
-  const { applied } = applyTokenMap('className="bg-panel bg-panel-2"', loadProfile("torchwood").tokenMap);
+  const { applied } = applyTokenMap(
+    'className="bg-panel bg-panel-2"',
+    loadProfile("torchwood").tokenMap,
+  );
   const panel = applied.find((a) => a.from === "bg-panel");
   const panel2 = applied.find((a) => a.from === "bg-panel-2");
   assert.equal(panel.count, 1);
@@ -60,13 +63,21 @@ test("token 引擎：未映射方言 token 进警告面（bg-muted 目标不误�
 });
 
 test("判断题检测：tone=/chart 基元/页壳", () => {
-  const hints = detectManualHints(
-    '<Badge tone="ok">x</Badge><X import="chart"/>',
-  );
+  const hints = detectManualHints('<Badge tone="ok">x</Badge><X import="chart"/>');
   // tone= 检测独立验证；chart/table-core/页壳逐项
-  assert.ok(detectManualHints('import { ChartContainer } from "@/components/ui/chart";').some((h) => h.includes("chart 基元")));
-  assert.ok(detectManualHints('import type { RowData } from "@tanstack/table-core";').some((h) => h.includes("table-core")));
-  assert.ok(detectManualHints('<div className="mx-auto max-w-5xl p-6">').some((h) => h.includes("页壳")));
+  assert.ok(
+    detectManualHints('import { ChartContainer } from "@/components/ui/chart";').some((h) =>
+      h.includes("chart 基元"),
+    ),
+  );
+  assert.ok(
+    detectManualHints('import type { RowData } from "@tanstack/table-core";').some((h) =>
+      h.includes("table-core"),
+    ),
+  );
+  assert.ok(
+    detectManualHints('<div className="mx-auto max-w-5xl p-6">').some((h) => h.includes("页壳")),
+  );
   assert.ok(hints.some((h) => h.includes("tone=")));
 });
 
@@ -81,7 +92,10 @@ test("头生成：源路径/版本/profile/适配清单/手工区", () => {
     unmapped: [{ token: "text-warn", count: 2 }],
     manualHints: ["Badge tone= ×1——…"],
   });
-  assert.match(header, /vendored from @lynx-go\/uikit registry\/values\/states\.tsx @0\.1\.1（2026-10-25 测试批次）/);
+  assert.match(
+    header,
+    /vendored from @lynx-go\/uikit registry\/values\/states\.tsx @0\.1\.1（2026-10-25 测试批次）/,
+  );
   assert.match(header, /--profile torchwood/);
   assert.match(header, /text-muted→text-muted-foreground/);
   assert.match(header, /手工步骤/);
@@ -103,7 +117,15 @@ test("头生成：无警告面时不出现手工区", () => {
 });
 
 test("profile 完备性：键 ⊆ 源词表；torchwood 核心 7 形全映射；fleetly 恒等化；warn/ok/accent 是警告面", () => {
-  const CORE = ["text-muted", "bg-panel", "bg-panel-2", "border-line", "divide-line", "text-fg", "text-err"];
+  const CORE = [
+    "text-muted",
+    "bg-panel",
+    "bg-panel-2",
+    "border-line",
+    "divide-line",
+    "text-fg",
+    "text-err",
+  ];
   for (const name of ["fleetly", "torchwood"]) {
     const { tokenMap } = loadProfile(name);
     for (const key of Object.keys(tokenMap)) {
@@ -132,11 +154,13 @@ test("registry.json 依赖收敛：无 workspace:/catalog: 协议泄漏，core �
     assert.doesNotMatch(dep, /catalog:/, `协议泄漏：${dep}`);
   }
   // core 依赖单源随版本走（major.minor range 从 package.json 推导——版本升级不再漏改此断言）
-  const coreVersion = JSON.parse(readFileSync(join(root, "packages/core/package.json"), "utf8")).version;
+  const coreVersion = JSON.parse(
+    readFileSync(join(root, "packages/core/package.json"), "utf8"),
+  ).version;
   const [major, minor] = coreVersion.split(".");
   assert.ok(deps.has(`@lynx-go/uikit-core@^${major}.${minor}`), `core 依赖单源 ^${major}.${minor}`);
-  const kitCount = items.filter((it) =>
-    it.dependencies.filter((d) => d.startsWith("@lynx-go/uikit-core")).length > 1,
+  const kitCount = items.filter(
+    (it) => it.dependencies.filter((d) => d.startsWith("@lynx-go/uikit-core")).length > 1,
   );
   assert.equal(kitCount.length, 0, "core 依赖单源（不混 workspace 解析值）");
 });
@@ -147,7 +171,17 @@ test("CLI 端到端：copy 真块到临时目录（映射+头+警告面+不覆�
     // 1) torchwood profile 拷 event-feed（含 warn 系 → 警告面 + tone= 检测）
     const out = execFileSync(
       process.execPath,
-      ["scripts/devtool.mjs", "copy", "subscription/event-feed", "--to", tmp, "--profile", "torchwood", "--note", "e2e"],
+      [
+        "scripts/devtool.mjs",
+        "copy",
+        "subscription/event-feed",
+        "--to",
+        tmp,
+        "--profile",
+        "torchwood",
+        "--note",
+        "e2e",
+      ],
       { cwd: root, encoding: "utf8" },
     );
     assert.match(out, /⚠ 未映射/);
@@ -155,7 +189,10 @@ test("CLI 端到端：copy 真块到临时目录（映射+头+警告面+不覆�
     const target = join(tmp, "components", "kit", "subscription", "event-feed.tsx");
     assert.ok(existsSync(target));
     const vendored = readFileSync(target, "utf8");
-    assert.match(vendored, /^\/\/ vendored from @lynx-go\/uikit registry\/subscription\/event-feed\.tsx @\d+\.\d+\.\d+/);
+    assert.match(
+      vendored,
+      /^\/\/ vendored from @lynx-go\/uikit registry\/subscription\/event-feed\.tsx @\d+\.\d+\.\d+/,
+    );
     assert.match(vendored, /text-muted-foreground/);
     // 代码体（头注释之后的 import 起）不得残留源方言 token——头注释里的
     // "text-muted→text-muted-foreground" 是映射文档，属合法出现。
@@ -167,7 +204,15 @@ test("CLI 端到端：copy 真块到临时目录（映射+头+警告面+不覆�
     try {
       execFileSync(
         process.execPath,
-        ["scripts/devtool.mjs", "copy", "subscription/event-feed", "--to", tmp, "--profile", "torchwood"],
+        [
+          "scripts/devtool.mjs",
+          "copy",
+          "subscription/event-feed",
+          "--to",
+          tmp,
+          "--profile",
+          "torchwood",
+        ],
         { cwd: root, encoding: "utf8", stdio: "pipe" },
       );
     } catch {
@@ -178,7 +223,16 @@ test("CLI 端到端：copy 真块到临时目录（映射+头+警告面+不覆�
     // 3) fleetly 恒等化实证：tokenMap 空 → 源方言原样保留（text-err 不改写）
     execFileSync(
       process.execPath,
-      ["scripts/devtool.mjs", "copy", "values/states", "--to", tmp, "--profile", "fleetly", "--force"],
+      [
+        "scripts/devtool.mjs",
+        "copy",
+        "values/states",
+        "--to",
+        tmp,
+        "--profile",
+        "fleetly",
+        "--force",
+      ],
       { cwd: root, encoding: "utf8" },
     );
     const states = readFileSync(join(tmp, "components", "kit", "values", "states.tsx"), "utf8");
@@ -191,10 +245,16 @@ test("CLI 端到端：copy 真块到临时目录（映射+头+警告面+不覆�
 });
 
 test("list/profiles 命令面", () => {
-  const list = execFileSync(process.execPath, ["scripts/devtool.mjs", "list"], { cwd: root, encoding: "utf8" });
+  const list = execFileSync(process.execPath, ["scripts/devtool.mjs", "list"], {
+    cwd: root,
+    encoding: "utf8",
+  });
   assert.match(list, /values: /);
   assert.match(list, /subscription: /);
-  const profiles = execFileSync(process.execPath, ["scripts/devtool.mjs", "profiles"], { cwd: root, encoding: "utf8" });
+  const profiles = execFileSync(process.execPath, ["scripts/devtool.mjs", "profiles"], {
+    cwd: root,
+    encoding: "utf8",
+  });
   assert.match(profiles, /torchwood/);
   assert.match(profiles, /警告面/);
 });
@@ -214,7 +274,9 @@ test("diff v2：lineDiff/stripVendoredHeader 纯函数矩阵", () => {
   const d2 = lineDiff("a\nb\nc\nd\ne", "a\nX\nc\nd\nY", 0);
   assert.ok(d2.hunks.length >= 2);
   // 头剥离：首个 import 前的注释行全部去除
-  const stripped = stripVendoredHeader("// vendored from …\n// 手工区\nimport { x } from \"y\";\nexport const z = x;");
+  const stripped = stripVendoredHeader(
+    '// vendored from …\n// 手工区\nimport { x } from "y";\nexport const z = x;',
+  );
   assert.ok(stripped.startsWith("import"));
   assert.ok(!stripped.includes("vendored from"));
 });
@@ -241,7 +303,16 @@ test("diff v2：CLI 端到端——拷贝后 in-sync，改动后漂移可见", (
     try {
       execFileSync(
         process.execPath,
-        ["scripts/devtool.mjs", "diff", "values/states", "--to", tmp, "--profile", "torchwood", "--check"],
+        [
+          "scripts/devtool.mjs",
+          "diff",
+          "values/states",
+          "--to",
+          tmp,
+          "--profile",
+          "torchwood",
+          "--check",
+        ],
         { cwd: root, encoding: "utf8", stdio: "pipe" },
       );
     } catch (e) {

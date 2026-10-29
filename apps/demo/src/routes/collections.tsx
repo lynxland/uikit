@@ -6,13 +6,7 @@ import { StatCard } from "@blocks/values/stat-card";
 import { StatusBadge } from "@blocks/values/status-badge";
 import { useCollection, useCollectionData } from "@lynx-go/uikit-core";
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  schedulesResource,
-  schedulesSearch,
-  tasksFetchAll,
-  tasksResource,
-  tasksSearch,
-} from "@/lib/resources";
+import { schedulesResource, schedulesSearch, tasksResource, tasksSearch } from "@/lib/resources";
 
 // 多集合同路由（M1 namespace + M3 无损编解码）：
 // - 两个 collectionQuerySchema 各带 namespace（tasks/schedules）——URL 键
@@ -67,11 +61,7 @@ function CollectionsPage() {
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <section className="rounded-lg border border-line bg-panel" data-testid="tasks-panel">
           <h2 className="px-3 pt-3 pb-1 text-sm font-medium">Tasks</h2>
-          <FilterBar
-            list={tasks}
-            schema={tasksSearch}
-            textPlaceholder="Search tasks… (tasks.q)"
-          />
+          <FilterBar list={tasks} schema={tasksSearch} textPlaceholder="Search tasks… (tasks.q)" />
           <DataTable
             list={tasks}
             getRowId={(row) => row.id}

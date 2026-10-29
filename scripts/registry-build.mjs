@@ -71,7 +71,9 @@ for (const [name, range] of Object.entries(rawRanges)) {
   if (range.startsWith("catalog:")) {
     const resolved = catalog[name];
     if (!resolved) {
-      throw new Error(`registry-build: ${name} 声明 ${range} 但 pnpm-workspace.yaml catalogs 未登记——先补 catalog 或改直书版本`);
+      throw new Error(
+        `registry-build: ${name} 声明 ${range} 但 pnpm-workspace.yaml catalogs 未登记——先补 catalog 或改直书版本`,
+      );
     }
     knownRanges[name] = resolved;
   } else if (!range.startsWith("workspace:")) {
@@ -143,7 +145,9 @@ for (const family of families) {
   const claimed = new Set(items.flatMap((i) => i.files.map((f) => basename(f.path))));
   for (const sc of sidecars) {
     if (!claimed.has(sc)) {
-      throw new Error(`registry build: orphan sidecar registry/${family}/${sc} — no block imports it`);
+      throw new Error(
+        `registry build: orphan sidecar registry/${family}/${sc} — no block imports it`,
+      );
     }
   }
 }

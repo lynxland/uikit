@@ -7,10 +7,12 @@ test.describe("two collections, one route (namespace keys)", () => {
     page,
   }) => {
     await page.goto("/collections");
-    await expect(page.getByTestId("tasks-panel").getByRole("cell", { name: "task-01" })).toBeVisible(
-      { timeout: 10_000 },
-    );
-    await expect(page.getByTestId("schedules-panel").getByRole("cell", { name: "sched-01" })).toBeVisible();
+    await expect(
+      page.getByTestId("tasks-panel").getByRole("cell", { name: "task-01" }),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.getByTestId("schedules-panel").getByRole("cell", { name: "sched-01" }),
+    ).toBeVisible();
 
     // 初始：无任何 q 键
     await expect(page).not.toHaveURL(/q/);
@@ -33,18 +35,30 @@ test.describe("two collections, one route (namespace keys)", () => {
     await expect(
       page.getByTestId("tasks-panel").getByRole("cell", { name: "task-05", exact: true }),
     ).toBeHidden();
-    await expect(page.getByTestId("tasks-panel").getByRole("cell", { name: "task-10", exact: true })).toBeVisible();
-    await expect(page.getByTestId("schedules-panel").getByRole("cell", { name: "sched-02", exact: true })).toBeHidden();
-    await expect(page.getByTestId("schedules-panel").getByRole("cell", { name: "sched-10", exact: true })).toBeVisible();
+    await expect(
+      page.getByTestId("tasks-panel").getByRole("cell", { name: "task-10", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("schedules-panel").getByRole("cell", { name: "sched-02", exact: true }),
+    ).toBeHidden();
+    await expect(
+      page.getByTestId("schedules-panel").getByRole("cell", { name: "sched-10", exact: true }),
+    ).toBeVisible();
   });
 
   test("deep link restores both lists from namespaced keys", async ({ page }) => {
     await page.goto("/collections?tasks.q=task-2&schedules.q=sched-1");
-    await expect(page.getByTestId("tasks-panel").getByRole("cell", { name: "task-21", exact: true })).toBeVisible({
+    await expect(
+      page.getByTestId("tasks-panel").getByRole("cell", { name: "task-21", exact: true }),
+    ).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByTestId("tasks-panel").getByRole("cell", { name: "task-01", exact: true })).toBeHidden();
-    await expect(page.getByTestId("schedules-panel").getByRole("cell", { name: "sched-10", exact: true })).toBeVisible();
+    await expect(
+      page.getByTestId("tasks-panel").getByRole("cell", { name: "task-01", exact: true }),
+    ).toBeHidden();
+    await expect(
+      page.getByTestId("schedules-panel").getByRole("cell", { name: "sched-10", exact: true }),
+    ).toBeVisible();
 
     // 搜索框初值来自各命名空间键（FilterBar 经谓词回读）
     await expect(page.getByTestId("tasks-panel").getByLabel("Search")).toHaveValue("task-2");
