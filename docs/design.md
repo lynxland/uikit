@@ -1097,6 +1097,8 @@ torchwood ui-kit 全量改造（§12.9）收尾后的消费侧审查：三轴并
 
 **验收与门禁**：`pnpm check` 全绿（layer-check + typecheck（严格度加严）+ size-check 20.9 kB ≤ 35 kB + 138 单测 + devtool）；demo e2e 28/28（新增 collections 3 条：键隔离/深链还原/伴读全量行）。版本面 0.4.0 候选（本批不发版——发版与 fleetly 回流另批）。
 
+**发版补记（2026-10-29，0.4.0 已发布）**：发版前 flaky 复审抓获真 bug——useRecord 的 query.enabled 未透传 queryOptions（M1 扩齐遗漏；旧测试 10ms 定时器翻 enabled 恰好与查询解析赛跑掩盖缺陷，改按钮驱动后确定性复现），修复后 5/5 稳定再发。`pnpm publish --no-git-checks` + publint + 净房冒烟全过；npm staged 版本传播本次约 5 分钟（registry 元数据可见 ≠ install 可解析——`npm view` 先见而 install 撞 ETARGET，净房换用独立 cache 目录绕过陈旧 packument 才装上；§12.10 的"约 1 分钟"窗口记录据此加宽）。
+
 **breaking 清单（0.4.0）**：① M2 投影匹配放宽 + 查询键形变更（scopeKeys 第 4 段，record id 第 5 段）；② M3 normalize 缺省 passthrough（validate 输出含未知键）；③ M10 core tsconfig 严格度加严只影响贡献方；QueryParams 放宽 undefined 为非破坏加宽。消费方升级面：手工拼 kit 键的测试需改用 collectionQueryOptions().queryKey 单源；依赖 normalize 丢键的路由需显式 unknownKeys:"drop"。
 
 **fleetly 回流预期**（升级 0.4.0 后可退役的消费方补丁对照）：19 伴读钩子 + 38 处 `.data?.rows` 解包 → useCollectionData 直消费；8 合并路由 validateSearch → 双 schema validate 组合或 namespace 形态；providers-view 裸 useQuery（30s 轮询）→ useRecord {query:{refetchInterval}}；kit/http.ts 微工厂 + 逐资源 fetch 样板（18 文件 toApiError 收敛）→ restCollection/restRecord；4 处 404→null 手写分支 → notFound:"null"；git hook 三写等手传 scope 补丁 → descriptor.scopeOf + 投影匹配（app-settings/panels 两测试锚零手传 scope 转绿）；backups 全量统计退场 → window:"all"。M5-M9（Transport 工厂/错误类化/token 单源/块契约）与 F4（漂移执法）不在本批。
