@@ -303,6 +303,7 @@ export function useRecord<T, ID, C extends CommandsRecord<ID>, S extends SubsRec
         ? { refetchInterval: options.query.refetchInterval }
         : {}),
       ...(options.query?.retry !== undefined ? { retry: options.query.retry } : {}),
+      ...(options.query?.enabled !== undefined ? { enabled: options.query.enabled } : {}),
     }),
     ...(scopeReady(resource, scope) ? {} : { enabled: false }),
   });

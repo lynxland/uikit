@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup } from "@testing-library/react";
-import { screen, waitFor } from "@testing-library/react";
-import { useEffect, useState } from "react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { clientCollection, mockFetchAll } from "../src/adapters";
 import type { ApiError } from "../src/kernel";
@@ -107,18 +107,22 @@ describe("useRecord options 扩齐（M1：refetchInterval/enabled/retry）", () 
   it("enabled: false 停 loading，翻 true 后正常出数", async () => {
     function RecordProbe() {
       const [enabled, setEnabled] = useState(false);
-      useEffect(() => {
-        const t = setTimeout(() => setEnabled(true), 10);
-        return () => clearTimeout(t);
-      }, []);
       const record = useRecord(rowsResource, { id: "row-01", query: { enabled } });
-      return <span data-testid="record-status">{record.status}</span>;
+      return (
+        <>
+          <span data-testid="record-status">{record.status}</span>
+          <button type="button" onClick={() => setEnabled(true)}>
+            enable
+          </button>
+        </>
+      );
     }
     await renderWithKit(<RecordProbe />, {});
+    // enabled:false —— 查询未启用，停 loading（无定时器驱动，确定性断言）
     expect(screen.getByTestId("record-status").textContent).toBe("loading");
-    await waitFor(
-      () => expect(screen.getByTestId("record-status").textContent).toBe("success"),
-      { timeout: 2000 },
+    fireEvent.click(screen.getByRole("button", { name: "enable" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("record-status").textContent).toBe("success"),
     );
   });
 });
