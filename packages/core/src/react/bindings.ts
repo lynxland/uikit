@@ -19,13 +19,21 @@ import { batchQueryOptions, collectionQueryOptions, recordQueryOptions } from ".
 import { scopeReady, useContextScope } from "./scope";
 
 /**
- * useCollection —— collection Query ↔ URL ↔ Table 的绑定。
- *
- * 写入契约（design.md §2.1.1）：
- * - 一切 setter 走函数式 search（对象字面量会静默 strip 消费方自定义参数）；
- * - 翻页 = push（历史栈即分页栈）；谓词/排序变化 = replace + 清游标回第一页；
- * - 绑定不在渲染期 navigate。
+ * 读模型分层（M1）：
+ * - **data 层** `useCollectionData` —— 零 URL、rows 直出（伴读消费点：壳层组件、
+ *   表单下拉、统计条……不再手写三件套或解包 `.data?.rows`）；
+ * - **URL 绑定层** `useCollection` —— data 层之上的装配（search 解码 + 写入契约
+ *   setter），语义与既有形态不变。
+ * scope 缺省链两层同构：显式传入 > （资源声明了 scope 键时）ResourceScopeProvider
+ * context > 无 scope。未就绪自动停用（fail-safe）同构。
  */
+
+/** window: "all" 的归一形态——整取方言（clientCollection）下的全量行访问。 */
+const ALL_WINDOW: QueryWindow = { size: Number.MAX_SAFE_INTEGER };
+const DEFAULT_DATA_SIZE = 20;
+
+const EMPTY_ROWS: ReadonlyArray<never> = [];
+
 export interface CollectionHandle<T> {
   rows: ReadonlyArray<T>;
   segment: Segment<T> | undefined;
@@ -50,8 +58,6 @@ export interface CollectionHandle<T> {
   searchPatch(patch: FlatPatch, options?: { replace?: boolean }): void;
 }
 
-const EMPTY_ROWS: ReadonlyArray<never> = [];
-
 export interface UseCollectionOptions {
   /** 调用方路由 id（Route.id——search 解码锚定活跃 match；pathless 布局下与 fullPath 不同形） */
   from: string;
@@ -62,11 +68,123 @@ export interface UseCollectionOptions {
     staleTime?: number;
     refetchInterval?: number | false;
     enabled?: boolean;
+    retry?: boolean | number;
     /** 默认 true：翻页/过滤过渡不闪 loading */
     keepPrevious?: boolean;
   };
 }
 
+// ============ data 层核心（useCollectionData / useCollection 共用） ============
+
+export interface UseCollectionDataOptions {
+  scope?: ResourceScope;
+  predicate?: Predicate;
+  order?: ReadonlyArray<Order>;
+  /** 窗口尺寸速记（与 window 二选一；均缺省 20） */
+  size?: number;
+  /**
+   * 查询窗口。`"all"` = 整取方言的全量行访问（归一为超大 size 窗口——
+   * clientCollection 天然支持；服务端方言慎用）。
+   */
+  window?: QueryWindow | "all";
+  staleTime?: number;
+  refetchInterval?: number | false;
+  enabled?: boolean;
+  retry?: boolean | number;
+  /** 默认 true：过渡不闪 loading（与 URL 层同律） */
+  keepPrevious?: boolean;
+}
+
+/** data 层句柄：URL 层句柄的无 setter 前缀（rows 直出，伴读消费形态）。 */
+export interface CollectionDataHandle<T> {
+  rows: ReadonlyArray<T>;
+  segment: Segment<T> | undefined;
+  /** 生效查询（options 组装的最终形；queryKey 由它单源派生） */
+  query: CollectionQuery;
+  status: "loading" | "empty" | "error" | "success";
+  error: ApiError | null;
+  total: number | undefined;
+  isFetching: boolean;
+  refetch: () => void;
+}
+
+function statusOf<T>(isPending: boolean, isError: boolean, rows: ReadonlyArray<T>) {
+  return isPending ? "loading" : isError ? "error" : rows.length === 0 ? "empty" : "success";
+}
+
+function useCollectionDataCore<T, ID, C extends CommandsRecord<ID>, S extends SubsRecord>(
+  resource: Resource<T, ID, C, S>,
+  scope: ResourceScope | undefined,
+  query: CollectionQuery,
+  engine: {
+    staleTime?: number;
+    refetchInterval?: number | false;
+    enabled?: boolean;
+    retry?: boolean | number;
+    keepPrevious?: boolean;
+  },
+): CollectionDataHandle<T> {
+  const target = scope ? scoped(resource, scope) : resource;
+  // 未就绪自动停用（fail-safe）：资源声明的 scope 键缺值时不启用——
+  // 消费方不再需要逐页 enabled 守卫，也堵住"未就绪空段"污染无 scope 键。
+  const ready = scopeReady(resource, scope);
+  const enabled = ready ? engine.enabled : false;
+  const result = useQuery<Segment<T>, ApiError>({
+    ...collectionQueryOptions(target, query, {
+      ...(engine.staleTime !== undefined ? { staleTime: engine.staleTime } : {}),
+      ...(engine.refetchInterval !== undefined ? { refetchInterval: engine.refetchInterval } : {}),
+      ...(engine.retry !== undefined ? { retry: engine.retry } : {}),
+      ...(enabled !== undefined ? { enabled } : {}),
+    }),
+    ...(engine.keepPrevious !== false ? { placeholderData: keepPreviousData } : {}),
+  });
+
+  const rows = result.data?.rows ?? EMPTY_ROWS;
+  return {
+    rows,
+    segment: result.data,
+    query,
+    status: statusOf(result.isPending, result.isError, rows),
+    error: result.error ?? null,
+    total: result.data?.total,
+    isFetching: result.isFetching,
+    refetch: () => void result.refetch(),
+  };
+}
+
+/**
+ * useCollectionData —— collection Query 的 data 层绑定（零 URL）。
+ *
+ * 伴读消费的标准形态：壳层组件 / 表单下拉 / 统计条直接 rows 直出——
+ * 不进 URL、不受列表页 q/page/cursor 影响（读原语与 URL 视图绑定解耦）。
+ * 整取方言的全量行访问用 `window: "all"`。
+ */
+export function useCollectionData<T, ID, C extends CommandsRecord<ID>, S extends SubsRecord>(
+  resource: Resource<T, ID, C, S>,
+  options: UseCollectionDataOptions = {},
+): CollectionDataHandle<T> {
+  const contextScope = useContextScope();
+  const scope = options.scope ?? (resource.scope?.length ? contextScope : undefined);
+  const window =
+    options.window === "all" ? ALL_WINDOW : (options.window ?? { size: options.size ?? DEFAULT_DATA_SIZE });
+  const query: CollectionQuery = {
+    ...(options.predicate ? { predicate: options.predicate } : {}),
+    ...(options.order ? { order: options.order } : {}),
+    window,
+  };
+  return useCollectionDataCore(resource, scope, query, options);
+}
+
+// ============ URL 绑定层（data 层之上的装配） ============
+
+/**
+ * useCollection —— collection Query ↔ URL ↔ Table 的绑定。
+ *
+ * 写入契约（design.md §2.1.1）：
+ * - 一切 setter 走函数式 search（对象字面量会静默 strip 消费方自定义参数）；
+ * - 翻页 = push（历史栈即分页栈）；谓词/排序变化 = replace + 清游标回第一页；
+ * - 绑定不在渲染期 navigate。
+ */
 export function useCollection<T, ID, C extends CommandsRecord<ID>, S extends SubsRecord>(
   resource: Resource<T, ID, C, S>,
   options: UseCollectionOptions,
@@ -89,27 +207,18 @@ export function useCollection<T, ID, C extends CommandsRecord<ID>, S extends Sub
     replace?: boolean;
   }) => Promise<void>;
 
-  // scope 缺省链：显式传入 > （资源声明了 scope 键时）ResourceScopeProvider
-  // context > 无 scope。声明 = 参与 scope 线程：未声明 scope 键的资源不采纳
-  // context 值——平台级资源不被项目 scope 意外污染（queryKey/失效相交均不受影响）。
   const contextScope = useContextScope();
   const scope = options.scope ?? (resource.scope?.length ? contextScope : undefined);
-  const target = scope ? scoped(resource, scope) : resource;
   const query = options.search.decode(rawSearch);
-  const keepPrevious = options.query?.keepPrevious !== false;
-  // 未就绪自动停用（fail-safe）：资源声明的 scope 键缺值时不启用——
-  // 消费方不再需要逐页 enabled 守卫，也堵住"未就绪空段"污染无 scope 键。
-  const enabled = scopeReady(resource, scope) ? options.query?.enabled : false;
 
-  const result = useQuery<Segment<T>, ApiError>({
-    ...collectionQueryOptions(target, query, {
-      ...(options.query?.staleTime !== undefined ? { staleTime: options.query.staleTime } : {}),
-      ...(options.query?.refetchInterval !== undefined
-        ? { refetchInterval: options.query.refetchInterval }
-        : {}),
-      ...(enabled !== undefined ? { enabled } : {}),
-    }),
-    ...(keepPrevious ? { placeholderData: keepPreviousData } : {}),
+  const data = useCollectionDataCore(resource, scope, query, {
+    ...(options.query?.staleTime !== undefined ? { staleTime: options.query.staleTime } : {}),
+    ...(options.query?.refetchInterval !== undefined
+      ? { refetchInterval: options.query.refetchInterval }
+      : {}),
+    ...(options.query?.retry !== undefined ? { retry: options.query.retry } : {}),
+    ...(options.query?.enabled !== undefined ? { enabled: options.query.enabled } : {}),
+    ...(options.query?.keepPrevious !== undefined ? { keepPrevious: options.query.keepPrevious } : {}),
   });
 
   const searchPatch = (patch: FlatPatch, navOptions?: { replace?: boolean }) => {
@@ -130,7 +239,7 @@ export function useCollection<T, ID, C extends CommandsRecord<ID>, S extends Sub
     searchPatch(options.search.patch({ window }), { replace: false });
   };
   const next = (): boolean => {
-    const segment = result.data;
+    const segment = data.segment;
     if (!segment) return false;
     const w = advance(query.window, segment, "next");
     if (!w) return false;
@@ -138,7 +247,7 @@ export function useCollection<T, ID, C extends CommandsRecord<ID>, S extends Sub
     return true;
   };
   const prev = (): boolean => {
-    const segment = result.data;
+    const segment = data.segment;
     if (!segment) return false;
     const w = advance(query.window, segment, "prev");
     if (!w) return false;
@@ -150,24 +259,8 @@ export function useCollection<T, ID, C extends CommandsRecord<ID>, S extends Sub
     searchPatch(options.search.resetPatch(), { replace: true });
   };
 
-  const rows = result.data?.rows ?? EMPTY_ROWS;
-  const status: CollectionHandle<T>["status"] = result.isPending
-    ? "loading"
-    : result.isError
-      ? "error"
-      : rows.length === 0
-        ? "empty"
-        : "success";
-
   return {
-    rows,
-    segment: result.data,
-    query,
-    status,
-    error: result.error ?? null,
-    total: result.data?.total,
-    isFetching: result.isFetching,
-    refetch: () => void result.refetch(),
+    ...data,
     setPredicate,
     setOrder,
     setWindow,
@@ -187,7 +280,18 @@ export interface RecordHandle<T> {
 
 export function useRecord<T, ID, C extends CommandsRecord<ID>, S extends SubsRecord>(
   resource: Resource<T, ID, C, S>,
-  options: { id: ID | undefined; scope?: ResourceScope; query?: { staleTime?: number } },
+  options: {
+    id: ID | undefined;
+    scope?: ResourceScope;
+    /** M1 扩齐：refetchInterval（providers-view 30s 轮询不再落回裸 useQuery）/
+     *  enabled / retry / staleTime */
+    query?: {
+      staleTime?: number;
+      refetchInterval?: number | false;
+      enabled?: boolean;
+      retry?: boolean | number;
+    };
+  },
 ): RecordHandle<T> {
   const contextScope = useContextScope();
   const scope = options.scope ?? (resource.scope?.length ? contextScope : undefined);
@@ -195,6 +299,10 @@ export function useRecord<T, ID, C extends CommandsRecord<ID>, S extends SubsRec
   const result = useQuery<T, ApiError>({
     ...recordQueryOptions(target, options.id, {
       ...(options.query?.staleTime !== undefined ? { staleTime: options.query.staleTime } : {}),
+      ...(options.query?.refetchInterval !== undefined
+        ? { refetchInterval: options.query.refetchInterval }
+        : {}),
+      ...(options.query?.retry !== undefined ? { retry: options.query.retry } : {}),
     }),
     ...(scopeReady(resource, scope) ? {} : { enabled: false }),
   });

@@ -19,6 +19,8 @@ export interface QueryEngineOptions {
   staleTime?: number;
   refetchInterval?: number | false;
   enabled?: boolean;
+  /** TanStack retry 直通（number = 次数上限；false = 关闭）；ApiError 感知分类见 kernel isRetryable */
+  retry?: boolean | number;
 }
 
 /** queryOptions 工厂：queryKey 单源；hooks 与 route loader（ensureQueryData/Link preload）共用。 */
@@ -32,6 +34,7 @@ export function collectionQueryOptions<T, ID, C extends CommandsRecord<ID>, S ex
   staleTime?: number;
   refetchInterval?: number | false;
   enabled?: boolean;
+  retry?: boolean | number;
 } {
   const collection = resource.collection;
   if (!collection) {
@@ -56,6 +59,7 @@ export function recordQueryOptions<T, ID, C extends CommandsRecord<ID>, S extend
   staleTime?: number;
   refetchInterval?: number | false;
   enabled?: boolean;
+  retry?: boolean | number;
 } {
   const record = resource.record;
   if (!record) {
@@ -86,6 +90,7 @@ export function batchQueryOptions<T, ID, C extends CommandsRecord<ID>, S extends
   staleTime?: number;
   refetchInterval?: number | false;
   enabled?: boolean;
+  retry?: boolean | number;
 } {
   const batch = resource.batch;
   if (!batch) {

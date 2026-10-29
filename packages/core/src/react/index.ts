@@ -5,11 +5,14 @@ export type {
 } from "../adapters/subscription";
 export {
   type BatchHandle,
+  type CollectionDataHandle,
   type CollectionHandle,
   type RecordHandle,
+  type UseCollectionDataOptions,
   type UseCollectionOptions,
   useBatch,
   useCollection,
+  useCollectionData,
   useRecord,
 } from "./bindings";
 export {
