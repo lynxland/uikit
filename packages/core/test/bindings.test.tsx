@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup } from "@testing-library/react";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { clientCollection, mockFetchAll } from "../src/adapters";
 import type { ApiError } from "../src/kernel";
 import { defineResource } from "../src/kernel";
-import { collectionQuerySchema } from "../src/schema";
 import { useCollection, useCollectionData, useRecord } from "../src/react/bindings";
+import { collectionQuerySchema } from "../src/schema";
 import { renderWithKit } from "../src/testing";
 
 // M1 读模型分层：useCollectionData（data 层，零 URL）× useCollection（URL 装配层）。
@@ -121,9 +120,45 @@ describe("useRecord options 扩齐（M1：refetchInterval/enabled/retry）", () 
     // enabled:false —— 查询未启用，停 loading（无定时器驱动，确定性断言）
     expect(screen.getByTestId("record-status").textContent).toBe("loading");
     fireEvent.click(screen.getByRole("button", { name: "enable" }));
-    await waitFor(() =>
-      expect(screen.getByTestId("record-status").textContent).toBe("success"),
-    );
+    await waitFor(() => expect(screen.getByTestId("record-status").textContent).toBe("success"));
+  });
+
+  it("isFetching 直通：初载与 refetch 刷新期为 true，落定回 false（按钮驱动——§12.11 教训）", async () => {
+    // record 挂起由 pending 队列手动放行——零定时器赛跑
+    const pending: Array<(row: Row) => void> = [];
+    const gatedResource = defineResource({
+      name: "record-fetching",
+      getId: (r: Row) => r.id,
+      record: (id: string) =>
+        new Promise<Row>((resolve) => {
+          pending.push((row) => resolve({ ...row, id }));
+        }),
+    });
+    function FetchingProbe() {
+      const record = useRecord(gatedResource, { id: "row-01" });
+      return (
+        <>
+          <span data-testid="record-status">{record.status}</span>
+          <span data-testid="record-fetching">{record.isFetching ? "true" : "false"}</span>
+          <button type="button" onClick={() => record.refetch()}>
+            refetch
+          </button>
+        </>
+      );
+    }
+    await renderWithKit(<FetchingProbe />, {});
+    // 初载挂起期：isFetching true（断言只读渲染态，不推进时钟）
+    expect(screen.getByTestId("record-fetching").textContent).toBe("true");
+    pending.shift()!({ id: "x", name: "row-01" });
+    await waitFor(() => expect(screen.getByTestId("record-status").textContent).toBe("success"));
+    expect(screen.getByTestId("record-fetching").textContent).toBe("false");
+
+    // refetch 触发后台刷新（data 保留）：isFetching 翻 true，放行后回 false
+    fireEvent.click(screen.getByRole("button", { name: "refetch" }));
+    await waitFor(() => expect(screen.getByTestId("record-fetching").textContent).toBe("true"));
+    expect(screen.getByTestId("record-status").textContent).toBe("success");
+    pending.shift()!({ id: "x", name: "row-01" });
+    await waitFor(() => expect(screen.getByTestId("record-fetching").textContent).toBe("false"));
   });
 });
 

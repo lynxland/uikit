@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { clientCollection } from "../src/adapters/evaluate";
+import { restCollection, restFetchAll, restRecord } from "../src/adapters/rest";
 import type { ApiError } from "../src/kernel";
 import { isApiError } from "../src/kernel";
-import { restCollection, restRecord } from "../src/adapters/rest";
 
 // M4 REST 适配工厂：fetch 注入（bring-your-own-fetch 主干）、信封展平、
 // 404 空态、错误收敛（Response 状态 → ApiError 封闭集）。
@@ -86,7 +87,10 @@ describe("restCollection", () => {
       [503, { message: "maintenance" }, "server"],
     ];
     for (const [status, body, kind] of cases) {
-      const collection = restCollection({ path: () => "/x", fetch: vi.fn().mockResolvedValue(jsonResponse(status, body)) });
+      const collection = restCollection({
+        path: () => "/x",
+        fetch: vi.fn().mockResolvedValue(jsonResponse(status, body)),
+      });
       const error = (await collection(Q, {}).then(
         () => null,
         (e: unknown) => e,
@@ -165,12 +169,99 @@ describe("restRecord（与 restCollection 同构）", () => {
 
   it("headers 回调每次请求调用（会话/scope 头注入位）", async () => {
     // Response 体单次可读——每次调用产新实例
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => jsonResponse(200, { id: "a" }));
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
+      jsonResponse(200, { id: "a" }),
+    );
     const headers = vi.fn(() => ({ "X-Project": "p1" }));
     const record = restRecord({ path: (id) => `/t/${id}`, headers, fetch: fetchMock });
     await record("a", {});
     await record("a", {});
     expect(headers).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ headers: { "X-Project": "p1" } });
+  });
+});
+
+describe("restFetchAll（M4 第二形态：clientCollection 组合件——整取方言）", () => {
+  it("默认信封 body.rows + undefined/null 行过滤；clientCollection 组合后客户端求值谓词/窗口", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, { rows: [{ id: "a" }, undefined, null, { id: "b" }] }));
+    const fetchAll = restFetchAll<{ id: string; kind: string }>({
+      path: (ctx) => `/v1/projects/${ctx.projectId}/items`,
+      fetch: fetchMock,
+    });
+    // fleetly 消费形：clientCollection(restFetchAll(...)) —— URL 求值全在客户端
+    const collection = clientCollection(fetchAll);
+    const segment = await collection(
+      { predicate: { field: "id", op: "eq", value: "b" }, window: { size: 10 } },
+      { projectId: "p1" },
+    );
+    expect(segment.rows).toEqual([{ id: "b" }]);
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/v1/projects/p1/items");
+  });
+
+  it("信封方言覆写 + params(ctx) 组取数上限（签名不带 query——整取方言裁决）", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, { items: [{ id: "x" }, undefined, { id: "y" }] }));
+    const fetchAll = restFetchAll<{ id: string }>({
+      baseUrl: "https://api.example.com",
+      path: () => "/things",
+      envelope: (body) => (body as { items: unknown[] }).items,
+      params: (ctx) => ({ limit: 200, app_id: ctx.appId }),
+      fetch: fetchMock,
+    });
+    await expect(fetchAll({ appId: "a1" })).resolves.toEqual([{ id: "x" }, { id: "y" }]);
+    const url = fetchMock.mock.calls[0]?.[0] as string;
+    expect(url).toContain("https://api.example.com/things");
+    expect(url).toContain("limit=200");
+    expect(url).toContain("app_id=a1");
+  });
+
+  it("错误收敛与 restCollection 同核：401→auth；2xx 非 JSON→decode；网络断层→network", async () => {
+    const unauthorized = restFetchAll({
+      path: () => "/x",
+      fetch: vi.fn().mockResolvedValue(jsonResponse(401, {})),
+    });
+    await expect(unauthorized({})).rejects.toMatchObject({ kind: "auth" });
+
+    const nonJson = restFetchAll({
+      path: () => "/x",
+      fetch: vi.fn().mockResolvedValue(new Response("<html>", { status: 200 })),
+    });
+    await expect(nonJson({})).rejects.toMatchObject({ kind: "decode" });
+
+    const offline = restFetchAll({
+      path: () => "/x",
+      fetch: vi.fn().mockRejectedValue(new TypeError("fetch failed")),
+    });
+    await expect(offline({})).rejects.toMatchObject({ kind: "network" });
+  });
+
+  it("abort 放行原样（取消不是失败）；signal 透传到 fetch", async () => {
+    const abortError = new Error("The operation was aborted");
+    abortError.name = "AbortError";
+    const initSeen: Array<RequestInit | undefined> = [];
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      initSeen.push(init);
+      throw abortError;
+    });
+    const fetchAll = restFetchAll({ path: () => "/x", fetch: fetchMock });
+    const controller = new AbortController();
+    const thrown = await fetchAll({}, controller.signal).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(thrown).toBe(abortError);
+    expect(isApiError(thrown)).toBe(false);
+    expect(initSeen[0]).toMatchObject({ signal: controller.signal });
+  });
+
+  it("无 notFound 选项：404 走失败通道（空数组吞错是静默假数据——裁决锚）", async () => {
+    const fetchAll = restFetchAll({
+      path: () => "/gone",
+      fetch: vi.fn().mockResolvedValue(jsonResponse(404, {})),
+    });
+    await expect(fetchAll({})).rejects.toMatchObject({ kind: "not-found" });
   });
 });

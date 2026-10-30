@@ -63,6 +63,8 @@ const data = useCollectionData(resource, { scope?, size?, window?, refetchInterv
 ## 详情 / 自定义内容页
 
 - 详情配方：`useRecord(resource, { id })` + `<DetailPage record title meta actions tabs activeTab onTabChange>`。
+  句柄带 `isFetching`（后台刷新期 true，与 status:"loading" 的初载互补）——刷新态 UI 勿再用
+  loading 近似（fleetly 换装前两处挂账注释的复原位）。
   **tab 进 search、切 tab = replace**（页面形态非分页，不吃历史栈）——页面从 `useSearch` 读、
   经 `navigate({ to: ".", search: prev => ({...prev, tab}), replace: true })` 写回（函数式 search）。
   demo：`apps/demo/src/routes/widgets.$id.tsx`。
@@ -185,6 +187,15 @@ render(<RouterProvider router={router} />, { wrapper: QueryClientProvider });
   `mockCollection`/`mockFetchAll`（延迟/失败注入/行替换）是现成驱动。
 - 命令测试断言失效：`r.queryClient.getQueryState(key)?.isInvalidated`（键经
   `collectionQueryOptions(...).queryKey` 单源取，勿手拼）。
+- **多资源取键帮手的类型写法**：帮手参数勿手拼 `Resource<T, ID, C, S, K>` 五参泛型
+  （fleetly 迁移实测的线程噪音源）——用 `Parameters<typeof collectionQueryOptions>[0]`
+  钉死精确参数类型，零泛型线程：
+
+```ts
+function kitKey(resource: Parameters<typeof collectionQueryOptions>[0], query: CollectionQuery) {
+  return collectionQueryOptions(resource, query).queryKey;
+}
+```
 
 ## 反模式（必读）
 
@@ -220,8 +231,24 @@ render(<RouterProvider router={router} />, { wrapper: QueryClientProvider });
 
 ## 适配器作者
 
-见 docs/design.md §2（契约签名）、§5（Effect 缝隙）、§5.2（protojson 配方：int64 双策略/枚举全名/repeated 序列化/零值缺席）、§5.1（401 闭环管线次序）、§5.3 实现期裁决（订阅引擎分诊矩阵）。核心入口：`createHttp({ onUnauthorized })`、`defineResource`、`clientCollection(fetchAll)`、`restCollection`/`restRecord`（REST-over-fetch 工厂：path 回调组 URL + 信封展平 + 404 空态（`notFound: "null"`）+ 错误收敛内置，fetch 可注入——bring-your-own-fetch 是主干）、`mockCollection`、`ndjsonTransport`/`sseTransport`（终态判据 isEnded/endEvent 归你的适配器）、`mockTransport`（测试/demo 帧流）、`createSubscriptionEngine`（命令式消费，quickstart 直开 Transport `for await` 亦可）。
+见 docs/design.md §2（契约签名）、§5（Effect 缝隙）、§5.2（protojson 配方：int64 双策略/枚举全名/repeated 序列化/零值缺席）、§5.1（401 闭环管线次序）、§5.3 实现期裁决（订阅引擎分诊矩阵）。核心入口：`createHttp({ onUnauthorized })`、`defineResource`、`clientCollection(fetchAll)`、`restCollection`/`restRecord`（REST-over-fetch 工厂：path 回调组 URL + 信封展平 + 404 空态（`notFound: "null"`）+ 错误收敛内置，fetch 可注入——bring-your-own-fetch 是主干）、`restFetchAll`（整取方言——clientCollection 组合件，见下）、`mockCollection`、`ndjsonTransport`/`sseTransport`（终态判据 isEnded/endEvent 归你的适配器）、`mockTransport`（测试/demo 帧流）、`createSubscriptionEngine`（命令式消费，quickstart 直开 Transport `for await` 亦可）。
 
-命令的 scope 同源（M2）：descriptor 声明 `scopeOf: (input) => ({ projectId, appId })`——引擎把同一份 scope 喂 `run(ctx)` 与失效匹配（投影匹配：读资源声明的 scope 键集逐键相等即命中）；工厂命令的身份从闭包迁入 input 或 scopeOf 派生，调用点零手传 scope。声明了 scope 键的资源命令，显式传 scope 必须覆盖全部声明键（partial 编译红）。
+命令的 scope 同源（M2）：descriptor 声明 `scopeOf: (input) => ({ projectId, appId })`——引擎把同一份 scope 喂 `run(ctx)` 与失效匹配（投影匹配：读资源声明的 scope 键集逐键相等即命中）；工厂命令的身份从闭包迁入 input 或 scopeOf 派生，调用点零手传 scope。声明了 scope 键的资源命令，显式传 scope 必须覆盖全部声明键（partial 编译红）。scopeOf 的适用判据：**身份完整在 input/工厂闭包里**——部分在 input、部分在环境上下文的嵌套 scope 域（torchwood collections），显式全量 scope 仍是正解（half-scope 陷阱，§12.12）。
+
+**鉴权/401 闭环 = fetch 注入点（bring-your-own-fetch 的横切配方）**：rest 工厂族（restCollection/restRecord/restFetchAll）的 `fetch` 选项是消费方管线的并轨位——只做 Bearer 头注入与 401 全局闭环通知，**错误体解析留给工厂内置的 Response→ApiError 单源**（authFetch 不判 `res.ok`、不抛错——Response 原样交还工厂分诊）：
+
+```ts
+// kit/http.ts（消费方持有，fleetly 参照实现）
+export async function authFetch(url: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(url, { ...init, headers: authHeaders(init?.headers) });
+  if (res.status === 401 && getToken() !== "") notifyUnauthorized(); // 全局闭环（三通道同源）
+  return res;
+}
+// 资源：restFetchAll({ path: () => "/v1/users", envelope: ..., fetch: authFetch })
+```
+
+axios 管线同题（torchwood 形态）：包一层 FetchLike，把 axios 响应重组为 `new Response(JSON.stringify(data), { status, headers })`——同壳不同传输，工厂无感。
+
+**整取方言（服务端端点无谓词/游标下发）**：`clientCollection(restFetchAll({ path, envelope?, params? }))`——REST 整取 + 客户端求值谓词/排序/窗口。restFetchAll 与 restCollection/restRecord 共用取数核心（错误收敛/信封缺省/行过滤内置）；params 签名是 `(ctx)`（query 与服务端无关，limit 类取数上限经闭包组装）；无 notFound——整取面 404 是父资源消失/端点错，不是空集合（裁决见 design.md §12.13）。
 
 keyset（服务端 token）方言的完整实装范本：torchwood 批 A 的 audit-logs 切片（design.md §12.2 实现期回写）——`window.cursor → page_token`、`order.dir → 枚举名`、谓词白名单展开、`Page → Segment`、消费方 axios 失败在适配器收敛 ApiError、URL 存绝对时刻。两个易咬点：schema 不设 defaultOrder（排序三态要能落回服务端默认序）；TanStack 把数组 search 值 JSON 编码，断言读解析后对象不读原始 query 串。

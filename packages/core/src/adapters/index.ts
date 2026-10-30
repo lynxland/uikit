@@ -37,8 +37,10 @@ export {
 export {
   type FetchLike,
   type RestCollectionOptions,
+  type RestFetchAllOptions,
   type RestRecordOptions,
   restCollection,
+  restFetchAll,
   restRecord,
 } from "./rest";
 export {

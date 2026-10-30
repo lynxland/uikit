@@ -74,7 +74,7 @@ fleetly 侧统计（grep 实测，症状证据）：伴读钩子 19 个同构（
 **机制补全**：adapters 增 `restCollection({path: (ctx) => string, envelope, params?, notFound?})` 与 `restRecord` 同构（`notFound: "null"` 选项吞 4 处 404 分支；错误收敛内置）。抽象度克制：path 回调起步，模板插值糖后置。
 **消灭**：kit/http.ts 与逐资源 fetch 样板（预计 fleetly kit 层 −40% 行数）。
 **验收**：fleetly 三域试点改造后样板归零。
-**落地形态**（2026-10-29，F1 批）：restCollection/restRecord 落地（零 Effect、fetch 注入、notFound:"null"、错误收敛抽 api-error.ts 单源与 http 管线共用）；见 design.md §12.11。
+**落地形态**（2026-10-29，F1 批）：restCollection/restRecord 落地（零 Effect、fetch 注入、notFound:"null"、错误收敛抽 api-error.ts 单源与 http 管线共用）；见 design.md §12.11。第二形态（2026-10-30，回流清偿批）：`restFetchAll`——整取方言 fetchAll 工厂，clientCollection 直挂（fleetly 19 个整取 kit 文件的铺开件，b4ff15ad 方言边界挂账的清偿）；params (ctx) 签名/无 notFound 两裁决见 design.md §12.13。
 
 ### M5. 订阅参数化用足 + Transport 工厂横切单源
 

@@ -1124,3 +1124,31 @@ torchwood console（全量 kit 化后的第一轮上游升级，0.3.0 → 0.4.0�
 
 **走查面**：audit-logs（游标深链/换向回首页）、api-keys（reveal/批量删）、documents（OCC conflict→刷新重载→重提成功）、leaderboards（条目 lookup）、ListenPanel（两次断线自动重连、seq 跨重连单调）全过 + Dashboard（M1 迁移面）统计卡数据正确。dev 环境坑复用 §12.10 记录（stub 形状/protojson 键名/role:"owner"），新增一条：隐藏窗格下 playwright actionability 点击必超时，evaluate 注入 `el.click()` 稳定替代。
 
+### 12.13 F1 回流清偿批：restFetchAll（M4 第二形态）+ useRecord 句柄扩齐（2026-10-30，fleetly 0.4.0 回流批挂账清偿）
+
+来源：fleetly 回流批（8e5b7577..b4ff15ad，2026-10-29 上站）收官挂账的三条库面缺口全部来自实证——①整取方言不能直挂 restCollection（b4ff15ad 方言边界裁决：19 个 clientCollection kit 文件整取 + URL 谓词客户端求值，服务端端点无谓词下发）；②app-spec/deployment-detail 两处 `isFetching 不在 useRecord 句柄面——loading 态近似` 挂账注释；③迁移实测两坑（fetch 注入的鉴权闭环形态、多资源取键帮手五参泛型线程噪音）。与 F2/F3/F4（M5/M9/M6/M7/M8）互不阻塞。
+
+**restFetchAll（M4 第二形态，本批主体）**：
+
+```ts
+restFetchAll<T>({ path: (ctx) => string, envelope?, params?, baseUrl?, headers?, fetch? })
+  : (ctx: ResourceScope, signal?: AbortSignal) => Promise<ReadonlyArray<T>>
+// fleetly 消费形：clientCollection(restFetchAll({...}))——REST 整取 + 客户端求值
+```
+
+- **共用核心不造第二管线**：与 restCollection/restRecord 同一 `requestJson`（fetch 注入/abort 放行/Response→ApiError 收敛）+ 同一信封缺省（body 直收或 body.rows）+ 行过滤抽 `compactRows` 共享——size-check 不动（20.9 kB ≤ 35 kB）。
+- **裁决 1——params 签名 `(ctx)`，不带 query**：整取方言的定义就是 query 与服务端无关（谓词/排序/窗口全在客户端求值），对称签名 `(query, ctx)` 是携带永不使用参数的伪对称（幻觉诱饵）；取数上限类常态参数（limit=200）是常量/ctx 派生，闭包组装零损失。与输出签名 `(ctx, signal)` 对 clientCollection fetchAll 槽位同形，直挂。
+- **裁决 2——不设 notFound 选项**：整取面 404 的语义是父资源消失/端点错，不是空集合（fleetly 19 个整取文件零 `404 → []` 手写分支——restRecord 的 notFound 有 4 处实证需求，fetchAll 的没有）；空数组吞错会静默造"无数据"假象（错误通道失效比空态闪烁更贵）。真实空态用例现身前不设，现身再以实证加。
+- 测试面：信封/行过滤/params URL 组装/错误收敛同核（401→auth、非 JSON→decode、网络断层→network）/abort 放行+signal 透传/404 走失败通道（裁决锚）+ clientCollection 组合求值验收。
+
+**RecordHandle 扩 `isFetching: boolean`**（result.isFetching 直通；与 status:"loading" 初载互补——后台刷新态）。**裁决 3——useBatch 不对齐，明确留白**：句柄族一致性不是"全部字段对齐"而是"每个字段有消费形态"——batch 的消费形态（列内显名/ReferenceSelect 下拉）从不渲染 fetching 过渡（空 Map.get 回 undefined 已是既定空态语义），fleetly/torchwood 零 isFetching 需求实证；且 BatchHandle 连 error/refetch 都未带（外键查找的最小句柄定位），单独补 isFetching 是半截工程。测试按钮驱动（§12.11 发版补记教训）：延迟 Promise 队列手动放行，零定时器赛跑——isFetching 初载 true → 放行落定 false → refetch 翻 true → 放行回 false 四段断言。
+
+**demo 换装（活文档）**：/collections 的 tasks/schedules 资源从 mockFetchAll 换装 `clientCollection(restFetchAll(...))`——新增 `apps/demo/src/lib/rest-demo.ts`（demo 的 REST 服务面：真 URL 路由 + 90ms 延迟；tasks 走默认信封 body.rows、schedules 走 envelope 方言覆写 + params limit——同一页对照两种信封形态）。e2e collections 3 条（键隔离/深链还原/伴读全量行）零改动过绿 = 换装零行为差的活文档证明。
+
+**SKILL.md 补记两则**：①适配器作者节——fetch 注入的鉴权/401 闭环配方（消费方 authFetch 形态：Bearer 头 + 401 全局闭环通知；错误体解析留给工厂 Response→ApiError 单源，authFetch 不判 res.ok 不抛错；torchwood axios 面同题——响应重组 Response 的薄壳）+ 整取方言条目（params (ctx) 签名与无 notFound 的裁决回链本节）；②测试配方节——多资源取键帮手类型写法（`Parameters<typeof collectionQueryOptions>[0]` 钉死参数类型，勿手拼 `Resource<T, ID, C, S, K>` 五参泛型——fleetly tasks.test 迁移实测坑）。另：scopeOf 适用判据补句（§12.12 half-scope 陷阱）与详情节 isFetching 复原锚。
+
+**裁决 4——版本 0.5.0（minor 口径）**：新导出面（restFetchAll/RestFetchAllOptions）+ 句柄字段（isFetching）是新增能力，semver 下 minor——0.x 的补丁号只留给纯修复（0.4.x 系预留发版期 flaky 类修复）；纯加法零 breaking（现有消费方升级面 = 新可选能力全可选）。
+
+**验收与门禁**：`pnpm check` 全绿（layer-check + typecheck + size-check 20.9 kB + 单测 + devtool）；demo e2e 全绿。
+
+**下游预告（fleetly 次批，不阻塞发版）**：restFetchAll 落地后 fleetly 可全量铺开整取面——19 个 clientCollection kit 文件（alerts/app-specs/apps/audit/backups/databases/deployments/exec/githubapps/identity/networks/nodes/projects/registry/revisions/routes/storage/tasks/variables）的 fetchRows/qs 微工厂消费与逐资源 toApiError 样板归零（retro M4 的 kit 层 −40% 行数预期在此兑现）；kit/http.ts 的 fetchRows/rowsOf/qs 三帮手随之退役（authFetch 常驻为 rest 工厂注入点）；app-spec/deployment-detail 两处 isFetching loading 近似复原。升级时 pnpm-workspace.yaml minimumReleaseAgeExclude 同步 0.5.0。

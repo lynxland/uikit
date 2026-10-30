@@ -166,7 +166,9 @@ export function useCollectionData<T, ID, C extends CommandsRecord<ID>, S extends
   const contextScope = useContextScope();
   const scope = options.scope ?? (resource.scope?.length ? contextScope : undefined);
   const window =
-    options.window === "all" ? ALL_WINDOW : (options.window ?? { size: options.size ?? DEFAULT_DATA_SIZE });
+    options.window === "all"
+      ? ALL_WINDOW
+      : (options.window ?? { size: options.size ?? DEFAULT_DATA_SIZE });
   const query: CollectionQuery = {
     ...(options.predicate ? { predicate: options.predicate } : {}),
     ...(options.order ? { order: options.order } : {}),
@@ -218,7 +220,9 @@ export function useCollection<T, ID, C extends CommandsRecord<ID>, S extends Sub
       : {}),
     ...(options.query?.retry !== undefined ? { retry: options.query.retry } : {}),
     ...(options.query?.enabled !== undefined ? { enabled: options.query.enabled } : {}),
-    ...(options.query?.keepPrevious !== undefined ? { keepPrevious: options.query.keepPrevious } : {}),
+    ...(options.query?.keepPrevious !== undefined
+      ? { keepPrevious: options.query.keepPrevious }
+      : {}),
   });
 
   const searchPatch = (patch: FlatPatch, navOptions?: { replace?: boolean }) => {
@@ -275,6 +279,8 @@ export interface RecordHandle<T> {
   data: T | undefined;
   status: "loading" | "error" | "success";
   error: ApiError | null;
+  /** 后台刷新中（refetch/refetchInterval 触发）——与 status:"loading"（初载）互补 */
+  isFetching: boolean;
   refetch: () => void;
 }
 
@@ -311,6 +317,7 @@ export function useRecord<T, ID, C extends CommandsRecord<ID>, S extends SubsRec
     data: result.data,
     status: result.isPending ? "loading" : result.isError ? "error" : "success",
     error: result.error ?? null,
+    isFetching: result.isFetching,
     refetch: () => void result.refetch(),
   };
 }

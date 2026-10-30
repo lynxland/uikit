@@ -1,9 +1,17 @@
-import { clientCollection, mockCollection, mockFetchAll } from "@lynx-go/uikit-core/adapters";
+import {
+  clientCollection,
+  mockCollection,
+  mockFetchAll,
+  restFetchAll,
+} from "@lynx-go/uikit-core/adapters";
 import type { CommandResult } from "@lynx-go/uikit-core/kernel";
 import { defineResource } from "@lynx-go/uikit-core/kernel";
 import { collectionQuerySchema } from "@lynx-go/uikit-core/schema";
 import type { Owner, Widget } from "./mock-data";
 import { OWNERS, WIDGETS } from "./mock-data";
+import { demoRestFetch, type Schedule, type Task } from "./rest-demo";
+
+export type { Schedule, Task };
 
 // ============ 资源（适配器作者视角：mock 驱动，双方言对照） ============
 
@@ -125,7 +133,7 @@ export const scopedWidgets = defineResource({
   name: "scoped-widgets",
   getId: (row: ScopedWidget) => row.id,
   scope: ["projectId"],
-  collection: async (q, ctx) => {
+  collection: async (_q, ctx) => {
     if (ctx.projectId == null) return { rows: [] }; // 防御：未就绪停用外的兜底
     await new Promise((r) => setTimeout(r, 120));
     const rows = SCOPED_ROWS.filter((row) => row.project === ctx.projectId);
@@ -162,47 +170,29 @@ export function toggleIdentityRole(): "admin" | "viewer" {
 }
 
 // ============ namespace 配方（M1：多集合同路由各持各键） ============
-
-export interface Task {
-  id: string;
-  title: string;
-  priority: "low" | "high";
-  done: boolean;
-}
-
-export interface Schedule {
-  id: string;
-  name: string;
-  cadence: "hourly" | "daily" | "weekly";
-}
-
-const TASKS: Task[] = Array.from({ length: 23 }, (_, i) => ({
-  id: `task-${String(i + 1).padStart(2, "0")}`,
-  title: `Task ${String(i + 1).padStart(2, "0")}`,
-  priority: i % 3 === 0 ? "high" : "low",
-  done: i % 4 === 0,
-}));
-
-const CADENCES: Schedule["cadence"][] = ["hourly", "daily", "weekly"];
-const SCHEDULES: Schedule[] = Array.from({ length: 17 }, (_, i) => ({
-  id: `sched-${String(i + 1).padStart(2, "0")}`,
-  name: `Schedule ${String(i + 1).padStart(2, "0")}`,
-  cadence: CADENCES[i % 3]!,
-}));
-
-export const tasksFetchAll = mockFetchAll(TASKS, { latencyMs: 90 });
-export const schedulesFetchAll = mockFetchAll(SCHEDULES, { latencyMs: 90 });
+// M4 第二形态活文档（2026-10-30 换装）：clientCollection(restFetchAll(...))——
+// REST 整取 + 客户端求值（fleetly 19 个 kit 资源文件的标准消费形）。tasks 走
+// 默认信封 body.rows；schedules 演示 envelope 方言覆写 + params 取数上限。
 
 export const tasksResource = defineResource({
   name: "tasks",
   getId: (row: Task) => row.id,
-  collection: clientCollection(tasksFetchAll),
+  collection: clientCollection(
+    restFetchAll<Task>({ path: () => "/v1/tasks", fetch: demoRestFetch }),
+  ),
 });
 
 export const schedulesResource = defineResource({
   name: "schedules",
   getId: (row: Schedule) => row.id,
-  collection: clientCollection(schedulesFetchAll),
+  collection: clientCollection(
+    restFetchAll<Schedule>({
+      path: () => "/v1/schedules",
+      envelope: (body) => (body as { schedules: unknown[] }).schedules,
+      params: () => ({ limit: 100 }),
+      fetch: demoRestFetch,
+    }),
+  ),
 });
 
 /** 双集合同路由：namespace 显式开启——URL 键 tasks.q / schedules.q 并存互不携带 */
