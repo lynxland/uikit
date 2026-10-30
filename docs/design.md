@@ -1102,3 +1102,25 @@ torchwood ui-kit 全量改造（§12.9）收尾后的消费侧审查：三轴并
 **breaking 清单（0.4.0）**：① M2 投影匹配放宽 + 查询键形变更（scopeKeys 第 4 段，record id 第 5 段）；② M3 normalize 缺省 passthrough（validate 输出含未知键）；③ M10 core tsconfig 严格度加严只影响贡献方；QueryParams 放宽 undefined 为非破坏加宽。消费方升级面：手工拼 kit 键的测试需改用 collectionQueryOptions().queryKey 单源；依赖 normalize 丢键的路由需显式 unknownKeys:"drop"。
 
 **fleetly 回流预期**（升级 0.4.0 后可退役的消费方补丁对照）：19 伴读钩子 + 38 处 `.data?.rows` 解包 → useCollectionData 直消费；8 合并路由 validateSearch → 双 schema validate 组合或 namespace 形态；providers-view 裸 useQuery（30s 轮询）→ useRecord {query:{refetchInterval}}；kit/http.ts 微工厂 + 逐资源 fetch 样板（18 文件 toApiError 收敛）→ restCollection/restRecord；4 处 404→null 手写分支 → notFound:"null"；git hook 三写等手传 scope 补丁 → descriptor.scopeOf + 投影匹配（app-settings/panels 两测试锚零手传 scope 转绿）；backups 全量统计退场 → window:"all"。M5-M9（Transport 工厂/错误类化/token 单源/块契约）与 F4（漂移执法）不在本批。
+
+### 12.12 torchwood 消费 0.4.0——F1 破坏面适配批（2026-10-29 同日，第二消费者首升）
+
+torchwood console（全量 kit 化后的第一轮上游升级，0.3.0 → 0.4.0）。「破坏面清零 + 有实收益才采用，不为采用而采用」立场下的升级面取证：
+
+**破坏面三条适配**：
+- **键形变（scopeKeys 第 4 段）零适配成本**：仓内零手工拼 kit 键面（account 的 setQueryData 走非 kit 键 `["console-admin-me"]`），测试零键形断言——§12.11 预言的「手工拼键消费方」在 torchwood 不存在，单源取键纪律（SKILL 测试配方）提前兑现了升级免税。
+- **投影匹配放宽零断言转红**：唯一失效行为锚（documents 行删→列表 refetch）在投影语义下仍命中；「不失效」类锚零转红。实际放宽收益现身一处：collections schema 编辑器六动词 scope 携带声明外 collId，0.3.x 全等 miss（编辑器写路径从不刷新 db 集合列表）→ 0.4.0 投影命中——失效面变宽是有意裁决的实例。
+- **normalize passthrough 零依赖反转**：16 域 validateSearch + useListParams 平面 record 投影均无「归一化即丢键」依赖面，`unknownKeys:"drop"` 零引入。§12.11 的破坏点（fleetly 8 手写合并体）在 torchwood 形态不存在——合并体是 fleetly 的存量伤，不是 kit 契约的普遍需求。
+
+**类型执法 12 编译红与 scopeOf 裁决（本批核心取证）**：全集中在 collections 资源命令面（显式 scope 含 `projectId ?? undefined`）。**裁决：不迁 scopeOf，条件总体推导**——根因是 projectId 不在命令 input（torchwood 项目上下文走 axios header 单源），scopeOf 只能从 input 构出 `{dbId}` 半份 scope，而 M2 链式采纳（scopeOf 整体胜出 Provider，不合并）下投影匹配会漏 projectId 反造失效 miss；给每个 input 加 projectId 是纯噪音。真实教训：**scopeOf 的适用判据是「身份完整在 input/工厂闭包里」——部分在 input、部分在环境上下文的嵌套 scope 域，显式全量 scope 仍是正解**（half-scope 陷阱已录）。SKILL.md 的 scopeOf 条目宜补这句判据。
+
+**机制采用决策表**：M1 采用（Dashboard 四处 `useQuery+collectionQueryOptions+手工解包` → useCollectionData，`keepPrevious:false` 行为等价、`enabled` 语义门保留——scopeReady 把空串视为就绪，统计面「未选项目」不是 scope 未就绪；`window:"all"` 不用，keyset 服务端方言无整取语义）；M3 不采用（无双列表同路由形态，不主动引入 namespace 的 URL 行为变更）；M2 scopeOf 不采用（见上）；M4 拒（§12.9 阶段 5 裁决维持）；M10 裁决保留 TestRouter（normalizeTestPath 双方言归一 + AuthProvider 镜像是本地语义，kit createTestRouter 严格 tsc 可用但不迁移）。
+
+**legacyKeys 复核（退役 0）**：37 处声明前缀逐条扫消费面——全部仍有真实读者（手写键详情页/子视图：`["documents",dbId,collId,docId]`/`["groups",groupId]`/`["api-keys",id]` 等）。§12.10 的宽前缀声明在「全量 kit 化」后并非自动消亡：**legacy 键是否退役的判据是该前缀是否仍被手写 useQuery 消费，不是 kit 化进度**。反身缺口三处挂账（有消费无声明）：`["leaderboards-board"]`/`["leaderboards-settlement-detail"]`/`["asset-defs-all"]`——实际不可达或 staleTime 封顶，不属破坏面，等子视图 kit 化时自然消亡。
+
+**升级防线**：devtool `diff --all --check` 6 处漂移逐块行数与 §12.10 手工层登记吻合（11/14/1/13/1/17），零新增漂移；filter-bar 的 namespace 内部变更不在 torchwood 消费面（该块未 vendored）。门禁 tsc 0 / vitest 166 / eslint 0 error / build 过。
+
+**浏览器走查抓获一个存量缺陷（非 0.4.0 回归）**：api-keys 直调批量删路径（§12.3 裁决 8 的 N 命令聚合面）手打 legacy 前缀 `["api-keys"]` 失效——kit 键首段是 kind，该前缀任何版本都匹配不到 kit 集合键，批量删后列表不刷新。修复 = `collectionKey(resource, list.query).slice(0,4)` 四段前缀失效（kind/name/scope/scopeKeys，覆盖本 scope 全部游标页）+ legacy 前缀保留（详情读仍消费）。教训入册：**legacy 前缀失效桥只服务 legacy 键读者；对 kit 绑定视图的失效必须走 kit 键（单源 collectionKey/collectionQueryOptions），两套键形两套桥，混用即漏**。§12.10「直调批量路径保留 kit 键失效经命令式面复用」的意图据此才算真正落地。
+
+**走查面**：audit-logs（游标深链/换向回首页）、api-keys（reveal/批量删）、documents（OCC conflict→刷新重载→重提成功）、leaderboards（条目 lookup）、ListenPanel（两次断线自动重连、seq 跨重连单调）全过 + Dashboard（M1 迁移面）统计卡数据正确。dev 环境坑复用 §12.10 记录（stub 形状/protojson 键名/role:"owner"），新增一条：隐藏窗格下 playwright actionability 点击必超时，evaluate 注入 `el.click()` 稳定替代。
+
