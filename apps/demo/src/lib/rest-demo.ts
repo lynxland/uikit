@@ -1,4 +1,4 @@
-import type { FetchLike } from "@lynx-go/uikit-core/adapters";
+import type { FetchLike } from "@lynxland/uikit-core/adapters";
 
 // demo 的 REST 服务面（restFetchAll 的活文档）：真 URL 路由 + 信封 + 延迟。
 // 消费方把它换成 authFetch（Bearer 头 + 401 全局闭环）即 fleetly 真实形态

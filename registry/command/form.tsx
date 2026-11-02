@@ -1,4 +1,4 @@
-import type { CommandResult } from "@lynx-go/uikit-core/kernel";
+import type { CommandResult } from "@lynxland/uikit-core/kernel";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 

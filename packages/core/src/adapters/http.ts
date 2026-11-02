@@ -43,7 +43,7 @@ export function runApi<A>(eff: Effect.Effect<A, AdapterFailure>): Promise<A> {
           return;
         }
         // defect（程序错误）——归一为可观测的包装，不混入 ApiError 封闭集
-        reject(new Error("@lynx-go/uikit-core: unexpected defect in adapter pipeline", { cause: err }));
+        reject(new Error("@lynxland/uikit-core: unexpected defect in adapter pipeline", { cause: err }));
       }),
   );
 }
@@ -100,7 +100,7 @@ export function createHttp(options: HttpOptions = {}) {
             catch: () =>
               new HttpFailure({
                 status: response.status,
-                body: { message: `@lynx-go/uikit-core: response is not JSON (${path})` },
+                body: { message: `@lynxland/uikit-core: response is not JSON (${path})` },
               }) as AdapterFailure,
           });
         }),

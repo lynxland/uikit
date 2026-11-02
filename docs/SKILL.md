@@ -1,6 +1,6 @@
-# @lynx-go/uikit SKILL.md（页面作者册）
+# @lynxland/uikit SKILL.md（页面作者册）
 
-> 面向用 @lynx-go/uikit 写 console 页面的 AI agent 与开发者。适配器作者册见文末指针。
+> 面向用 @lynxland/uikit 写 console 页面的 AI agent 与开发者。适配器作者册见文末指针。
 > 完整设计：docs/design.md。反模式与幻觉诱饵在最后——先读它们能省一半调试。
 
 ## 心智模型（就 4 个名词）
@@ -160,7 +160,7 @@ const sub = useSubscription(eventsStream, { cursor: anchor ?? undefined, getCurs
 ## 测试配方（/testing 出口）
 
 ```tsx
-import { createTestRouter, renderWithKit } from "@lynx-go/uikit-core/testing";
+import { createTestRouter, renderWithKit } from "@lynxland/uikit-core/testing";
 
 // 单路由 + Query/Router/Scope 三上下文一体接线（useCollection 系绑定缺一即假绿）
 const r = await renderWithKit(<MyPage />, {

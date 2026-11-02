@@ -1,4 +1,4 @@
-import type { SubscriptionEngine } from "@lynx-go/uikit-core/react";
+import type { SubscriptionEngine } from "@lynxland/uikit-core/react";
 import { PauseCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import { useSyncExternalStore } from "react";

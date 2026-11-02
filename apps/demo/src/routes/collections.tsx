@@ -4,7 +4,7 @@ import { Pagination } from "@blocks/query/pagination";
 import { Page } from "@blocks/shell/page";
 import { StatCard } from "@blocks/values/stat-card";
 import { StatusBadge } from "@blocks/values/status-badge";
-import { useCollection, useCollectionData } from "@lynx-go/uikit-core";
+import { useCollection, useCollectionData } from "@lynxland/uikit-core";
 import { createFileRoute } from "@tanstack/react-router";
 import { schedulesResource, schedulesSearch, tasksResource, tasksSearch } from "@/lib/resources";
 

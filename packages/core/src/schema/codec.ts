@@ -67,7 +67,7 @@ export type FlatPatch = Partial<
 export interface StandardSchemaV1<Input = unknown, Output = Input> {
   "~standard": {
     version: 1;
-    vendor: "@lynx-go/uikit-core";
+    vendor: "@lynxland/uikit-core";
     validate(value: Input): { value: Output };
   };
 }
@@ -103,7 +103,7 @@ export function collectionQuerySchema(spec: QuerySchemaSpec = {}): QuerySearchSc
   const defaultSize = spec.defaultSize ?? 20;
   if (spec.namespace !== undefined && spec.namespace.includes(".")) {
     throw new Error(
-      `@lynx-go/uikit-core: namespace "${spec.namespace}" must not contain "." (URL key ownership is prefix-based)`,
+      `@lynxland/uikit-core: namespace "${spec.namespace}" must not contain "." (URL key ownership is prefix-based)`,
     );
   }
   // M1 namespace：URL 键的扁平前缀（缺省空 = 存量无前缀形态）。
@@ -152,7 +152,7 @@ export function collectionQuerySchema(spec: QuerySchemaSpec = {}): QuerySearchSc
     );
     if (!isText) {
       throw new Error(
-        "@lynx-go/uikit-core: predicate with OR is not URL-serializable — keep it in local state or a custom search param",
+        "@lynxland/uikit-core: predicate with OR is not URL-serializable — keep it in local state or a custom search param",
       );
     }
     return leaves;
@@ -258,7 +258,7 @@ export function collectionQuerySchema(spec: QuerySchemaSpec = {}): QuerySearchSc
       return {
         "~standard": {
           version: 1,
-          vendor: "@lynx-go/uikit-core",
+          vendor: "@lynxland/uikit-core",
           validate(value: unknown) {
             return { value: normalize(value, mode) };
           },

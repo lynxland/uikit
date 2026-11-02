@@ -1,4 +1,4 @@
-# @lynx-go/uikit
+# @lynxland/uikit
 
 Headless core + copy-owned UI blocks for data-dense console UIs — **Query / Command / Subscription** over TanStack engines.
 
@@ -27,11 +27,11 @@ Design principles, held mechanically (not aspirationally):
 
 Two channels, deliberately different:
 
-- **`@lynx-go/uikit-core`** (`packages/core`) — the headless core: kernel contracts + URL codec + HTTP pipeline/subscription engine + React bindings + testing harness. Published to npm, source-distributed.
+- **`@lynxland/uikit-core`** (`packages/core`) — the headless core: kernel contracts + URL codec + HTTP pipeline/subscription engine + React bindings + testing harness. Published to npm, source-distributed.
 - **`registry/`** — five families of UI blocks, shadcn-style: you *copy* them, you own the code. Blocks contain no business entities and fetch nothing; they only consume binding output.
 
 ```bash
-npm install @lynx-go/uikit-core
+npm install @lynxland/uikit-core
 # peers: react >=19 · @tanstack/react-query >=5.100 · @tanstack/react-router >=1.120 (optional) · @tanstack/react-form >=1.30 (optional)
 ```
 
@@ -41,9 +41,9 @@ Declare a Resource, share one search schema between route and bindings, read the
 
 ```tsx
 // lib/projects.ts
-import { mockCollection } from "@lynx-go/uikit-core/adapters";
-import { defineResource } from "@lynx-go/uikit-core/kernel";
-import { collectionQuerySchema } from "@lynx-go/uikit-core/schema";
+import { mockCollection } from "@lynxland/uikit-core/adapters";
+import { defineResource } from "@lynxland/uikit-core/kernel";
+import { collectionQuerySchema } from "@lynxland/uikit-core/schema";
 
 export interface Project {
   id: string;
@@ -84,7 +84,7 @@ export const projectsSearch = collectionQuerySchema({ defaultSize: 20 });
 
 ```tsx
 // routes/projects.index.tsx — TanStack Router file route
-import { useCollection } from "@lynx-go/uikit-core";
+import { useCollection } from "@lynxland/uikit-core";
 import { createFileRoute } from "@tanstack/react-router";
 import { projectsResource, projectsSearch } from "@/lib/projects";
 
@@ -155,7 +155,7 @@ node scripts/devtool.mjs diff --all --dir src/components/kit --check   # drift g
 ## Repo layout
 
 ```
-packages/core   @lynx-go/uikit-core  kernel / schema / adapters / react / testing
+packages/core   @lynxland/uikit-core  kernel / schema / adapters / react / testing
 registry/       UI blocks, five families (copy-based distribution)
 apps/demo       living documentation — every recipe is a runnable page
 docs/           design.md (decisions & history) · SKILL.md (page-author guide) · llms.txt

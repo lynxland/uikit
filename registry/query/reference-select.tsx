@@ -1,6 +1,6 @@
-import { collectionQueryOptions } from "@lynx-go/uikit-core";
-import type { ApiError, Resource, Segment } from "@lynx-go/uikit-core/kernel";
-import { textPredicate } from "@lynx-go/uikit-core/kernel";
+import { collectionQueryOptions } from "@lynxland/uikit-core";
+import type { ApiError, Resource, Segment } from "@lynxland/uikit-core/kernel";
+import { textPredicate } from "@lynxland/uikit-core/kernel";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";

@@ -6,8 +6,8 @@ import {
   useInvalidateOnFrame,
   usePreference,
   useSubscription,
-} from "@lynx-go/uikit-core";
-import type { ApiError, Cursor, Segment } from "@lynx-go/uikit-core/kernel";
+} from "@lynxland/uikit-core";
+import type { ApiError, Cursor, Segment } from "@lynxland/uikit-core/kernel";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";

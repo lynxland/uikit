@@ -1,4 +1,4 @@
-# @lynx-go/uikit
+# @lynxland/uikit
 
 数据密集 console UI 的无头核心 + 拷贝制 UI 块——架在 TanStack 引擎上的 **Query / Command / Subscription**。
 
@@ -27,11 +27,11 @@
 
 两个通道，刻意不同：
 
-- **`@lynx-go/uikit-core`**（`packages/core`）——无头核心：kernel 契约 + URL 编解码 + HTTP 管线/订阅引擎 + React 绑定 + 测试 harness。发 npm，源码分发。
+- **`@lynxland/uikit-core`**（`packages/core`）——无头核心：kernel 契约 + URL 编解码 + HTTP 管线/订阅引擎 + React 绑定 + 测试 harness。发 npm，源码分发。
 - **`registry/`**——五族 UI 块，shadcn 式：**拷贝**进你的仓，代码归你所有。块不含业务实体、不自带数据获取，只消费绑定输出。
 
 ```bash
-npm install @lynx-go/uikit-core
+npm install @lynxland/uikit-core
 # peers: react >=19 · @tanstack/react-query >=5.100 · @tanstack/react-router >=1.120（可选）· @tanstack/react-form >=1.30（可选）
 ```
 
@@ -41,9 +41,9 @@ npm install @lynx-go/uikit-core
 
 ```tsx
 // lib/projects.ts
-import { mockCollection } from "@lynx-go/uikit-core/adapters";
-import { defineResource } from "@lynx-go/uikit-core/kernel";
-import { collectionQuerySchema } from "@lynx-go/uikit-core/schema";
+import { mockCollection } from "@lynxland/uikit-core/adapters";
+import { defineResource } from "@lynxland/uikit-core/kernel";
+import { collectionQuerySchema } from "@lynxland/uikit-core/schema";
 
 export interface Project {
   id: string;
@@ -84,7 +84,7 @@ export const projectsSearch = collectionQuerySchema({ defaultSize: 20 });
 
 ```tsx
 // routes/projects.index.tsx —— TanStack Router 文件路由
-import { useCollection } from "@lynx-go/uikit-core";
+import { useCollection } from "@lynxland/uikit-core";
 import { createFileRoute } from "@tanstack/react-router";
 import { projectsResource, projectsSearch } from "@/lib/projects";
 
@@ -155,7 +155,7 @@ node scripts/devtool.mjs diff --all --dir src/components/kit --check   # 升级�
 ## 仓库结构
 
 ```
-packages/core   @lynx-go/uikit-core  kernel / schema / adapters / react / testing
+packages/core   @lynxland/uikit-core  kernel / schema / adapters / react / testing
 registry/       UI 块五族（拷贝制分发）
 apps/demo       活文档——每个配方一个可运行页面
 docs/           design.md（决策与历史）· SKILL.md（页面作者册）· llms.txt

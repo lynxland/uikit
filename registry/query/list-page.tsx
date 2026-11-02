@@ -1,5 +1,5 @@
-import type { CollectionHandle } from "@lynx-go/uikit-core/react";
-import type { ApiError } from "@lynx-go/uikit-core/kernel";
+import type { CollectionHandle } from "@lynxland/uikit-core/react";
+import type { ApiError } from "@lynxland/uikit-core/kernel";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { EmptyState, ErrorState, LoadingState } from "../values/states";

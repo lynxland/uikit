@@ -53,7 +53,7 @@ async function fetchOrApiError(
 
 class TransportInterrupt extends Error {
   constructor(detail: string) {
-    super(`@lynx-go/uikit-core: transport interrupted (${detail})`);
+    super(`@lynxland/uikit-core: transport interrupted (${detail})`);
   }
 }
 

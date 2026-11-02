@@ -1,4 +1,4 @@
-import type { SubscriptionEngine } from "@lynx-go/uikit-core/react";
+import type { SubscriptionEngine } from "@lynxland/uikit-core/react";
 import { ArrowDown, Download, Trash2 } from "lucide-react";
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Badge } from "@/components/ui/badge";

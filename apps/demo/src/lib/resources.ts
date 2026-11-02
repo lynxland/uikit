@@ -3,10 +3,10 @@ import {
   mockCollection,
   mockFetchAll,
   restFetchAll,
-} from "@lynx-go/uikit-core/adapters";
-import type { CommandResult } from "@lynx-go/uikit-core/kernel";
-import { defineResource } from "@lynx-go/uikit-core/kernel";
-import { collectionQuerySchema } from "@lynx-go/uikit-core/schema";
+} from "@lynxland/uikit-core/adapters";
+import type { CommandResult } from "@lynxland/uikit-core/kernel";
+import { defineResource } from "@lynxland/uikit-core/kernel";
+import { collectionQuerySchema } from "@lynxland/uikit-core/schema";
 import type { Owner, Widget } from "./mock-data";
 import { OWNERS, WIDGETS } from "./mock-data";
 import { demoRestFetch, type Schedule, type Task } from "./rest-demo";
@@ -34,7 +34,7 @@ export const widgetsClient = defineResource({
   record: (id: string) => {
     const widget = widgetsFetchAll.rows().find((w) => w.id === id);
     if (!widget)
-      throw { kind: "not-found" } satisfies import("@lynx-go/uikit-core/kernel").ApiError;
+      throw { kind: "not-found" } satisfies import("@lynxland/uikit-core/kernel").ApiError;
     return Promise.resolve(widget);
   },
   batch: (ids) => Promise.resolve(widgetsFetchAll.rows().filter((w) => ids.includes(w.id))),

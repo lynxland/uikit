@@ -39,7 +39,7 @@ export function collectionQueryOptions<T, ID, C extends CommandsRecord<ID>, S ex
   const collection = resource.collection;
   if (!collection) {
     throw new Error(
-      `@lynx-go/uikit-core: resource "${String(resource.name)}" has no collection query — did you mean to wrap it with clientCollection()?`,
+      `@lynxland/uikit-core: resource "${String(resource.name)}" has no collection query — did you mean to wrap it with clientCollection()?`,
     );
   }
   return {
@@ -63,7 +63,7 @@ export function recordQueryOptions<T, ID, C extends CommandsRecord<ID>, S extend
 } {
   const record = resource.record;
   if (!record) {
-    throw new Error(`@lynx-go/uikit-core: resource "${String(resource.name)}" has no record query`);
+    throw new Error(`@lynxland/uikit-core: resource "${String(resource.name)}" has no record query`);
   }
   if (id === undefined)
     return {
@@ -94,7 +94,7 @@ export function batchQueryOptions<T, ID, C extends CommandsRecord<ID>, S extends
 } {
   const batch = resource.batch;
   if (!batch) {
-    throw new Error(`@lynx-go/uikit-core: resource "${String(resource.name)}" has no batch query`);
+    throw new Error(`@lynxland/uikit-core: resource "${String(resource.name)}" has no batch query`);
   }
   const scope = scopeOf(resource);
   return {

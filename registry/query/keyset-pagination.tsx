@@ -1,4 +1,4 @@
-import type { CollectionHandle } from "@lynx-go/uikit-core/react";
+import type { CollectionHandle } from "@lynxland/uikit-core/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 

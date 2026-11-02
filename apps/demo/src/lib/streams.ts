@@ -1,7 +1,7 @@
-import { mockCollection, mockTransport, ndjsonTransport } from "@lynx-go/uikit-core/adapters";
-import type { SubscriptionDescriptor } from "@lynx-go/uikit-core/kernel";
-import { defineResource } from "@lynx-go/uikit-core/kernel";
-import { collectionQuerySchema } from "@lynx-go/uikit-core/schema";
+import { mockCollection, mockTransport, ndjsonTransport } from "@lynxland/uikit-core/adapters";
+import type { SubscriptionDescriptor } from "@lynxland/uikit-core/kernel";
+import { defineResource } from "@lynxland/uikit-core/kernel";
+import { collectionQuerySchema } from "@lynxland/uikit-core/schema";
 
 // ============ events：backlog Query 定锚 × Subscription 续订（fleetly events 方言模拟） ============
 

@@ -289,7 +289,7 @@ importers:
       '@biomejs/biome':
         specifier: catalog:default
         version: 2.6.2
-      '@lynx-go/uikit-core':
+      '@lynxland/uikit-core':
         specifier: workspace:*
         version: link:packages/core
       '@tanstack/react-form':
@@ -340,7 +340,7 @@ importers:
 
   apps/demo:
     dependencies:
-      '@lynx-go/uikit-core':
+      '@lynxland/uikit-core':
         specifier: workspace:*
         version: link:../../packages/core
       '@tanstack/react-form':

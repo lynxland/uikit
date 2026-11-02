@@ -172,7 +172,7 @@ export function defineResource<
 >(spec: ResourceSpec<T, ID, C, S> & { scope?: ScopeKeys }): Resource<T, ID, C, S, ScopeKeys> {
   if (!/^[a-z][a-z0-9-]*$/.test(spec.name)) {
     throw new Error(
-      `@lynx-go/uikit-core: resource name "${spec.name}" must be kebab-case (it lives in query keys and URL diagnostics)`,
+      `@lynxland/uikit-core: resource name "${spec.name}" must be kebab-case (it lives in query keys and URL diagnostics)`,
     );
   }
   const commands = spec.commands

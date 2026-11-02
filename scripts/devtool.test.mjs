@@ -94,7 +94,7 @@ test("头生成：源路径/版本/profile/适配清单/手工区", () => {
   });
   assert.match(
     header,
-    /vendored from @lynx-go\/uikit registry\/values\/states\.tsx @0\.1\.1（2026-10-25 测试批次）/,
+    /vendored from @lynxland\/uikit registry\/values\/states\.tsx @0\.1\.1（2026-10-25 测试批次）/,
   );
   assert.match(header, /--profile torchwood/);
   assert.match(header, /text-muted→text-muted-foreground/);
@@ -158,9 +158,9 @@ test("registry.json 依赖收敛：无 workspace:/catalog: 协议泄漏，core �
     readFileSync(join(root, "packages/core/package.json"), "utf8"),
   ).version;
   const [major, minor] = coreVersion.split(".");
-  assert.ok(deps.has(`@lynx-go/uikit-core@^${major}.${minor}`), `core 依赖单源 ^${major}.${minor}`);
+  assert.ok(deps.has(`@lynxland/uikit-core@^${major}.${minor}`), `core 依赖单源 ^${major}.${minor}`);
   const kitCount = items.filter(
-    (it) => it.dependencies.filter((d) => d.startsWith("@lynx-go/uikit-core")).length > 1,
+    (it) => it.dependencies.filter((d) => d.startsWith("@lynxland/uikit-core")).length > 1,
   );
   assert.equal(kitCount.length, 0, "core 依赖单源（不混 workspace 解析值）");
 });
@@ -191,7 +191,7 @@ test("CLI 端到端：copy 真块到临时目录（映射+头+警告面+不覆�
     const vendored = readFileSync(target, "utf8");
     assert.match(
       vendored,
-      /^\/\/ vendored from @lynx-go\/uikit registry\/subscription\/event-feed\.tsx @\d+\.\d+\.\d+/,
+      /^\/\/ vendored from @lynxland\/uikit registry\/subscription\/event-feed\.tsx @\d+\.\d+\.\d+/,
     );
     assert.match(vendored, /text-muted-foreground/);
     // 代码体（头注释之后的 import 起）不得残留源方言 token——头注释里的
