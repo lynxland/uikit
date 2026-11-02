@@ -1155,6 +1155,8 @@ restFetchAll<T>({ path: (ctx) => string, envelope?, params?, baseUrl?, headers?,
 
 **发版补记（2026-10-30，0.5.0 已发布）**：`pnpm publish --no-git-checks` + publint 全过（All good）。npm staged 传播窗口本次约 3 分钟（publish 后 `npm view` 仍报 0.4.0 latest、install 撞 ETARGET；3 分钟后 view 见 0.5.0，独立 cache 净房随即装上——较 §12.11 的 5 分钟缩短，窗口时长不稳定、按 ≥5 分钟预期操作）。净房冒烟口径记录：源码分发包的裸 Node 运行时导入不可行——Node 22 的 type stripping 设计性拒绝 node_modules 内 .ts（ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING），运行时契约是消费方 bundler 编译；冒烟 = 独立 cache install 解析 0.5.0 + publint exports 映射 + 发布物源码结构断言（restFetchAll 导出/RecordHandle.isFetching 在场）。
 
+**发版补记（2026-11-02，0.6.0 已发布）**：组织改名批随版发布——GitHub 仓库与 npm 组织 lynx-go → lynxland 一次对齐（git remote / repository URL / 全仓包名与 import / devtool 生成头注释 / registry.json；npm 旧名 @lynx-go/uikit-core 的 0.5.0 及更早不迁移，@lynxland/uikit-core 以 0.6.0 为首版，下游按新名安装）。`pnpm publish --no-git-checks` + publint 全过；staged 传播窗口本次约 90 秒（`npm view --prefer-online` 先见 0.0.0-stage 占位再翻 0.6.0，较前两次窗口进一步缩短）；独立 cache 净房 install 解析 0.6.0 + 发布物源码结构断言（六 exports 键齐全 / restFetchAll、useRecord 在场 / 发布物零 lynx-go 残留）全过。
+
 ### 12.14 G 批：双 console 统一 + 服务端契约 + 项目模板——总体裁决与批次规划（2026-10-31，调研先行）
 
 来源：用户目标「通过 uikit 统一 fleetly/torchwood 的使用模式 + 为后续同类项目（React 管理台）启动建立模板」，并补充裁决前提：**两后端为自有项目，可调整 API 以配合 kit 演化、可统一服务端模式**。三路调研先行：①torchwood 消费面全量盘点；②fleetly 消费面全量盘点（0.5.0 铺开批已落地：b4ff15ad 试点 + b80142c3 全量，kit/http.ts 仅剩 authFetch 11 行）；③九家竞品（shadcn/create-t3-app/TanStack Starters/refine/react-admin/RedwoodJS/Nest+Angular schematics+Rails/Modern.js+ice）。
