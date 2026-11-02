@@ -1,4 +1,4 @@
-# @lynx-go/uikit 设计文档
+# @lynxland/uikit 设计文档
 
 - **版本**：draft-2（六视角审查 + 交叉审核修订版）
 - **日期**：2026-10-23
@@ -10,23 +10,23 @@
 
 ## 0. 定位与非目标
 
-**@lynx-go/uikit** 是一个数据密集 console UI 库：由人指导 AI Agent 构建，同样服务于人指导 AI Agent 的使用。
+**@lynxland/uikit** 是一个数据密集 console UI 库：由人指导 AI Agent 构建，同样服务于人指导 AI Agent 的使用。
 
 **定位**：
 1. **内部优先、开源友好**——首要消费者是 fleetly console 与 torchwood console 的重写；但无业务残留：英文命名、文案全走 messages 覆盖通道、不含任何业务名词。
-2. **TanStack 原生**——Router（typed file routes + `validateSearch`）、Query、Table、Form 是引擎层，**借用不重建**。@lynx-go/uikit 不在引擎上再包一层抽象（refine 的 routerProvider 两次重写是前车之鉴）。
-3. **分发双通道**——无头核心 `@lynx-go/uikit-core` 发 npm（semver + changesets）；UI 块走 shadcn registry 拷贝制（open code，归消费方所有）。
+2. **TanStack 原生**——Router（typed file routes + `validateSearch`）、Query、Table、Form 是引擎层，**借用不重建**。@lynxland/uikit 不在引擎上再包一层抽象（refine 的 routerProvider 两次重写是前车之鉴）。
+3. **分发双通道**——无头核心 `@lynxland/uikit-core` 发 npm（semver + changesets）；UI 块走 shadcn registry 拷贝制（open code，归消费方所有）。
 4. **Agent-first**——SKILL.md（TanStack Intent 格式）、llms.txt、AGENTS.md 随包分发；集中反模式清单（§13）与幻觉诱饵对照表（§14）直接进 SKILL.md。
 
 **非目标（持证拒签，理由与重启条件见 §8）**：
 - 不造路由抽象层（不支持多路由器/SSR 元框架绑定）
 - 不做页面原型 / 词表 / 登记制本体论（旧项目死因）
-- 不做 undo / 乐观更新（双 console 零使用证伪；**明码标价**：react-admin 与 shadcn-admin-kit 的编辑/删除默认即 undoable，@lynx-go/uikit 默认同步等待——这是有意的体验取舍）
+- 不做 undo / 乐观更新（双 console 零使用证伪；**明码标价**：react-admin 与 shadcn-admin-kit 的编辑/删除默认即 undoable，@lynxland/uikit 默认同步等待——这是有意的体验取舍）
 - 不做后端适配器生态（自持后端，适配缝即插件点）
 - 不做完整 i18n 语言包（messages 通道 + 消费方词条）
 - 不内置 toast/通知系统（`useCommandForm` 暴露 `onSettled` 回调，消费方接 sonner 等——shadcn 生态惯例）
 
-**一句话**：@lynx-go/uikit = 三个交互原语（Query / Command / Subscription）+ 一个交互面（Resource）+ Effect 缝隙 + 五族 UI 块，架在 TanStack 引擎上。
+**一句话**：@lynxland/uikit = 三个交互原语（Query / Command / Subscription）+ 一个交互面（Resource）+ Effect 缝隙 + 五族 UI 块，架在 TanStack 引擎上。
 
 ---
 
@@ -40,13 +40,13 @@
 | ---------------- | ---- | ------------------------------ | ----------------------------------------------- |
 | **Query**        | 问   | 参数化缓存读，无副作用         | TanStack Query                                  |
 | **Command**      | 令   | 有副作用的意图，可被结构化拒绝 | TanStack Query mutation + 失效                  |
-| **Subscription** | 听   | 按游标定位的帧递送             | @lynx-go/uikit 自建（Effect 引擎在 /adapters，见 §5） |
+| **Subscription** | 听   | 按游标定位的帧递送             | @lynxland/uikit 自建（Effect 引擎在 /adapters，见 §5） |
 
 三者同属一个语域（交互消息类型学，CQRS + 订阅的标准词汇），彼此正交（§2 各节论证）。
 
 ### 1.2 引擎借用
 
-缓存/去重/失效（Query）、URL/类型化路由/历史栈（Router）、表格状态机（Table）、表单状态机（Form）已经由 TanStack 提供。@lynx-go/uikit 的价值不在重建引擎，而在：
+缓存/去重/失效（Query）、URL/类型化路由/历史栈（Router）、表格状态机（Table）、表单状态机（Form）已经由 TanStack 提供。@lynxland/uikit 的价值不在重建引擎，而在：
 1. 定义**用户实现的契约**（后端交互的统一形状）；
 2. 提供**绑定**（把契约接到引擎与 URL 的 headless hooks + queryOptions 预取工厂）；
 3. 提供**块**（消费绑定输出的 shadcn 风格组件）。
@@ -546,7 +546,7 @@ exec 终端（双向有状态会话，Subscription 单向；受理/观测仍可�
 
 #### MetricChart 实现期裁决（2026-10-24，双 console 取证后；批内第一性裁决）
 
-**选型 = recharts（vendored shadcn chart.tsx 基元 + 块直用 recharts 原语）**。取证：两 console 现行同库 recharts ^3.10.1（fleetly shadcn 封装 + torchwood 裸用）；密度上限 240 点/序列 × ≤10 序列/图（fleetly 窗宽定死 240 桶）——uPlot 的百万点性能溢价无落点，且 canvas 渲染丢 CSS 变量主题化、tooltip/图例全要自建；自绘 SVG 需重建时间轴 scale/跟随 tooltip/图例，为省一个消费者已有的依赖重造轮子。**分发影响**：registry 拷贝制下 recharts 落消费方——registry.json item `dependencies` 声明（registry-build 扫描块裸导入自动追加）+ root devDeps 供 demo；不进 @lynx-go/uikit-core core，/adapters 预算门不受影响。
+**选型 = recharts（vendored shadcn chart.tsx 基元 + 块直用 recharts 原语）**。取证：两 console 现行同库 recharts ^3.10.1（fleetly shadcn 封装 + torchwood 裸用）；密度上限 240 点/序列 × ≤10 序列/图（fleetly 窗宽定死 240 桶）——uPlot 的百万点性能溢价无落点，且 canvas 渲染丢 CSS 变量主题化、tooltip/图例全要自建；自绘 SVG 需重建时间轴 scale/跟随 tooltip/图例，为省一个消费者已有的依赖重造轮子。**分发影响**：registry 拷贝制下 recharts 落消费方——registry.json item `dependencies` 声明（registry-build 扫描块裸导入自动追加）+ root devDeps 供 demo；不进 @lynxland/uikit-core core，/adapters 预算门不受影响。
 
 对齐真实消费者的形态裁决（fleetly metric-chart.tsx 实证）：
 
@@ -590,7 +590,7 @@ FilterBar/Pagination 等是 ListPage 的**兄弟组件**（示例代码未画 fi
 
 ### 6.4 为什么不需要 CustomPage
 
-`CustomPage`/`<CustomRoutes>` 的存在前提是**框架拥有页面类型系统**。@lynx-go/uikit 不拥有路由——**TanStack Router 文件路由就是全部页面**，自定义内容页是缺省状态。承接机制：① `Page` 外壳块服务所有页面；② 横切关注点与页面类型正交（导航 = navSections prop、错误边界 = 每路由、权限 = beforeLoad + useCan、Suspense = 根路由）。
+`CustomPage`/`<CustomRoutes>` 的存在前提是**框架拥有页面类型系统**。@lynxland/uikit 不拥有路由——**TanStack Router 文件路由就是全部页面**，自定义内容页是缺省状态。承接机制：① `Page` 外壳块服务所有页面；② 横切关注点与页面类型正交（导航 = navSections prop、错误边界 = 每路由、权限 = beforeLoad + useCan、Suspense = 根路由）。
 
 ---
 
@@ -636,9 +636,9 @@ FilterBar/Pagination 等是 ListPage 的**兄弟组件**（示例代码未画 fi
 
 **超越（收敛为五点，措辞经对竞品 v5 实测校准）**：
 1. **全链路类型安全**——资源寻址（branded ResourceName vs 竞品 string）、谓词（类型化 Predicate vs 松散 CrudFilters/filters）、URL（typed search + Standard Schema vs 弱类型）。注明：react-admin v5"Stricter TypeScript"、refine v5"更一致的类型化 hook 接口"已收窄差距——超越集中在**资源寻址+谓词+URL 三处**，非全面。
-2. **流式帧消费（代差）**——竞品 live 契约是 pub/sub 事件（refine auto=失效重取、**manual=事件回调——消费方可自建缓冲**；ra-realtime=EE 付费重取模型）；@lynx-go/uikit 的契约原生携带**游标定位/backlog→follow/断档重同步/暂停/退避转轮询/环形缓冲**——这些机制在竞品中须消费方全部自建。结论（代差）保留，"字面上无法表达"的过度断言删除。
+2. **流式帧消费（代差）**——竞品 live 契约是 pub/sub 事件（refine auto=失效重取、**manual=事件回调——消费方可自建缓冲**；ra-realtime=EE 付费重取模型）；@lynxland/uikit 的契约原生携带**游标定位/backlog→follow/断档重同步/暂停/退避转轮询/环形缓冲**——这些机制在竞品中须消费方全部自建。结论（代差）保留，"字面上无法表达"的过度断言删除。
 3. **分页方言的类型化 + URL 化**——结构类型 QueryWindow vs 模式枚举/字符串游标（refine 有 cursor 约定、ra 有 getPaginationCursor+pageInfo——表达力存在，差距在**类型化与 URL 历史**）。
-4. **具名动词命令 + 声明式失效**——refine `useCustomMutation` 文档自认"不失效查询"（消费方手接 useInvalidate）；react-admin 自定义动词=裸 useMutation+手动 queryClient——@lynx-go/uikit 的 invalidates 声明反而更硬。
+4. **具名动词命令 + 声明式失效**——refine `useCustomMutation` 文档自认"不失效查询"（消费方手接 useInvalidate）；react-admin 自定义动词=裸 useMutation+手动 queryClient——@lynxland/uikit 的 invalidates 声明反而更硬。
 5. **Subscription/Command 的领域契约**（失败/结果两分、OCC、reveal、gapped）与 **TanStack Router/Form 全栈**。
 
 **持平**：CRUD 页面三件套、数据契约、认证/权限、引用**读侧**（写侧见缺失）、无头+皮肤分离、registry 源码分发、链接预取（Router preload 等价）、**Agent 文档**（kit 已自带 SKILL.md——跟进持平而非首创）。
@@ -646,17 +646,17 @@ FilterBar/Pagination 等是 ListPage 的**兄弟组件**（示例代码未画 fi
 **缺失三类处置**：
 - **A 类（补齐，进计划）**：ReferenceSelect、usePreference（含 SavedQueriesList 配方块后排）、mockResource/mockTransport、**useCollectionInfinite（升格：双竞品一等 + fleetly 消费）**
 - **B 类（配方化）**：实时失效=invalidateOnFrame；导出 CSV=rows+unparse 配方；clone=useRecord+create 配方；Inferencer→脚手架 devtool（kit 的 guessers 对应物，open-code 哲学，后排）；向导=Stepper；translatable 字段=自定义字段块；日历/看板/树=自定义块等第二消费者（**注：react-admin 树组件是 EE 付费——我们的处置反而占优**）
-- **C 类（持证拒签）**：**undo/乐观更新（明码标价：ra/kit 默认 undoable，@lynx-go/uikit 默认同步等待——重启条件：真实消费者需求，作为命令时机策略加回）**、SSR/元框架、后端适配器生态（kit 50+ providers、ra 同）、完整 i18n 语言包、provider 动物园/多租户 EE
+- **C 类（持证拒签）**：**undo/乐观更新（明码标价：ra/kit 默认 undoable，@lynxland/uikit 默认同步等待——重启条件：真实消费者需求，作为命令时机策略加回）**、SSR/元框架、后端适配器生态（kit 50+ providers、ra 同）、完整 i18n 语言包、provider 动物园/多租户 EE
 
-**shadcn-admin-kit 专门对照（诚实版）**：kit v2.0（2026-09）= ra-core + shadcn/Base UI + React Router v7 + RHF + Zod，98+ 组件、guessers、saved-queries、undoable 默认、自带 SKILL.md、EE realtime/locks/soft-delete。@lynx-go/uikit 真实差异化收敛为上述五点超越；kit 优势如实：组件数量（98+ vs 首批 ~25）、十年数据层打磨、50+ data providers、undo/export/guessers 开箱。**诚实提醒**：react-admin 十年、refine 六年，npm 周下载 core 各 ~16 万/~9 万（ra-core ~12 万）；@lynx-go/uikit 成熟度只能靠垂直切片+双 console 迁移逐步挣得。
+**shadcn-admin-kit 专门对照（诚实版）**：kit v2.0（2026-09）= ra-core + shadcn/Base UI + React Router v7 + RHF + Zod，98+ 组件、guessers、saved-queries、undoable 默认、自带 SKILL.md、EE realtime/locks/soft-delete。@lynxland/uikit 真实差异化收敛为上述五点超越；kit 优势如实：组件数量（98+ vs 首批 ~25）、十年数据层打磨、50+ data providers、undo/export/guessers 开箱。**诚实提醒**：react-admin 十年、refine 六年，npm 周下载 core 各 ~16 万/~9 万（ra-core ~12 万）；@lynxland/uikit 成熟度只能靠垂直切片+双 console 迁移逐步挣得。
 
 ---
 
 ## 9. 包结构与分发
 
 ```
-ui/                              # @lynx-go/uikit（pnpm monorepo + catalog 单源版本）
-├── packages/core                # @lynx-go/uikit-core
+ui/                              # @lynxland/uikit（pnpm monorepo + catalog 单源版本）
+├── packages/core                # @lynxland/uikit-core
 │   ├── src/kernel/              # 契约+类型+查询/游标代数（零依赖，零 react import）
 │   ├── src/schema/              # Effect Schema 工厂（依赖 effect ~4.0；公开面零 effect/schema 泄漏）
 │   ├── src/adapters/            # http 管线(Effect 内部+runApi+401)/订阅引擎(零 React)/
@@ -731,7 +731,7 @@ createHttp({
 
 按上节 fleetly 路线 1–4 步做的可验收切片（console 仓内），裁决先于实现记录如下：
 
-1. **分发 = tarball vendored**：@lynx-go/ui-kit 未发布，试点经 `pnpm pack` 产 tarball 落消费方仓内 `console/vendor/`，`file:` 协议安装。否决 link/相对路径目录依赖——fleetly 的 `console:verify` 零漂移门禁在 CI 跑 install+build+test，相对路径在无 @lynx-go/ui checkout 的环境必炸；tarball 进仓与该仓 dist 提交文化一致。代价：版本升级 = 重新 pack+commit 双仓手工同步（devtool 痛点 #1）。
+1. **分发 = tarball vendored**：@lynxland/ui-kit 未发布，试点经 `pnpm pack` 产 tarball 落消费方仓内 `console/vendor/`，`file:` 协议安装。否决 link/相对路径目录依赖——fleetly 的 `console:verify` 零漂移门禁在 CI 跑 install+build+test，相对路径在无 @lynxland/ui checkout 的环境必炸；tarball 进仓与该仓 dist 提交文化一致。代价：版本升级 = 重新 pack+commit 双仓手工同步（devtool 痛点 #1）。
 2. **int64 = "string"**：fleetly 生成链（protojson→swagger→openapi-typescript）已把 int64/uint64 钉死为 string，§5.2 双策略取 string 侧，无新决策空间。
 3. **URL 兼容 = 纯增量**：fleetly console 列表页现状**零 URL 参数**（过滤/分页全在 useState）——`q/page/size/sort` 是新键，无存量参数需要兼容解码或 redirect；§2.1.1 键名定案与存量 URL 的边界在本仓 = 空集。既有 `?tab=` 等参数不受影响。
 4. **token 方言 = 类级重写（拷贝适配）**：registry 块说 demo 的自研 token 方言（`text-muted/bg-panel/border-line/text-fg`…），消费方是 shadcn 全量 token。Tailwind v4 里 `--color-muted` 已被消费方 `bg-muted` 占用——**token 覆盖不可行，只能类名重写**（映射：`text-muted→text-muted-foreground`、`bg-panel→bg-card`、`bg-panel-2→bg-muted/50`、`border-line→border-border`、`divide-line→divide-border`、`text-fg→text-foreground`、`text-err→text-[var(--status-danger)]`）。这是拷贝制的机械适配步骤，映射表是 devtool 的第一个确定性需求。
@@ -757,15 +757,15 @@ createHttp({
 **行为对照验收（console 无 e2e 基建，stub API + 浏览器实测清单，2026-10-24 全过）**：
 ① 列表渲染：25 apps / 首页 20 行 / 页头描述带项目名 ✓；② 快筛 `q=web-1` 进 URL、命中 10 行（web-10..19，name/id 字段集与旧页 fieldsOf 等价）✓；③ Clear 清 q 回 25 行 ✓；④ Next → `?size=20&page=2` push、Showing 21–25、后退回第 1 页（历史=分页栈）✓；⑤ 表头排序 asc/desc 进 URL、行序正确（web-01 ↔ web-25）✓；⑥ 深链 `q+sort+page+size` 重载全还原 ✓；⑦ 过滤空态与源空态两套文案 ✓；⑧ 行点击进 app 详情、后退回列表 ✓；⑨ 错误态（分状态诚实文案 + Retry 一等按钮；stub 停机→恢复实测）✓；⑩ 视觉：token 映射后与 console 暗色主题融合（截图核验：标题/表格/徽章/等宽 id/分页条无对比度问题）。**门禁**：console 153 测试（+6 新：protojson 收敛/空 scope/Bearer 头/错误信封/编解码往返/清除补丁）、tsc、build（dist 再生成）、console:verify 零漂移口径全绿。**新增 URL 能力（行为增量，非等价破坏）**：过滤/分页/排序/页大小全部可分享、可前进后退——旧页这四者全是 useState 本地态。
 
-**§12 路线第 5 步补记：metrics 页对照直迁（2026-10-24 完成）**：MetricChart 块拷入 console（该块零 kit import——recharts + shadcn chart 基元 + cn，token 映射同 §12.1-4 表）；`features/metrics/metric-chart.tsx` 重写为**页面投影 + 同名薄壳**——`toMetricSeries`（key=`s{下标}`、label 经 seriesIdentity 按全集频次判别同名副本）+ `serverCapOf`（truncated/series_total → 块 serverCap props），**seriesIdentity 留 console 侧**（§6.1 裁决兑现：base/replica 是业务词汇）；三个调用点（工作台/app metrics tab/databases metrics）props 零改动——投影薄壳是 v1 形 props 与块 props 之间的诚实边界。旧 console 的 10 条数据语义测试锚（零值缺省/时间轴对齐/脏点/s{index} 唯一/身份判别/活跃排序/截断披露）完整迁移到 `toMetricSeries ∘ buildMetricRows` 真实执行路径——**vendored 块的单测覆盖家在消费方**（registry 块不进 ui-kit 包，@lynx-go/ui 侧只有 e2e 覆盖），此约定成文。行为差异记录：图内重复的 ChartLegend（旧实现渲染了两份图例）随迁移消去，"+N more" 文案由业务句（"stopped replicas…queryable in the workbench"）改为块的通用句——实体文案归页面/消费方的边界在此反向生效（块不认业务词；消费方如需业务句可自持薄壳覆写，本批接受通用句）。浏览器实测（stub 15 序列 fixture）：活跃窗排序/双副本判别尾/全零序列 0% 末值（W-B1 锚）/10 条渲染上限/+N more/服务端截断披露全部呈现。
+**§12 路线第 5 步补记：metrics 页对照直迁（2026-10-24 完成）**：MetricChart 块拷入 console（该块零 kit import——recharts + shadcn chart 基元 + cn，token 映射同 §12.1-4 表）；`features/metrics/metric-chart.tsx` 重写为**页面投影 + 同名薄壳**——`toMetricSeries`（key=`s{下标}`、label 经 seriesIdentity 按全集频次判别同名副本）+ `serverCapOf`（truncated/series_total → 块 serverCap props），**seriesIdentity 留 console 侧**（§6.1 裁决兑现：base/replica 是业务词汇）；三个调用点（工作台/app metrics tab/databases metrics）props 零改动——投影薄壳是 v1 形 props 与块 props 之间的诚实边界。旧 console 的 10 条数据语义测试锚（零值缺省/时间轴对齐/脏点/s{index} 唯一/身份判别/活跃排序/截断披露）完整迁移到 `toMetricSeries ∘ buildMetricRows` 真实执行路径——**vendored 块的单测覆盖家在消费方**（registry 块不进 ui-kit 包，@lynxland/ui 侧只有 e2e 覆盖），此约定成文。行为差异记录：图内重复的 ChartLegend（旧实现渲染了两份图例）随迁移消去，"+N more" 文案由业务句（"stopped replicas…queryable in the workbench"）改为块的通用句——实体文案归页面/消费方的边界在此反向生效（块不认业务词；消费方如需业务句可自持薄壳覆写，本批接受通用句）。浏览器实测（stub 15 序列 fixture）：活跃窗排序/双副本判别尾/全零序列 0% 末值（W-B1 锚）/10 条渲染上限/+N more/服务端截断披露全部呈现。
 
-**分发形态演进（2026-10-24，npm 首发后）**：裁决 1 的 vendored tarball 是未发布期的过渡形态——@lynx-go/ui-kit 0.1.1 公开发布后，console 已切 registry 依赖 `^0.1.1`（vendor/ 目录删除，CI install 不再依赖双仓同步，痛点 #1 随之消解）。发版纪律成文：**必须 `pnpm publish`**——`npm publish` 不解析 pnpm `catalog:` 协议，首发 0.1.0 依赖泄漏 `"effect": "catalog:default"` 不可安装（已 deprecate，净房 install 实证 EUNSUPPORTEDPROTOCOL）；publint + 净房 `npm install` 冒烟是发版门。可见性裁决：组织无付费计划，`publishConfig.access: public`（源码分发模型下 npm 包即源码公开，接受）。
+**分发形态演进（2026-10-24，npm 首发后）**：裁决 1 的 vendored tarball 是未发布期的过渡形态——@lynxland/ui-kit 0.1.1 公开发布后，console 已切 registry 依赖 `^0.1.1`（vendor/ 目录删除，CI install 不再依赖双仓同步，痛点 #1 随之消解）。发版纪律成文：**必须 `pnpm publish`**——`npm publish` 不解析 pnpm `catalog:` 协议，首发 0.1.0 依赖泄漏 `"effect": "catalog:default"` 不可安装（已 deprecate，净房 install 实证 EUNSUPPORTEDPROTOCOL）；publint + 净房 `npm install` 冒烟是发版门。可见性裁决：组织无付费计划，`publishConfig.access: public`（源码分发模型下 npm 包即源码公开，接受）。
 
 ### 12.2 torchwood 批 A：路由换轨 + keyset 切片——实现期裁决（2026-10-24，取证先行）
 
 torchwood console 取证要点（裁决依据）：react-router-dom **v7** 集中式路由表（App.tsx 60+ 路由，React.lazy + RequireAuth/RequireRole 组件守卫 + RouteErrorBoundary key=pathname 技巧）；axios 管线（HttpOnly cookie 会话 + 401 单飞刷新 + `expired=1` 断路器 + **X-Torchwood-Project header 全局注入**（localStorage 单源）+ 全局错误 toast）；keyset 契约 = `Page<T>{rows, nextPageToken}` 空页停 token、换向回第一页（游标与方向耦合）、gateway 枚举名 `SORT_ORDER_ASC/DESC`、repeated 参数需 `key=a&key=b` 串行化；**token 栈在 useState（useServerPaging）——游标不进 URL，深链中栈不可用**（§2.1.1 已成文的边界即此现状）；Tailwind v3 + shadcn classic token（`text-muted-foreground/bg-card/border-border` 全有——token 映射对 torchwood 近恒等）；测试 74 条（vitest + testing-library，10 文件用 MemoryRouter）；无 e2e；dist 不进 git（仅 .gitkeep）。
 
-1. **路由迁移 = 一次性全量换轨 + 过渡兼容层**：TanStack Router **code-based 集中路由表**（src/router.ts 镜像现 App.tsx 表——路由路径形态零变化、lazy 经 `route.lazy()`），不做 file-based 改造（60+ 页文件搬家是纯搬运，收益归后续批）。页面层经 `src/router/compat.tsx` 过渡兼容层（Link/NavLink/useNavigate/useParams/useSearchParams/Outlet/Navigate/useLocation 的 TanStack 薄映射），页面文件只改 import 行（react-router-dom → @/router/compat）——机械可审、低风险；**react-router-dom 依赖移除 + eslint no-restricted-imports 禁回**（守卫执法）。后续批次随各页 @lynx-go/ui 化逐页退 compat（页内改 Route.useParams/useSearch 原生形态），compat 层清空即退役——过渡层有始有终，不是永久拐杖。
+1. **路由迁移 = 一次性全量换轨 + 过渡兼容层**：TanStack Router **code-based 集中路由表**（src/router.ts 镜像现 App.tsx 表——路由路径形态零变化、lazy 经 `route.lazy()`），不做 file-based 改造（60+ 页文件搬家是纯搬运，收益归后续批）。页面层经 `src/router/compat.tsx` 过渡兼容层（Link/NavLink/useNavigate/useParams/useSearchParams/Outlet/Navigate/useLocation 的 TanStack 薄映射），页面文件只改 import 行（react-router-dom → @/router/compat）——机械可审、低风险；**react-router-dom 依赖移除 + eslint no-restricted-imports 禁回**（守卫执法）。后续批次随各页 @lynxland/ui 化逐页退 compat（页内改 Route.useParams/useSearch 原生形态），compat 层清空即退役——过渡层有始有终，不是永久拐杖。
 2. **守卫与错误边界映射**：RequireAuth/RequireRole 组件包裹 → TanStack `beforeLoad`（auth context + role 判定 + `throw redirect`）；RouteErrorBoundary 的 key=pathname 重置技巧 → TanStack 原生每路由 `errorComponent`（消费方 ErrorBoundary 组件保留，壳换挂法）。G8-1 路由级权限语义不变。
 3. **数据层切片（audit-logs 先行）**：适配器**复用 axios 管线**（拦截器栈是 torchwood 资产：cookie 刷新/断路器/scope header/toast——kit createHttp 的 onUnauthorized 闭环暂不接入，**接入是后续收敛批**，记挂账）；collection 适配 = `CollectionQuery.window.cursor → page_token`、`order.dir → SORT_ORDER_*`、`predicate → 白名单过滤参数`（action/status/actor_id/resource_id/created_after/created_before/include_platform/all_projects——§2.1.1 `filter=field:op:value` 与存量无冲突：该页现状过滤全在 useState 不进 URL）；`Page<T> → Segment{rows, nextCursor}`（next_page_token 缺席 = 到底；meta.total_count 存在但 keyset 语义不显示——leaderboards 型 total 并存的另一个实证，KeysetPagination 不吃它）。**游标进 URL 是新能力**（现状 token 栈组件态）。
 4. **int64/version = number**（§5.2 number 侧——version 比较是 torchwood 动机，本切片无 version 面）。
@@ -878,16 +878,16 @@ torchwood console 取证要点（裁决依据）：react-router-dom **v7** 集�
 
 ### 12.7 devtool 实现——拷贝制适配的机械化（2026-10-25，裁决先行）
 
-§12.1 痛点清单实施终版。取证要点：registry 源 token 词表 18 形（text-muted ×45、border-line ×17、text-fg/text-err ×9、bg-panel ×9、bg-panel-2 ×7、warn/ok/accent 系 ×18、bg-line ×1…）；双 console 实证映射表已散落在各 vendored 头（fleetly §12.1-4 与 torchwood 批 A–D 头注释）——**devtool 第一步是把散落的实证映射表收拢为仓内单源**。registry-build 三态瑕疵：`@lynx-go/ui-kit@workspace:*`（root devDeps 解析值）与模板 `@^0.1` 混入同列表 + `recharts@catalog:default`（pnpm catalog 协议泄漏——npm publish 0.1.0 事故同类）。
+§12.1 痛点清单实施终版。取证要点：registry 源 token 词表 18 形（text-muted ×45、border-line ×17、text-fg/text-err ×9、bg-panel ×9、bg-panel-2 ×7、warn/ok/accent 系 ×18、bg-line ×1…）；双 console 实证映射表已散落在各 vendored 头（fleetly §12.1-4 与 torchwood 批 A–D 头注释）——**devtool 第一步是把散落的实证映射表收拢为仓内单源**。registry-build 三态瑕疵：`@lynxland/ui-kit@workspace:*`（root devDeps 解析值）与模板 `@^0.1` 混入同列表 + `recharts@catalog:default`（pnpm catalog 协议泄漏——npm publish 0.1.0 事故同类）。
 
 1. **形态 = 仓内 CLI `scripts/devtool.mjs`**（零依赖 node 脚本，与 layer-check/registry-build/size-check 同文化）；**不做独立 npm 包**——消费方是本地双 console，open-code 源码可见即文档，包分发的版本管理成本 > 收益（tarball 痛点 #1 的教训反向适用：工具本身不分发，跟着 checkout 走）。
 2. **命令面 v1 = `list` / `profiles` / `copy`**；`diff`（上游块变更 vs 消费方副本的升级同步提示）挂账 v2——拷贝制核心循环是"拷贝 → 手工适配"，自动 diff 需先证明手工适配可稳定叠加。
 3. **profile = `scripts/profiles/<name>.json`**：`tokenMap`（类名→类名）+ `cnImport`（规范化目标）+ 可选 note。fleetly/torchwood 两条从两 console 实证 vendored 头提取落仓（差异实证：text-err 与 bg-panel-2 双 console 不同目标；warn/ok/accent 系**不设默认映射**——那是每块语境判断（torchwood amber/emerald、fleetly status vars），工具以警告面呈现而非假装可机械）。
 4. **token 引擎 = 词边界类名重写**：`(?<![\w-])token(?![\w-])`——`text-muted` 不得误伤 `text-muted-foreground`（连字符是 token 内部字符，边界须含它）。替换后面源再扫一遍源词表：仍出现的 = 未映射警告（列 token + 出现处）。registry 源不含 `-foreground` 形（demo 方言独占词表），无反向污染。
 5. **cn import 规范化 = `@/lib/utils`**：块源恒 `@/lib/utils`，fleetly 走已建 shim（src/lib/utils.ts 转发 cn npm——两世界单源）；torchwood 原生同路径。存量 fleetly 3 文件直 `import { cn } from "cn"` 是 shim 前形态，不回改（copy 默认不覆盖已存在文件）。
-6. **vendored 头生成**：既有格式自动化——`// vendored from @lynx-go/uikit registry/<family>/<file> @<kitVersion>（<日期> <note>）` + 适配清单（tokenMap 已应用/cn 规范化）+ 手工步骤提示区（未映射 token、检测到的 `tone=`（Badge 方言面）、`@/components/ui/chart`（需随批拷基元））。kitVersion 从 packages/core/package.json 读。
+6. **vendored 头生成**：既有格式自动化——`// vendored from @lynxland/uikit registry/<family>/<file> @<kitVersion>（<日期> <note>）` + 适配清单（tokenMap 已应用/cn 规范化）+ 手工步骤提示区（未映射 token、检测到的 `tone=`（Badge 方言面）、`@/components/ui/chart`（需随批拷基元））。kitVersion 从 packages/core/package.json 读。
 7. **判断题不自动化**：Badge tone→variant、文案中文化、结构剥离（页壳）、Select 桥——工具把机械面吃掉、把判断题显式列出来（警告即交接单）。痛点 ⑤（tsr generate）⑥（table-core 主入口——上游可直接修，另行处理）⑦（shell-agnostic 化）⑧（严格度穿透——已修）不在本工具面。
-8. **registry-build 瑕疵修复（三态）**：`blockDependencies` 排除 `@lynx-go/ui-kit`（core 依赖单源 = 硬编码 semver）；`catalog:` 协议解析——读 pnpm-workspace.yaml catalogs 还原真 semver（recharts ^3.10.1）；解析不到硬错（协议泄漏必须在构建期爆，不能流到 registry.json）。
+8. **registry-build 瑕疵修复（三态）**：`blockDependencies` 排除 `@lynxland/ui-kit`（core 依赖单源 = 硬编码 semver）；`catalog:` 协议解析——读 pnpm-workspace.yaml catalogs 还原真 semver（recharts ^3.10.1）；解析不到硬错（协议泄漏必须在构建期爆，不能流到 registry.json）。
 9. **测试 = `node --test scripts/devtool.test.mjs`**（scripts 层非 workspace 包，无 vitest 面；node 24 内建 runner 零配置）：token 引擎矩阵（边界/误伤/未映射警告）、头生成、依赖提示、profile 完备性（两 profile 对源词表的覆盖面 = 警告面断言）、registry-build 依赖收敛。`pnpm check` 链入 `test:devtool`。
 
 **devtool 实现期回写（2026-10-25 落地，`pnpm check` 全绿 + 真实块干跑对照通过）**：
@@ -896,7 +896,7 @@ torchwood console 取证要点（裁决依据）：react-router-dom **v7** 集�
 - **词边界方言两处坑（测试矩阵锁住）**：① 连字符是 token 内部字符——`(?<![\w-])…(?![\w-])` 否则 `text-muted` 误伤 `text-muted-foreground`（词边界 `\b` 因 `-` 属非词字符而失效）；② 映射目标（如 torchwood 的 `bg-muted`）不得误报未映射——**未映射扫描用源词表枚举正则而非生成式模式**（`(text|bg|…)-(muted|…)` 生成式会把合法目标 `bg-muted` 当方言）。
 - **头注释是映射文档不是代码**：端到端断言"输出不含源 token"须切代码体（首个 import 起）——头里 `text-muted→text-muted-foreground` 是合法的文档性出现。
 - **copy 默认拒绝覆盖**（--force 例外）：拷贝制的核心循环是"拷贝→手工适配"，重拷会静默抹掉手工层——升级同步走 diff（v2 挂账）而非盲覆盖。
-- **registry-build 修复实证**：依赖面收敛为 `@lynx-go/ui-kit@^0.1` + `recharts@^3.10.1` 两项（此前 workspace:\* 与 catalog:default 混入）；catalog 解析不到时构建期硬错（协议泄漏不过夜）。
+- **registry-build 修复实证**：依赖面收敛为 `@lynxland/ui-kit@^0.1` + `recharts@^3.10.1` 两项（此前 workspace:\* 与 catalog:default 混入）；catalog 解析不到时构建期硬错（协议泄漏不过夜）。
 - 痛点对照收束：②（token 映射表）✓ 工具化；③（基元方言）→ 检测提示（chart 基元/tone=）；④（cn shim）→ profile cnImport 规范化；①（tarball 同步）已被 npm 发版消解；⑤⑥⑦⑧ 维持原处置（上游可修/已修/判断题）。
 
 ### 12.8 torchwood 可用性收口——BarChart 根因 + 全站扫查 + 合入 main（2026-10-25）
@@ -933,9 +933,9 @@ torchwood console 取证要点（裁决依据）：react-router-dom **v7** 集�
 - **验收**：门禁全绿（tsc 0/vitest 164/eslint 0 error/build 过）+ 浏览器全站 22 页扫查全渲染 + 导航抽检（行点击 $id 详情/typed Link/带 query 跳转）全通。**冷启动时序假阴性两次教训**：dev server 刚起时首访页冷编译 >1.1s 窗口——扫查判定前须加长等待或复测。
 - **torchwood ui-kit 改造至此全量完成**：读（useCollection 16 域 + collectionQueryOptions）/写（useCommand 全量 + useCommandForm api-keys/documents）/听（useSubscription）/块（List/DataTable/KeysetPagination/Form/Fields/EventFeed/MetricChart/StatCard/states）四族绑定全覆盖，compat 零残留。遗留存量（非 kit 面）：ResourceListPage 子视图族（assets 用户资产/storage 文件列表/groups 成员——useListParams 原生重写后仍可用，等第二个消费者再裁去留）。
 
-**§12.10 品牌退役：fleet-ui → @lynx-go/ui（2026-10-25）**：
+**§12.10 品牌退役：fleet-ui → @lynxland/ui（2026-10-25）**：
 
-- **根包更名**：`fleet-ui` → `@lynx-go/ui`（private 根；lockfile 不记录根 importer 名，零感知）。fleet-ui 品牌全量退役，逐面清单：库错误前缀 `@lynx-go/ui-kit:`（8 处——报错归属精确到包）；Standard Schema v1 `vendor: "@lynx-go/ui-kit"`（vendor=实现方身份标识，不进 URL 线格式，纯类型/诊断面）；kernel 概念名 `isFleetKey`→`isKindedQueryKey`、`FLEET_KINDS`→`QUERY_KINDS`（kernel 零品牌指涉，命名政策兑现）；vendored 头来源标识 `// vendored from @lynx-go/ui …`（devtool 与其测试同步）；AppShell brand 缺省 + demo 标题；对照表库自称 fleet → kit（§13/§14/SKILL）。
+- **根包更名**：`fleet-ui` → `@lynxland/ui`（private 根；lockfile 不记录根 importer 名，零感知）。fleet-ui 品牌全量退役，逐面清单：库错误前缀 `@lynxland/ui-kit:`（8 处——报错归属精确到包）；Standard Schema v1 `vendor: "@lynxland/ui-kit"`（vendor=实现方身份标识，不进 URL 线格式，纯类型/诊断面）；kernel 概念名 `isFleetKey`→`isKindedQueryKey`、`FLEET_KINDS`→`QUERY_KINDS`（kernel 零品牌指涉，命名政策兑现）；vendored 头来源标识 `// vendored from @lynxland/ui …`（devtool 与其测试同步）；AppShell brand 缺省 + demo 标题；对照表库自称 fleet → kit（§13/§14/SKILL）。
 - **vendoring target 更名**：`components/fleet/<family>/` → `components/lynx/<family>/`（registry-build 重生成 29 块，devtool copy 落点与测试同步）。选 lynx 不选 ui——避撞消费方 shadcn `components/ui/` 基元目录。
 - **消费方迁移挂账**：torchwood 存量 `components/fleet/**`（16 域块 + `components/fleet/ui/` Select 桥）与 `src/fleet/**`（每域 `fleet/<domain>.ts` 适配器、errors/documents/realtime）需一次性 git mv + import 重写（机械批）；旧 vendored 头注释保留为历史事实不改写。下次 copy 前完成，否则新旧两目录并存。
 - **历史段落保留时序事实**：§12 各阶段回写中的 `components/fleet/`、`src/fleet/`、`fleet 化` 字样记录当时消费方仓实况，不回改——本条即分界线。
@@ -1009,7 +1009,7 @@ torchwood console 取证要点（裁决依据）：react-router-dom **v7** 集�
 - **Q5 scope 类型化**：✅ `ResourceScope` 松散 Record（不进 Resource 泛型——类型噪音大于收益；branded name 已保失效安全，附录 A#9 的"scope 非框架轴"维持）。
 - **Q6 表单映射**：✅ §5.4（onSubmitAsync 返回制；onSettled；重播；v2 监测）。
 - **Q7 FrameSource**：✅ AsyncIterable + closeReason 终态分诊 + AbortError 区分（§2.3）。
-- **Q8 registry 对齐**：块依赖 `@lynx-go/uikit-core` 的 semver range 写进 registry item 的 dependencies（shadcn CLI 原生支持 npm range）。
+- **Q8 registry 对齐**：块依赖 `@lynxland/uikit-core` 的 semver range 写进 registry item 的 dependencies（shadcn CLI 原生支持 npm range）。
 - **Q9 messages 通道**：MessagesProvider（context）+ 块级 props 覆盖（props > context > 内置英文缺省）——形状简单，实现期定稿即可，不再是阻塞项。
 - **Q10 mock 能力边界**：mockResource 需支持——延迟/失败注入（测试三态与闭环）、keyset/offset 双方言模拟（demo）、命令结果分支注入（rejected/conflict/ok+reveal）。实现期定稿验收。
 
@@ -1044,19 +1044,19 @@ torchwood ui-kit 全量改造（§12.9）收尾后的消费侧审查：三轴并
 - **devtool diff v2 落地**（§12.7 挂账关闭）：`diff <family>/<name> | --all [--dir] [--check]`——token 映射与 vendored 头归一后行级 diff（LCS 纯函数 lineDiff/stripVendoredHeader + 测试矩阵），残余即手工层或上游更新；多文件块伴生随主块核对；本地新文件不计漂移。torchwood 真块干跑：9 块核对、6 漂移全部命中已知手工层（metric-chart react-refresh 方言 11 行/stat-card tone 14/data-table·fields eslint-disable 各 1/list-page 13/event-feed 17）、4 块 in-sync——升级同步从纯手工对照变为可机械核对，--check 可挂门禁。实现期自咬：diff hunk 折叠窗口以 end 为锚（从 k 起全量 some 会吞并中间未变更行——测试矩阵抓获）。
 - **页面级三件套（shownList 投影/选择态/手绘过滤条）维持挂账**：fleetly 交叉取证——其列表页用 FilterBar 服务端过滤范式、无行选择、无页内搜索，三件模式在第二消费者不存在；torchwood 侧是"行为等价约束"（legacy 页内搜索/批量选择是存量行为）的产物。为单一消费者的存量行为上 kit/registry 面 = 虚假抽象（§12.9 runCommandMapped 复制裁决的反面教训）——等真正的第二消费者再裁。顺带记录：FilterBar 在 fleetly 侧是活块，④ 的纯函数层已使其可被 torchwood 未来采用（若页内搜索换服务端 q）。
 
-**§12.10 品牌对齐批：@lynx-go/ui → @lynx-go/uikit，库包迁 @lynx-go/uikit-core（2026-10-26）**：目录/包名/仓库名/README 四面一次对齐——
-- **更名面**：根包 `@lynx-go/ui` → `@lynx-go/uikit`（private 根，零感知）；库包 `@lynx-go/ui-kit` → `@lynx-go/uikit-core`，目录 `packages/ui-kit` → `packages/core`；GitHub 仓库 `lynx-go/ui-kit` → `lynx-go/uikit`（平台侧改名由人执行，remote URL 与 package.json repository 字段先就位，改名后旧 URL 自动重定向）。
+**§12.10 品牌对齐批：@lynxland/ui → @lynxland/uikit，库包迁 @lynxland/uikit-core（2026-10-26）**：目录/包名/仓库名/README 四面一次对齐——
+- **更名面**：根包 `@lynxland/ui` → `@lynxland/uikit`（private 根，零感知）；库包 `@lynxland/ui-kit` → `@lynxland/uikit-core`，目录 `packages/ui-kit` → `packages/core`；GitHub 仓库 `lynxland/ui-kit` → `lynxland/uikit`（平台侧改名由人执行，remote URL 与 package.json repository 字段先就位，改名后旧 URL 自动重定向）。
 - **版本裁决**：npm 新名首发即 **0.3.0**——继承 0.2.x 版本脉络（旧名止于 0.2.1 不再发版；内外皆内部使用，无 deprecate 转址必要）。registry.json 依赖单源与 CORE_RANGE 同步升 `^0.3`。
-- **逐面清单**：imports 全仓（demo/registry/scripts/docs）；错误前缀 `@lynx-go/uikit-core:`（transport 1 + options 3 + codec 3）；Standard Schema v1 vendor 字段 ×2；devtool vendored 头来源标识 + kitVersion 读取路径 + 测试断言（**转义斜杠形态 `@lynx-go\/ui` 是 sed 盲区**——测试矩阵抓获，三处手工修）；AppShell brand 缺省 + demo 标题；AGENTS/SKILL/llms.txt/README。
+- **逐面清单**：imports 全仓（demo/registry/scripts/docs）；错误前缀 `@lynxland/uikit-core:`（transport 1 + options 3 + codec 3）；Standard Schema v1 vendor 字段 ×2；devtool vendored 头来源标识 + kitVersion 读取路径 + 测试断言（**转义斜杠形态 `@lynxland\/ui` 是 sed 盲区**——测试矩阵抓获，三处手工修）；AppShell brand 缺省 + demo 标题；AGENTS/SKILL/llms.txt/README。
 - **testing 出口 Fleet 尾巴清偿**（§12.10 首批退役漏网，本轮"内部使用无破坏顾虑"裁决放行）：`renderWithFleet`/`RenderWithFleetOptions`/`FleetRenderResult` → `renderWithKit`/`RenderWithKitOptions`/`KitRenderResult`（自称 "kit" 与 §13/§14 对照表一致）；kernel 注释与测试描述 "fleet 键" → "kit 键"。torchwood 测试面同步。
 - **README 重写**：从单行占位符重写为双语实文档——英文 `README.md` + 中文 `README_ZH.md`，互链；四面概念表/双通道分发（npm core + 拷贝制块）/快速上手（resource + search schema + useCollection + CommandResult 分支 + 帧）/五族块表/分层不变量/文档指针。
-- **历史记录保真**：本文件既有 §12.x 条目中的旧名（fleet-ui / @lynx-go/ui / @lynx-go/ui-kit / renderWithFleet）保持原样不改写——历史条目是当时的记录，不是现状的描述；现状以本条与代码为准。
+- **历史记录保真**：本文件既有 §12.x 条目中的旧名（fleet-ui / @lynxland/ui / @lynxland/ui-kit / renderWithFleet）保持原样不改写——历史条目是当时的记录，不是现状的描述；现状以本条与代码为准。
 
 **§12.10 vendoring 落点二改：lynx → kit（2026-10-26，torchwood 消费方迁移批联动）**：品牌对齐批定名 uikit 后，§12.10 首选的 `components/lynx/<family>/` 落点沦为品牌中间态遗物，二改为 `components/kit/<family>/`——kit 词干跨三轮品牌（fleet-ui → ui-kit → uikit）稳定，目录名说角色不绑品牌快照；且避开 `components/uikit` 与消费方 shadcn `components/ui/` 的前缀邻接（首批拒 ui 的同款理由对 uikit 弱化成立）。改动面：devtool copy/diff 缺省基目录（torchwood 仍 `--dir src/components/kit`，src 布局例外）、registry-build target 模板 + registry.json 30 块 target、devtool 测试断言。消费方同步：torchwood 已迁移 `src/fleet → src/kit`、`components/fleet → components/kit`（torchwood 25ea6f32；本地标识符同批去品牌 FleetScopeBinding/FleetListPage 等 → Kit*；vendored 头与「fleet 化」历史字样按惯例保留）；fleetly 迁移时直接落 kit，零特例。
 
 **§12.10 包边界裁决批：core 拆包三清单——现在拆/挂账等触发/永不拆（2026-10-26 同日续）**：提问"哪些该从 core 拆出去"，取证后裁决——
 - **取证三件**：① effect 实测足迹仅 `adapters/http.ts` + `adapters/subscription.ts` 两文件——schema 分层**允许** effect（layer-check 规则）但**事实零 import**（AGENTS.md 原文"依赖 effect"是允许方向非事实依赖，本轮勘误）；② `/testing` 出口（renderWithKit harness）隐含 `@testing-library/react` 依赖（不在 deps/peerDeps 声明）且**零外部消费者**——torchwood 用自建 TestRouter 未采纳；③ react 层 peer 面已收敛：bindings→query+router（URL 写入契约）、command→form+query、invalidate→query。源码分发 + subpath exports 下未 import 的层不进 bundle——拆包对体积零收益，收益全在 install 面与依赖声明诚实度。
-- **现在做（①）**：/testing 闭瑕疵 = 补 `@testing-library/react` optional peer 声明（≥16，0.3.1 发版落地）。**不拆包**：零外部消费者时拆 `@lynx-go/uikit-testing` 会把未验证 API 固化成独立包公开面（虚假抽象的包形态变体）。
+- **现在做（①）**：/testing 闭瑕疵 = 补 `@testing-library/react` optional peer 声明（≥16，0.3.1 发版落地）。**不拆包**：零外部消费者时拆 `@lynxland/uikit-testing` 会把未验证 API 固化成独立包公开面（虚假抽象的包形态变体）。
 - **挂账两件（触发即拆）**：② `kernel` → 独立包——触发 = 非 React 消费方出现（服务端共享 ApiError/CommandResult/CollectionQuery 契约类型、codegen、第二前端框架）；届时 kernel-only 消费者免装 effect（dependencies 唯一运行时依赖）。③ `schema` → 独立包——触发 = 服务端要解析/校验 CollectionQuery 线格式（"URL 即真相"的另一半消费者）。
 - **永不拆清单**：adapters+react 不拆对——订阅引擎（退避归零、runForEach+Queue.offer）与 useSubscription/useInvalidateOnFrame 帧语义是同一次裁决的两侧，拆开 = 版本对齐税；registry 永不进 npm 包（拷贝制分发是 §12 核心裁决，打包 = 推翻）；mock/mockTransport 留 adapters（demo 活文档与消费方 stub 驱动，非纯 dev-time 工具）。
 - **拆包通用成本（任一触发时认账）**：registry-build 的 CORE_PACKAGE 单源变多源；workspace 版本同步与发版节奏翻倍；消费方 import 再改一轮（torchwood 59 文件前车之鉴）。
@@ -1154,3 +1154,44 @@ restFetchAll<T>({ path: (ctx) => string, envelope?, params?, baseUrl?, headers?,
 **下游预告（fleetly 次批，不阻塞发版）**：restFetchAll 落地后 fleetly 可全量铺开整取面——19 个 clientCollection kit 文件（alerts/app-specs/apps/audit/backups/databases/deployments/exec/githubapps/identity/networks/nodes/projects/registry/revisions/routes/storage/tasks/variables）的 fetchRows/qs 微工厂消费与逐资源 toApiError 样板归零（retro M4 的 kit 层 −40% 行数预期在此兑现）；kit/http.ts 的 fetchRows/rowsOf/qs 三帮手随之退役（authFetch 常驻为 rest 工厂注入点）；app-spec/deployment-detail 两处 isFetching loading 近似复原。升级时 pnpm-workspace.yaml minimumReleaseAgeExclude 同步 0.5.0。
 
 **发版补记（2026-10-30，0.5.0 已发布）**：`pnpm publish --no-git-checks` + publint 全过（All good）。npm staged 传播窗口本次约 3 分钟（publish 后 `npm view` 仍报 0.4.0 latest、install 撞 ETARGET；3 分钟后 view 见 0.5.0，独立 cache 净房随即装上——较 §12.11 的 5 分钟缩短，窗口时长不稳定、按 ≥5 分钟预期操作）。净房冒烟口径记录：源码分发包的裸 Node 运行时导入不可行——Node 22 的 type stripping 设计性拒绝 node_modules 内 .ts（ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING），运行时契约是消费方 bundler 编译；冒烟 = 独立 cache install 解析 0.5.0 + publint exports 映射 + 发布物源码结构断言（restFetchAll 导出/RecordHandle.isFetching 在场）。
+
+### 12.14 G 批：双 console 统一 + 服务端契约 + 项目模板——总体裁决与批次规划（2026-10-31，调研先行）
+
+来源：用户目标「通过 uikit 统一 fleetly/torchwood 的使用模式 + 为后续同类项目（React 管理台）启动建立模板」，并补充裁决前提：**两后端为自有项目，可调整 API 以配合 kit 演化、可统一服务端模式**。三路调研先行：①torchwood 消费面全量盘点；②fleetly 消费面全量盘点（0.5.0 铺开批已落地：b4ff15ad 试点 + b80142c3 全量，kit/http.ts 仅剩 authFetch 11 行）；③九家竞品（shadcn/create-t3-app/TanStack Starters/refine/react-admin/RedwoodJS/Nest+Angular schematics+Rails/Modern.js+ice）。
+
+**调研结论（裁决依据）**：
+
+1. **「标准姿势」事实存在**：两仓独立演化收敛出同构目录契约（`src/api` 传输层 / `src/kit` 资源胶水层 / `src/components/kit` vendored 块 / 薄壳路由 + providers 栈）；分歧收敛为四个槽位——HTTP 管线（axios vs fetch）、分页方言（服务端 keyset vs 整取+clientCollection vs restCollection）、重复胶水、配置/门禁面（minimumReleaseAgeExclude 两种处理；antipattern 测试仅 fleetly 有；块漂移执法仅 torchwood 侧跑 `diff --all --check`）。
+2. **双份胶水是 kit 级资产非消费方政策**：两仓 `kit/errors.ts`（toApiError + runCommandMapped）近逐字相同、各自单源；fleetly 另有 `toast.ts` toastOnSettled 单源。政策性部分恰好都是注入参数（错误体映射、fetch 桥、toast 形态）——上收为注入式工厂不绑架消费方（与 §12.9 阶段 5「axios 管线保留」不冲突：桥仍是 torchwood 的槽内实现）。
+3. **服务端可调 ⇒ 客户端多数「方言」是后端历史形状的投影**，消解对照：torchwood OCC=400+message 前缀（`kit/documents.ts` 唯一域变体）→ 409+code 后域变体消亡；`SORT_ORDER_ASC/DESC` 枚举名与 repeated 序列化映射层（`api/pagination.ts`）→ 服务端直吃 codec 形后消亡；users ParseUserList DSL 组装+消毒（`kit/users.ts`）→ filter 参数化后消亡；fleetly 19 文件 envelope 逐域回调 → 信封归一后一行；fleetly 整取伪造游标 → 规范显式定义「有界整取」为合法小形态（按数据规模分流，非历史原因）。torchwood 后端内部已统一 `Page<T>{rows, nextPageToken}`（§12.9 取证 16 域同构）——规范信封非空中楼阁。
+4. **竞品分类学**：契约型（react-admin/refine）/拷贝型（shadcn）/生成型（schematics/微生成器）/模板型（create-t3-app/examples）四路线，成熟方案皆分层组合。可抄清单：shadcn preset 编码化+validate+migrate 窄通道、Nest spec 成对生成、ng update 迁移型生成器（感知用户改动，优于盲覆盖）、Modern.js 微生成器（存量项目持续收敛）、TanStack/Next examples 同仓共测、react-admin 组合子（withLifecycleCallbacks 按资源挂行为）。反面教训：suspenders（可升级部分必须依赖制——现有「core npm 包 + registry 拷贝」切分正确）、Blitz（生成物贴近普通代码才长寿）、T3（胶水应收进上游/生成器——两仓手写胶水正是该消灭的东西）。
+
+**裁决**（用户 2026-10-31 拍板四项 + 依此推演）：
+
+1. **统一 = 三轴**：①客户端标准姿势（目录契约 + 胶水 + 块 + 配置门禁面）；②服务端契约规范（console API 规范，见裁决 3）；③模板与工具（同仓 starter + devtool 微生成器族）。
+2. **方言槽双态改判**：自有后端 = 过渡机制（服务端迁移完成即坍缩为默认值）；第三方后端 = **永久适配面**——rest 工厂注入点（envelope/params/fetch）的合法用途是接不可调整的第三方 API（react-admin dataProvider 的对应物）。适配器作者册成文时按双态写（规范默认态 / 第三方方言态）。
+3. **console API 规范 v1**（G2 成文 `docs/console-api.md`，Go 仓可引用）。骨架：
+   - 列表：`200 {rows: T[], next_cursor?: string, total_count?: number}`（snake_case，Go 自然形）；**游标分页为一等形态，有界整取（显式上限、无 next_cursor）为合法小形态**——与 kernel QueryWindow 游标代数及 clientCollection 求值两侧一一对应。
+   - 谓词/排序参数与 kit URL codec 同形（`sort=field:dir` / `filter=field:op:value` repeated 裸键 / `cursor` / `size`）；可过滤字段白名单仍是资源 schema 声明，服务端校验与其一致。
+   - 错误体：`{error: {code: string, message: string}}`（两后端已事实趋同，定死）；命令语义状态码归位：400=rejected（code 必填）/403/404/409=conflict（OCC/唯一性，code）/428=确认（code，fleetly E_CONFIRMATION 族为范本）/401=刷新后仍死会话才到调用方/5xx。torchwood OCC 错位是唯一大修项。
+   - int64=string（protojson 既有约定）。
+4. **共享 Go 件 console-gw**：契约之外抽共享 Go module（列表信封构造、cursor 编解码、错误码→HTTP 状态映射、filter/sort 参数解析），两后端都引——双仓实现必漂移，客户端双份胶水的教训服务端同样适用。落点（独立仓 / 某后端仓 pkg/）G2 批内定。
+5. **胶水上收 core**（G1）：toApiError/runCommandMapped/toastOnSettled/空 scope 守卫门 上收 /adapters 为**注入式工厂**（错误体映射、fetch、toast 均为参数）。名词预算审查：是 ApiError/CommandResult 的「形」非新名词，预算不动；命名按「适配器=动词」批内裁。**M9（ApiError 类化）自 F2 移入 G1 合流**，F2 缩为 M5 Transport 工厂单项。
+6. **客户端标准姿势成文**（G1/G4 间）：目录契约、kit 文件标准形态（服务端规范化后坍缩至 ~8 行/域：defineResource + restCollection({path, fetch})，envelope/params 全吃默认）、方言槽位表、配置面（minimumReleaseAgeExclude 约定）、门禁面（antipattern 测试模板化——torchwood 补课）。
+7. **模板 = 同仓 starter**（G4）：`apps/template-console`——标准目录 + 一个全形态示例域 + antipattern 测试 + 401 桩 + devtool 接线，随 `pnpm check` 共测（TanStack/Next examples 模式，模板永不腐烂）；新项目由 `devtool init` stamp。
+8. **devtool 微生成器化**（G4/G5）：`init`（stamp 模板 / 给存量项目铺 kit 骨架）、`doctor`（审计存量 console：块漂移/胶水单源在位/配置面/反模式面）、`scaffold <domain>`（配方级生成 kit 文件+路由+页面初稿——§8 B 类「Inferencer→脚手架」升格）、profile→preset 编码化（shadcn preset 方向，可部分应用）；`migrate` 窄通道挂账（ng update 模式，首个破坏性演进时启用）。
+
+**G 批次表**：
+
+| 批 | 仓 | 内容 | 依赖 |
+|---|---|---|---|
+| G1 胶水上收 | uikit | /adapters 注入式工厂 + M9 合流 + demo 换装试点 + 0.6.0 发版 | 无（先行） |
+| G2 规范与 Go 件 | uikit + Go 仓 | docs/console-api.md 定稿 + console-gw 骨架 + 两后端各一试点端点 | 无（与 G1 并行） |
+| G3 服务端迁移 | torchwood / fleetly（Go） | 按域分批迁移到规范；客户端方言槽先吃过渡形、端点迁移完即坍缩默认 | G2 |
+| G4 模板与 init | uikit | apps/template-console + devtool init + 标准姿势成文 | G1 |
+| G5 devtool 深化 | uikit | doctor + scaffold + preset 编码化 | G4 |
+| G6 下游收口 | torchwood / fleetly | 换 upstream 胶水、退过渡件、antipattern 统一、doctor 全绿 | G1+G3（各自侧） |
+
+**执行方式与在途衔接**：uikit 仓批（G1/G2/G4/G5）本仓直做；消费方/Go 批（G3/G6）沿用「下游 prompt 交用户开消费方会话执行」惯例。在途 torchwood 适配批（axiosFetch 桥 + restCollection 换装，prompt 已交）**不推翻**——桥正是方言槽的 torchwood 形，其成果在 G3 服务端迁移前作为过渡件长存，迁移完成后排序/序列化映射层自然坍缩；fleetly 0.5.0 铺开已完成，其 G6 面仅剩 errors/toast 换 upstream 件。
+
+**冻结与合流改道（2026-10-31 补记，用户裁决）**：服务端轴冻结——服务端模式正提取进 lynxland/lynx-start（Go 侧 shadcn 式基建：kernel 契约库含**错误码区段**与 **crud 分页方言** + 源码模块 registry + init/add/update/doctor CLI + preset 体系），提取完成前动 G2/G3 会与其冲突。待其完成后 G2 重启并改道：**console-gw 独立仓裁决作废——共享 Go 契约件 = lynx-start kernel**（错误码区段+分页方言已在其契约面内）；console API 规范改判为「lynx-start kernel 契约的客户端投影」（字段命名/状态码/错误体随其 kernel 定稿对齐）；鉴权统一大概率由 lynx-start session/access 模块形态决定而非自选 cookie vs Bearer。G3 改判为「两后端采用 lynx-start 模块/kernel」而非自定迁移。连带挂起至重启时点：在途 torchwood 换装批的处置（改按域原子切换 vs 照旧两段式）、规范字段命名（camelCase 倾向待核）。**客户端轴不受影响照常可做**：G1（胶水上收+M9）→ G4（模板+init）→ G5（devtool 深化）均纯 uikit 仓零冲突。联动备注：lynx-start 的 `update` 三方合并（本地/安装基线/upstream）是本仓 devtool migrate 挂账的成熟参照；两侧 preset 体系（devtool preset / lynx-start --preset）命名对齐点届时裁。
