@@ -20,9 +20,13 @@ import { basename, join } from "node:path";
 const root = new URL("..", import.meta.url).pathname;
 const families = ["values", "query", "command", "subscription", "shell"];
 
-// core 依赖单源：kit 自身的 semver range（root devDeps 里是 workspace:*，不可外发）
+// core 依赖单源：kit 自身的 semver range（root devDeps 里是 workspace:*，不可外发）。
+// major.minor 从 packages/core/package.json 推导——与 devtool.test 版本断言同源，版本升级不再漏改
 const CORE_PACKAGE = "@lynxland/uikit-core";
-const CORE_RANGE = "^0.5";
+const [CORE_MAJOR, CORE_MINOR] = JSON.parse(
+  readFileSync(join(root, "packages/core/package.json"), "utf8"),
+).version.split(".");
+const CORE_RANGE = `^${CORE_MAJOR}.${CORE_MINOR}`;
 
 // 生态基线包：vendored shadcn 模型下假定消费方已有，不进 dependencies
 const ECOSYSTEM = [
