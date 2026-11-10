@@ -6,8 +6,14 @@ import { fieldControl } from "./input";
 
 const triggerClass = cx(
   fieldControl,
-  "h-9 cursor-pointer items-center justify-between gap-2 py-2 text-left [&>span]:truncate",
+  "cursor-pointer items-center justify-between gap-2 py-2 text-left [&>span]:truncate",
 );
+
+const sizeClass = {
+  sm: "h-8",
+  md: "h-9",
+  lg: "h-10",
+} as const;
 
 const popupClass =
   "z-50 max-h-[min(24rem,var(--available-height))] min-w-[var(--anchor-width)] overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--popover)] p-1 text-[var(--popover-foreground)] shadow-md data-[starting-style]:opacity-0 data-[ending-style]:opacity-0";
@@ -27,6 +33,9 @@ export function Select({
   placeholder,
   disabled = false,
   id,
+  size = "md",
+  className,
+  contentClassName,
   "aria-label": ariaLabel,
 }: SelectProps) {
   return (
@@ -40,7 +49,10 @@ export function Select({
       disabled={disabled}
       id={id}
     >
-      <BaseSelect.Trigger aria-label={ariaLabel} className={triggerClass}>
+      <BaseSelect.Trigger
+        aria-label={ariaLabel}
+        className={cx(triggerClass, sizeClass[size], className)}
+      >
         <BaseSelect.Value placeholder={placeholder} />
         <BaseSelect.Icon className="flex size-4 shrink-0 items-center justify-center text-[var(--muted-foreground)]">
           <ChevronDown />
@@ -48,7 +60,7 @@ export function Select({
       </BaseSelect.Trigger>
       <BaseSelect.Portal>
         <BaseSelect.Positioner sideOffset={4}>
-          <BaseSelect.Popup className={popupClass}>
+          <BaseSelect.Popup className={cx(popupClass, contentClassName)}>
             <BaseSelect.List>
               {options.map((option) => (
                 <BaseSelect.Item

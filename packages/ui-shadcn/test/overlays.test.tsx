@@ -54,6 +54,29 @@ describe("Dialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  it("maps xl/fullscreen sizes and applies className to the popup", async () => {
+    const { rerender } = render(
+      <Dialog open onOpenChange={() => undefined} title="Build log" size="xl" className="dialog-wide">
+        <p>Log body</p>
+      </Dialog>,
+    );
+
+    const popup = await screen.findByRole("dialog");
+    expect(popup.getAttribute("data-size")).toBe("xl");
+    expect(popup.className).toContain("sm:max-w-[64rem]");
+    expect(popup.className).toContain("dialog-wide");
+
+    rerender(
+      <Dialog open onOpenChange={() => undefined} title="Build log" size="fullscreen">
+        <p>Log body</p>
+      </Dialog>,
+    );
+    const fullscreen = screen.getByRole("dialog");
+    expect(fullscreen.getAttribute("data-size")).toBe("fullscreen");
+    expect(fullscreen.className).toContain("h-[calc(100dvh-1rem)]");
+    expect(fullscreen.className).toContain("max-w-none");
+  });
 });
 
 describe("Drawer", () => {
@@ -85,6 +108,28 @@ describe("Drawer", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("maps xl/fullscreen sizes and applies className to the panel", async () => {
+    const { rerender } = render(
+      <Drawer open onOpenChange={() => undefined} title="Logs" size="xl" className="drawer-wide">
+        <p>Drawer body</p>
+      </Drawer>,
+    );
+
+    const popup = await screen.findByRole("dialog");
+    expect(popup.getAttribute("data-size")).toBe("xl");
+    expect(popup.className).toContain("sm:max-w-[64rem]");
+    expect(popup.className).toContain("drawer-wide");
+
+    rerender(
+      <Drawer open onOpenChange={() => undefined} title="Logs" size="fullscreen">
+        <p>Drawer body</p>
+      </Drawer>,
+    );
+    const fullscreen = screen.getByRole("dialog");
+    expect(fullscreen.getAttribute("data-size")).toBe("fullscreen");
+    expect(fullscreen.className).toContain("sm:max-w-none");
   });
 });
 

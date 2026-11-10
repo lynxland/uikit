@@ -366,6 +366,15 @@ Router `<Link>` 渲染成按钮；`Tooltip` 的 `trigger` 同样按元素渲染�
 `className` 只作用于内容面板（宽度/padding 逃生口），不作用于 trigger。
 `Input`/`Textarea` 的 `variant` 为 `default | bare`：`bare` 去掉自身边框/
 背景/焦点环，由 `InputGroup` 提供统一外框。
+`Select` 的 `size` 为 `sm | md | lg`（trigger 高度），`className` 作用于
+trigger，`contentClassName` 作用于选项弹层（ui-plain 的原生 select 把
+`contentClassName` 落到 `<select>`，浏览器拥有弹层）。`Menu` 的 item
+`kind` 为 `item | checkbox | radio | separator | label | submenu`；
+`checked`/`onCheckedChange` 是受控状态，submenu 用 `items` 嵌套；旧的
+`separator: true` 仍是“在此项前画分隔线”的 v3 简写，与 `kind:"separator"`
+并存但不引入别名层。`Dialog`/`Drawer` 的 `size` 为
+`sm | md | lg | xl | fullscreen`，`className` 只作用于弹层/面板。`Card`
+的 `headerDivider`/`footer`/`bodyClassName` 提供分节线、页脚和内容区逃生口。
 具体 UI 库的 compound API 不泄漏到 surfaces。
 
 - 默认：`@lynxland/uikit-ui-shadcn`（Base UI 1.9 + shadcn）。
@@ -568,6 +577,9 @@ Router `<Link>` 渲染成按钮；`Tooltip` 的 `trigger` 同样按元素渲染�
   `onMobileOpenChange` 控制 <768px 的 overlay drawer。sidebar 颜色走
   `--ui-sidebar*` token。
 - `Breadcrumb` / `SectionCard` / `ScopeSwitcher` / `Stepper` / `RouteErrorBoundary` 同层。
+- `SectionCard` 透传 `headerDivider`（标题下通栏分隔线）、`footer` 与
+  `bodyClassName` 到 adapter `Card`；页面内重复的 raw `<section>` 卡片头应改用
+  `SectionCard headerDivider`，不要再手写 `<h2>` + border 的卡片头。
 
 ### 5.5 字段三拆
 

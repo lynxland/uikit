@@ -11,6 +11,7 @@ export function Drawer({
   children,
   side = "right",
   size = "md",
+  className,
 }: DrawerProps) {
   return (
     <ModalShell
@@ -20,6 +21,7 @@ export function Drawer({
       description={description}
       footer={footer}
       size={size}
+      className={className}
       kind="drawer"
       side={side}
     >

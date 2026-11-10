@@ -65,7 +65,7 @@ test.describe("Dokploy shell and home", () => {
     await page.goto("/dashboard/settings/web-server");
     await expect(page.getByRole("heading", { level: 1, name: "Server Domain" })).toBeVisible();
     await expect(page.getByLabel("Domain")).toHaveValue("hostinger.dokploy.com");
-    await expect(page.getByRole("heading", { level: 2, name: "Web Server" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Web Server" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Web Server");
   });
 

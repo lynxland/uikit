@@ -53,4 +53,31 @@ describe("Select", () => {
     render(<Select aria-label="Fruit" options={options} disabled />);
     expect(screen.getByRole("combobox", { name: "Fruit" }).hasAttribute("disabled")).toBe(true);
   });
+
+  it("applies size, trigger and popup class escapes", async () => {
+    const { rerender } = render(
+      <Select
+        aria-label="Fruit"
+        options={options}
+        size="sm"
+        className="w-40"
+        contentClassName="select-popup"
+      />,
+    );
+
+    const trigger = screen.getByRole("combobox", { name: "Fruit" });
+    expect(trigger.className).toContain("h-8");
+    expect(trigger.className).toContain("w-40");
+
+    fireEvent.mouseDown(trigger);
+    const listbox = await screen.findByRole("listbox");
+    expect(listbox.closest(".select-popup")).toBeTruthy();
+
+    rerender(
+      <Select aria-label="Fruit" options={options} size="lg" className="w-64" />,
+    );
+    const large = screen.getByRole("combobox", { name: "Fruit" });
+    expect(large.className).toContain("h-10");
+    expect(large.className).toContain("w-64");
+  });
 });

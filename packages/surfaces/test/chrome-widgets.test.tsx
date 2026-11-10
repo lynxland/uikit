@@ -46,6 +46,25 @@ describe("SectionCard", () => {
     expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
     expect(screen.getByText("Card body")).toBeTruthy();
   });
+
+  it("passes the header divider, footer and body class through to the adapter Card", () => {
+    render(
+      withAdapter(
+        <SectionCard
+          title="Section"
+          headerDivider
+          footer={<span>Section footer</span>}
+          bodyClassName="section-body"
+        >
+          <p>Body</p>
+        </SectionCard>,
+      ),
+    );
+
+    expect(screen.getByText("Section").closest("header")?.getAttribute("data-divider")).toBe("true");
+    expect(screen.getByText("Section footer").closest("[data-slot='card-footer']")).toBeTruthy();
+    expect(screen.getByText("Body").closest(".section-body")).toBeTruthy();
+  });
 });
 
 describe("ScopeSwitcher", () => {

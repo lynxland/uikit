@@ -1,3 +1,4 @@
+import type { DialogSize } from "@lynxland/uikit-surfaces/adapter";
 import { type ReactNode, useEffect, useId, useRef } from "react";
 import { cx } from "./cx";
 import { X } from "./icons";
@@ -9,9 +10,10 @@ export interface ModalShellProps {
   description?: ReactNode;
   footer?: ReactNode;
   children?: ReactNode;
-  size: "sm" | "md" | "lg";
+  size: DialogSize;
   kind: "dialog" | "drawer";
   side?: "left" | "right";
+  className?: string;
 }
 
 /**
@@ -37,6 +39,7 @@ export function ModalShell({
   size,
   kind,
   side = "right",
+  className,
 }: ModalShellProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -95,6 +98,7 @@ export function ModalShell({
                 `ui-plain-drawer-panel--${size}`,
               )
             : cx("ui-plain-dialog-panel", `ui-plain-dialog-panel--${size}`),
+          className,
         )}
         data-slot={kind}
         data-size={size}

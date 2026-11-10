@@ -41,6 +41,8 @@ export interface SelectOption {
   disabled?: boolean;
 }
 
+export type SelectSize = "sm" | "md" | "lg";
+
 export interface SelectProps {
   value?: string;
   defaultValue?: string;
@@ -49,6 +51,12 @@ export interface SelectProps {
   placeholder?: string;
   disabled?: boolean;
   id?: string;
+  /** Trigger size preset; defaults to `md`. */
+  size?: SelectSize;
+  /** Class for the trigger (width/height escapes). */
+  className?: string;
+  /** Class for the option popup; ignored by adapters without a DOM popup. */
+  contentClassName?: string;
   "aria-label"?: string;
 }
 
@@ -125,6 +133,8 @@ export interface TooltipProps {
   disabled?: boolean;
 }
 
+export type DialogSize = "sm" | "md" | "lg" | "xl" | "fullscreen";
+
 export interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -133,12 +143,14 @@ export interface DialogProps {
   footer?: ReactNode;
   children?: ReactNode;
   /** Width preset; the adapter maps it to a class/style. */
-  size?: "sm" | "md" | "lg";
+  size?: DialogSize;
+  /** Class for the popup surface, never the backdrop. */
+  className?: string;
 }
 
 export interface DrawerProps extends Omit<DialogProps, "size"> {
   side?: "left" | "right";
-  size?: "sm" | "md" | "lg";
+  size?: DialogSize;
 }
 
 export interface PopoverProps {
@@ -153,14 +165,34 @@ export interface PopoverProps {
   className?: string;
 }
 
+export type MenuItemKind = "item" | "checkbox" | "radio" | "separator" | "label" | "submenu";
+
 export interface MenuItem {
-  label: ReactNode;
+  /**
+   * Item text. Optional only for `kind: "separator"`, which renders no label.
+   */
+  label?: ReactNode;
   onSelect?: () => void;
   icon?: ReactNode;
   disabled?: boolean;
   danger?: boolean;
-  /** Render a separator before this item. */
+  /**
+   * Render a separator before this item. Legacy shorthand kept in the v3 API:
+   * it is equivalent to a preceding `{ kind: "separator" }` entry and may be
+   * combined with any item kind.
+   */
   separator?: boolean;
+  /** Item role; defaults to `"item"`. */
+  kind?: MenuItemKind;
+  /** Checked state for `kind: "checkbox"` / `kind: "radio"`. */
+  checked?: boolean;
+  /**
+   * Reports a checkbox toggle or a radio selection. Radio items are grouped by
+   * consecutive runs and selecting one calls only that item's handler.
+   */
+  onCheckedChange?: (checked: boolean) => void;
+  /** Children for `kind: "submenu"`. */
+  items?: readonly MenuItem[];
 }
 
 export interface MenuProps {
@@ -183,6 +215,12 @@ export interface CardProps {
   title?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
+  /** Draw a full-width rule under the header. */
+  headerDivider?: boolean;
+  /** Optional footer region, separated by a full-width rule. */
+  footer?: ReactNode;
+  /** Class for the content region (padding/layout escapes). */
+  bodyClassName?: string;
   className?: string;
 }
 

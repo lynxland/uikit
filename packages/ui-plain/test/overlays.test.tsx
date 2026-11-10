@@ -52,6 +52,28 @@ describe("Dialog", () => {
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  it("maps xl/fullscreen sizes and applies className to the panel", async () => {
+    const { rerender } = render(
+      <Dialog open onOpenChange={() => undefined} title="Build log" size="xl" className="dialog-wide">
+        <p>Controlled body</p>
+      </Dialog>,
+    );
+
+    const panel = await screen.findByRole("dialog");
+    expect(panel.getAttribute("data-size")).toBe("xl");
+    expect(panel.className).toContain("ui-plain-dialog-panel--xl");
+    expect(panel.className).toContain("dialog-wide");
+
+    rerender(
+      <Dialog open onOpenChange={() => undefined} title="Build log" size="fullscreen">
+        <p>Controlled body</p>
+      </Dialog>,
+    );
+    const fullscreen = screen.getByRole("dialog");
+    expect(fullscreen.getAttribute("data-size")).toBe("fullscreen");
+    expect(fullscreen.className).toContain("ui-plain-dialog-panel--fullscreen");
+  });
 });
 
 describe("Drawer", () => {
@@ -81,6 +103,34 @@ describe("Drawer", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("maps xl/fullscreen sizes and applies className to the panel", async () => {
+    const { rerender } = render(
+      <Drawer
+        open
+        onOpenChange={() => undefined}
+        title="Logs"
+        size="xl"
+        className="drawer-wide"
+      >
+        <p>Drawer body</p>
+      </Drawer>,
+    );
+
+    const panel = await screen.findByRole("dialog");
+    expect(panel.getAttribute("data-size")).toBe("xl");
+    expect(panel.className).toContain("ui-plain-drawer-panel--xl");
+    expect(panel.className).toContain("drawer-wide");
+
+    rerender(
+      <Drawer open onOpenChange={() => undefined} title="Logs" size="fullscreen">
+        <p>Drawer body</p>
+      </Drawer>,
+    );
+    const fullscreen = screen.getByRole("dialog");
+    expect(fullscreen.getAttribute("data-size")).toBe("fullscreen");
+    expect(fullscreen.className).toContain("ui-plain-drawer-panel--fullscreen");
   });
 });
 

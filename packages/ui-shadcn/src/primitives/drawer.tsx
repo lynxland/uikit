@@ -7,6 +7,8 @@ const sizeClass = {
   sm: "sm:max-w-sm",
   md: "sm:max-w-md",
   lg: "sm:max-w-lg",
+  xl: "sm:max-w-[64rem]",
+  fullscreen: "sm:max-w-none",
 } as const;
 
 /**
@@ -22,6 +24,7 @@ export function Drawer({
   children,
   side = "right",
   size = "md",
+  className,
 }: DrawerProps) {
   return (
     <BaseDrawer.Root
@@ -43,9 +46,11 @@ export function Drawer({
               "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
               side === "left" ? "border-r" : "border-l",
               sizeClass[size],
+              className,
             )}
             data-slot="drawer"
             data-side={side}
+            data-size={size}
           >
             <BaseDrawer.Close
               type="button"

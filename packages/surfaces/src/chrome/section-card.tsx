@@ -11,6 +11,11 @@ export interface SectionCardProps {
   title?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
+  /** Draw a full-width rule under the header. */
+  headerDivider?: boolean;
+  footer?: ReactNode;
+  /** Class for the card content region (padding/layout escapes). */
+  bodyClassName?: string;
   className?: string;
   children: ReactNode;
 }
@@ -19,6 +24,9 @@ export function SectionCard({
   title,
   description,
   actions,
+  headerDivider,
+  footer,
+  bodyClassName,
   className,
   children,
 }: SectionCardProps) {
@@ -31,6 +39,9 @@ export function SectionCard({
       {...(title !== undefined ? { title } : {})}
       {...(description !== undefined ? { description } : {})}
       {...(actions !== undefined ? { actions } : {})}
+      {...(headerDivider !== undefined ? { headerDivider } : {})}
+      {...(footer !== undefined ? { footer } : {})}
+      {...(bodyClassName !== undefined ? { bodyClassName } : {})}
     >
       <div className="ui-section-card__body">{children}</div>
     </ui.Card>

@@ -147,27 +147,30 @@ export function DokployProjectsPage({ from }: { from: string }) {
                   }
                   items={[
                     {
+                      kind: "radio",
                       label: "All tags",
-                      onSelect: () => patchSearch({ tag: undefined }),
+                      checked: tag === "",
+                      onCheckedChange: () => patchSearch({ tag: undefined }),
                     },
                     ...tags.map((item) => ({
+                      kind: "radio" as const,
                       label: item,
-                      onSelect: () => patchSearch({ tag: item }),
+                      checked: tag === item,
+                      onCheckedChange: () => patchSearch({ tag: item }),
                     })),
                   ]}
                 />
                 <div className="inline-flex items-center gap-2 text-muted-foreground">
                   <ArrowUpDown size={14} aria-hidden />
-                  <div className="w-40">
-                    <ui.Select
-                      aria-label="Sort projects"
-                      value={sort}
-                      options={PROJECT_SORT_OPTIONS.map((item) => ({ ...item }))}
-                      onValueChange={(value) =>
-                        patchSearch({ sort: value === "createdAt-desc" ? undefined : value })
-                      }
-                    />
-                  </div>
+                  <ui.Select
+                    aria-label="Sort projects"
+                    className="w-40"
+                    value={sort}
+                    options={PROJECT_SORT_OPTIONS.map((item) => ({ ...item }))}
+                    onValueChange={(value) =>
+                      patchSearch({ sort: value === "createdAt-desc" ? undefined : value })
+                    }
+                  />
                 </div>
               </div>
             </div>

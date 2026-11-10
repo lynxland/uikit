@@ -53,6 +53,31 @@ describe("Card", () => {
     expect(screen.getByRole("button", { name: "Create" })).toBeTruthy();
     expect(screen.getByText("Card body")).toBeTruthy();
   });
+
+  it("renders a header divider, body class and footer", () => {
+    render(
+      <Card
+        title="Web Server"
+        description="Reload or clean."
+        headerDivider
+        bodyClassName="custom-body"
+        footer={<span>Footer note</span>}
+      >
+        <p>Card body</p>
+      </Card>,
+    );
+
+    const header = screen.getByText("Web Server").closest("[data-slot='card-header']");
+    expect(header?.getAttribute("data-divider")).toBe("true");
+    expect(header?.className).toContain("border-b");
+
+    const body = screen.getByText("Card body").closest("[data-slot='card-content']");
+    expect(body?.className).toContain("custom-body");
+    expect(body?.className).not.toContain("pt-0");
+
+    const footer = screen.getByText("Footer note").closest("[data-slot='card-footer']");
+    expect(footer?.className).toContain("border-t");
+  });
 });
 
 describe("Field", () => {

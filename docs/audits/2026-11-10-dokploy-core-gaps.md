@@ -506,3 +506,56 @@ corresponding CSS/duplicated implementation, and keeps `pnpm check` +
   way out) and the hover readout is pointer-only — keyboard/screen-reader users
   get the sr-only summary table instead. InputGroup uses native `fieldset`
   semantics, which also disable descendant addon buttons when `disabled`.
+
+## 16. P1-A adapter/surfaces API completeness landed (2026-11-10)
+
+- [x] **Menu item model** — `MenuItem.kind` (`item | checkbox | radio |
+  separator | label | submenu`), `checked`, `onCheckedChange`, nested `items`;
+  `separator: true` stays the v3 “separator before this item” shorthand and can
+  combine with any kind (no alias layer). `ui-shadcn` maps to Base UI
+  CheckboxItem/RadioGroup+RadioItem/SubmenuRoot+SubmenuTrigger/Separator, so
+  keyboard, typeahead and ARIA (`menuitemcheckbox`/`menuitemradio`,
+  `aria-expanded` on submenu triggers) come from the library. `ui-plain`
+  implements `role="menu"`, `menuitemcheckbox`/`menuitemradio` with
+  `aria-checked`, nested `role="menu"`, Escape/ArrowLeft to exit a submenu,
+  ArrowRight to open it, ArrowUp/Down/Home/End focus movement, and initial
+  focus. Checkbox toggles keep the menu open; radio selection closes it.
+- [x] **Demo Tags filter** — Projects “Tags” is a radio menu (`All tags` +
+  each tag) bound to the existing single `tag` URL value; the e2e selector
+  moved from `menuitem` to `menuitemradio`. The environment switchers already
+  use `CommandMenu` checked state, so they were left unchanged.
+- [x] **Select styling escapes** — `SelectProps.size` (`sm | md | lg`),
+  `className` (trigger; plain wrapper) and `contentClassName` (shadcn popup;
+  plain applies it to the native `<select>` because the browser owns the
+  popup). Demo removed the `w-40` / `min-w-32` wrappers that only set Select
+  width; the outer grid wrappers remain where they own the layout.
+- [x] **Card / SectionCard** — `CardProps.headerDivider`, `footer`,
+  `bodyClassName` in both adapters (full-width rule under the header, ruled
+  optional footer, content-region class). `SectionCard` passes them through.
+  Settings Web Server and Invitations raw `<section>` headers replaced with
+  `SectionCard headerDivider`; the Web Server body keeps `p-5` via
+  `bodyClassName`, Invitations keeps its centred empty state.
+- [x] **Dialog / Drawer width escapes** — `DialogSize`
+  (`sm | md | lg | xl | fullscreen`) on both adapter primitives, with `xl` at
+  64rem and `fullscreen` at near-viewport dimensions; `className` applies to
+  the popup/panel only, never the backdrop. Demo deployment log drawer uses
+  `size="xl"`.
+- [x] **Docs** — `docs/SKILL.md` §5.1/§5.4 and `docs/design.md` adapter table +
+  SectionCard notes updated; this checklist added.
+- [x] **Verification** — `pnpm check` green (core 44, react 34, testing 7,
+  surfaces 133, ui-shadcn 41, ui-plain 38, preset 35, cli 5, spike 10);
+  `pnpm --filter demo build` green (existing >500 kB warning only);
+  `pnpm --filter demo e2e` 18/18 green; Biome over
+  `packages/surfaces/src packages/ui-shadcn/src packages/ui-plain/src
+  apps/demo/src apps/demo/e2e` has no errors (only the pre-existing CSS
+  descending-specificity warnings).
+- Remaining risks: radio grouping is by consecutive radio entries, so a
+  label/separator starts a new group; menu keys use declaration order because
+  `MenuItem` has no id (static menus only). `ui-plain` Menu is non-portalled
+  and has no typeahead/focus trap; a nested submenu can clip inside an
+  `overflow: hidden` ancestor. Native Select cannot style its popup, so
+  `contentClassName` targets the `<select>` there. `Card`’s footer padding is
+  fixed and `SectionCard`’s `bodyClassName` styles the adapter body, not the
+  inner `.ui-section-card__body` wrapper. `SectionCard` titles render through
+  the adapter’s `Card` heading (`h3`), which is why the demo e2e now asserts
+  the heading by name rather than level.

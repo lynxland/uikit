@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { Button, Field, Input, Textarea } from "../src";
+import { Button, Field, Input, Select, Textarea } from "../src";
 import "./setup";
 
 describe("Button", () => {
@@ -89,6 +89,31 @@ describe("Input / Textarea", () => {
     const textarea = screen.getByRole("textbox", { name: "Grouped notes" });
     expect(textarea.className).toContain("ui-plain-textarea--bare");
     expect(textarea.getAttribute("data-variant")).toBe("bare");
+  });
+});
+
+describe("Select", () => {
+  it("applies size and class escapes to the wrapper and select", () => {
+    render(
+      <Select
+        aria-label="Fruit"
+        size="sm"
+        className="select-wide"
+        contentClassName="select-control"
+        options={[
+          { value: "apple", label: "Apple" },
+          { value: "banana", label: "Banana" },
+        ]}
+      />,
+    );
+
+    const select = screen.getByRole("combobox", { name: "Fruit" });
+    expect(select.className).toContain("ui-plain-select");
+    expect(select.className).toContain("select-control");
+    const wrapper = select.closest("[data-slot='select']");
+    expect(wrapper?.className).toContain("ui-plain-select-wrap--sm");
+    expect(wrapper?.className).toContain("select-wide");
+    expect(wrapper?.getAttribute("data-size")).toBe("sm");
   });
 });
 

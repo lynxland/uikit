@@ -1,7 +1,16 @@
 import type { CardProps } from "@lynxland/uikit-surfaces/adapter";
 import { cx } from "./cx";
 
-export function Card({ children, title, description, actions, className }: CardProps) {
+export function Card({
+  children,
+  title,
+  description,
+  actions,
+  headerDivider = false,
+  footer,
+  bodyClassName,
+  className,
+}: CardProps) {
   const hasHeader = title !== undefined || description !== undefined || actions !== undefined;
   return (
     <div
@@ -12,7 +21,14 @@ export function Card({ children, title, description, actions, className }: CardP
       data-slot="card"
     >
       {hasHeader ? (
-        <div className="flex items-start justify-between gap-4 p-6" data-slot="card-header">
+        <div
+          className={cx(
+            "flex items-start justify-between gap-4 p-6",
+            headerDivider && "border-b border-[var(--border)]",
+          )}
+          data-slot="card-header"
+          data-divider={headerDivider || undefined}
+        >
           <div className="flex min-w-0 flex-col gap-1.5">
             {title !== undefined ? (
               <h3
@@ -35,9 +51,17 @@ export function Card({ children, title, description, actions, className }: CardP
           ) : null}
         </div>
       ) : null}
-      <div className={cx("p-6", hasHeader && "pt-0")} data-slot="card-content">
+      <div
+        className={cx("p-6", hasHeader && !headerDivider && "pt-0", bodyClassName)}
+        data-slot="card-content"
+      >
         {children}
       </div>
+      {footer !== undefined ? (
+        <div className="border-t border-[var(--border)] p-6 pt-4 text-sm" data-slot="card-footer">
+          {footer}
+        </div>
+      ) : null}
     </div>
   );
 }

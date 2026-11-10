@@ -10,6 +10,7 @@ export function Dialog({
   footer,
   children,
   size = "md",
+  className,
 }: DialogProps) {
   return (
     <ModalShell
@@ -19,6 +20,7 @@ export function Dialog({
       description={description}
       footer={footer}
       size={size}
+      className={className}
       kind="dialog"
     >
       {children}

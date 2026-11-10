@@ -32,6 +32,31 @@ describe("display primitives", () => {
     expect(screen.getByText("Card body")).toBeTruthy();
   });
 
+  it("renders a header divider, body class and footer", () => {
+    render(
+      <Card
+        title="Web Server"
+        description="Reload or clean."
+        headerDivider
+        bodyClassName="custom-body"
+        footer={<span>Footer note</span>}
+      >
+        <p>Card body</p>
+      </Card>,
+    );
+
+    const header = screen.getByText("Web Server").closest("[data-slot='card-header']");
+    expect(header?.className).toContain("ui-plain-card-header--divider");
+    expect(header?.getAttribute("data-divider")).toBe("true");
+
+    const body = screen.getByText("Card body").closest("[data-slot='card-content']");
+    expect(body?.className).toContain("custom-body");
+    expect(body?.className).not.toContain("ui-plain-card-content--with-header");
+
+    const footer = screen.getByText("Footer note").closest("[data-slot='card-footer']");
+    expect(footer?.className).toContain("ui-plain-card-footer");
+  });
+
   it("renders table slots and inline icons", () => {
     render(
       <Table.Root>

@@ -1201,6 +1201,8 @@ export interface FilterField {
   - 颜色/边框走 `--ui-sidebar` / `--ui-sidebar-fg` / `--ui-sidebar-border` /
     `--ui-sidebar-accent`；adapter 必须提供这组 token（surfaces 提供 fallback）。
 - `Breadcrumb`、`SectionCard`、`ScopeSwitcher`、`Stepper`、`RouteErrorBoundary` 归 Chrome/App 面。
+  `SectionCard` 把 `headerDivider`/`footer`/`bodyClassName` 透传给 adapter `Card`；
+  设置页/详情页的 section 卡片统一用它，不再手写“标题区 + border-b + 内容区”模板。
 
 ```tsx
 <AppShell
@@ -1621,17 +1623,17 @@ ui-shadcn / ui-plain (peer: React; type-only import surfaces.UiAdapter)
    |---|---|---|
    | Button | `variant/size/disabled/loading/onClick/children` | 受控按钮 |
    | Input / Textarea | `value/onChange/placeholder/type/disabled/variant` | 原生控件语义；`variant="bare"` 供 InputGroup 去边框 |
-   | Select | `value/onValueChange/options/placeholder/disabled` | 不暴露 Base UI compound API |
+   | Select | `value/onValueChange/options/placeholder/disabled/size/className/contentClassName` | 不暴露 Base UI compound API；`size` 映射 trigger 高度，`className` 只作用 trigger、`contentClassName` 只作用弹层 |
    | Checkbox | `checked/onCheckedChange/disabled` | `boolean \| "indeterminate"` |
    | DateTimeInput | `value/onChange/disabled/min/max` | 值用 `YYYY-MM-DDTHH:mm`；adapter 自绘 picker，不依赖原生弹窗 |
    | Switch | `checked/onCheckedChange/disabled` | 受控 |
    | Field | `label/description/error/required/htmlFor` | label/说明/错误包装 |
    | Popover | `open/onOpenChange/trigger/children/className` | trigger 作为元素渲染，不嵌套 button；className 只作用于内容面板 |
-   | Menu | `trigger/items/align/side` | 操作菜单；item 支持 icon/danger/separator |
+   | Menu | `trigger/items/align/side` | item `kind` 为 `item \| checkbox \| radio \| separator \| label \| submenu`；`checked/onCheckedChange` 受控，submenu 用 `items`；`separator: true` 是“前置分隔线”的 v3 简写，不是 alias 层 |
    | Tooltip | `trigger/content/side/align/delay/disabled` | trigger 作为元素渲染；不替代 `aria-label` |
-   | Dialog / Drawer | `open/onOpenChange/title/description/footer/children` | 内部处理 portal/focus/esc |
+   | Dialog / Drawer | `open/onOpenChange/title/description/footer/children/size/className` | `size` 为 `sm \| md \| lg \| xl \| fullscreen`；className 只作用于弹层/面板，不碰 backdrop；内部处理 portal/focus/esc |
    | Tabs | `items/value/onValueChange/variant` | 受控、键盘/a11y 内置 |
-   | Badge / Card / Table | `tone/variant/children/className` | 简单展示 |
+   | Badge / Card / Table | `tone/variant/children/className` | Card 另有 `headerDivider/footer/bodyClassName`；简单展示 |
    | icons | 12 个受控 SVG | 不强制 lucide/具体图标库 |
 
    - 具体类型可以按 UI 库调整，但**名字/语义**固定；不把 Base UI 的

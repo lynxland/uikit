@@ -318,13 +318,23 @@ function Badge({ children, tone, variant }: BadgeProps) {
   );
 }
 
-function Card({ children, title, description, actions, className }: CardProps) {
+function Card({
+  children,
+  title,
+  description,
+  actions,
+  headerDivider,
+  footer,
+  bodyClassName,
+  className,
+}: CardProps) {
   return (
     <section className={join("test-card", className)}>
-      {title !== undefined ? <header>{title}</header> : null}
+      {title !== undefined ? <header data-divider={headerDivider || undefined}>{title}</header> : null}
       {description !== undefined ? <p>{description}</p> : null}
-      {children}
+      <div className={join("test-card-body", bodyClassName)}>{children}</div>
       {actions}
+      {footer !== undefined ? <footer data-slot="card-footer">{footer}</footer> : null}
     </section>
   );
 }

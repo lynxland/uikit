@@ -419,45 +419,44 @@ export function DokployWebServerPage() {
           </div>
         </div>
 
-        <section className="rounded-xl border border-[var(--border)]">
-          <div className="border-b border-[var(--border)] p-5">
-            <h2 className="text-base font-semibold">Web Server</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Reload or clean the web server.</p>
+        <SectionCard
+          title="Web Server"
+          description="Reload or clean the web server."
+          headerDivider
+          bodyClassName="p-5"
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ui.Button type="button" variant="outline" size="sm" onClick={() => action("Reload")}>
+              Server
+            </ui.Button>
+            <ui.Button type="button" variant="outline" size="sm" onClick={() => action("Reload")}>
+              Traefik
+            </ui.Button>
+            <ui.Button type="button" variant="outline" size="sm" onClick={() => action("Clean")}>
+              Space
+            </ui.Button>
+            <ui.Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => action("Check for updates")}
+            >
+              Check for updates
+            </ui.Button>
           </div>
-          <div className="p-5">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <ui.Button type="button" variant="outline" size="sm" onClick={() => action("Reload")}>
-                Server
-              </ui.Button>
-              <ui.Button type="button" variant="outline" size="sm" onClick={() => action("Reload")}>
-                Traefik
-              </ui.Button>
-              <ui.Button type="button" variant="outline" size="sm" onClick={() => action("Clean")}>
-                Space
-              </ui.Button>
-              <ui.Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => action("Check for updates")}
-              >
-                Check for updates
-              </ui.Button>
-            </div>
-            <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-[var(--border)] pt-4 text-xs text-muted-foreground">
-              <span>Server IP: 192.168.1.100</span>
-              <span>Version: v0.29.10</span>
-              <span className="ml-auto inline-flex items-center gap-2">
-                <ui.Switch
-                  checked={dailyCleanup}
-                  onCheckedChange={setDailyCleanup}
-                  aria-label="Daily Docker Cleanup"
-                />
-                Daily Docker Cleanup
-              </span>
-            </div>
+          <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-[var(--border)] pt-4 text-xs text-muted-foreground">
+            <span>Server IP: 192.168.1.100</span>
+            <span>Version: v0.29.10</span>
+            <span className="ml-auto inline-flex items-center gap-2">
+              <ui.Switch
+                checked={dailyCleanup}
+                onCheckedChange={setDailyCleanup}
+                aria-label="Daily Docker Cleanup"
+              />
+              Daily Docker Cleanup
+            </span>
           </div>
-        </section>
+        </SectionCard>
       </PageLayout>
     </DokployCard>
   );
@@ -552,23 +551,22 @@ export function DokployUsersPage() {
           </table>
         </div>
 
-        <section className="rounded-xl border border-[var(--border)]">
-          <div className="border-b border-[var(--border)] p-5">
-            <h2 className="flex items-center gap-2 text-base font-semibold">
+        <SectionCard
+          title={
+            <span className="flex items-center gap-2">
               <Mail size={16} aria-hidden /> Invitations
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Create invitations to your organization.
-            </p>
-          </div>
-          <div className="flex flex-col items-center justify-center gap-3 px-5 py-12 text-center">
-            <Users size={28} className="text-muted-foreground" aria-hidden />
-            <p className="text-sm text-muted-foreground">Invite users to your organization</p>
-            <ui.Button type="button" size="sm" onClick={() => notify.placeholder("Invitations")}>
-              <Plus size={13} aria-hidden /> Add Invitation
-            </ui.Button>
-          </div>
-        </section>
+            </span>
+          }
+          description="Create invitations to your organization."
+          headerDivider
+          bodyClassName="flex flex-col items-center justify-center gap-3 px-5 py-12 text-center"
+        >
+          <Users size={28} className="text-muted-foreground" aria-hidden />
+          <p className="text-sm text-muted-foreground">Invite users to your organization</p>
+          <ui.Button type="button" size="sm" onClick={() => notify.placeholder("Invitations")}>
+            <Plus size={13} aria-hidden /> Add Invitation
+          </ui.Button>
+        </SectionCard>
       </PageLayout>
     </DokployCard>
   );

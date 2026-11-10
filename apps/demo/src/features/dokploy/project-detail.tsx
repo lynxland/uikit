@@ -408,33 +408,30 @@ export function DokployProjectEnvironmentPage({
           </div>
 
           <div className="grid shrink-0 grid-cols-3 gap-2">
-            <div className="w-full min-w-32">
-              <ui.Select
-                aria-label="Sort services"
-                value={sort}
-                options={SORT_OPTIONS.map((item) => ({ ...item }))}
-                onValueChange={(value) => setSort(value as ServiceSort)}
-              />
-            </div>
-            <div className="w-full min-w-32">
-              <ui.Select
-                aria-label="Filter by type"
-                value={typeFilter}
-                options={TYPE_OPTIONS.map((item) => ({ ...item }))}
-                onValueChange={(value) => setTypeFilter(value as ServiceTypeFilter)}
-              />
-            </div>
-            <div className="w-full min-w-32">
-              <ui.Select
-                aria-label="Filter by server"
-                value={serverFilter}
-                options={[
-                  { value: "all", label: "All servers" },
-                  ...servers.rows.map((server) => ({ value: server.id, label: server.name })),
-                ]}
-                onValueChange={setServerFilter}
-              />
-            </div>
+            <ui.Select
+              aria-label="Sort services"
+              className="w-full min-w-32"
+              value={sort}
+              options={SORT_OPTIONS.map((item) => ({ ...item }))}
+              onValueChange={(value) => setSort(value as ServiceSort)}
+            />
+            <ui.Select
+              aria-label="Filter by type"
+              className="w-full min-w-32"
+              value={typeFilter}
+              options={TYPE_OPTIONS.map((item) => ({ ...item }))}
+              onValueChange={(value) => setTypeFilter(value as ServiceTypeFilter)}
+            />
+            <ui.Select
+              aria-label="Filter by server"
+              className="w-full min-w-32"
+              value={serverFilter}
+              options={[
+                { value: "all", label: "All servers" },
+                ...servers.rows.map((server) => ({ value: server.id, label: server.name })),
+              ]}
+              onValueChange={setServerFilter}
+            />
           </div>
         </div>
 

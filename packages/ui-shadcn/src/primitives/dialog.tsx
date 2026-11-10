@@ -4,9 +4,11 @@ import { cx } from "./cx";
 import { X } from "./icons";
 
 const sizeClass = {
-  sm: "sm:max-w-sm",
-  md: "sm:max-w-lg",
-  lg: "sm:max-w-2xl",
+  sm: "w-[calc(100%-2rem)] max-h-[85vh] sm:max-w-sm",
+  md: "w-[calc(100%-2rem)] max-h-[85vh] sm:max-w-lg",
+  lg: "w-[calc(100%-2rem)] max-h-[85vh] sm:max-w-2xl",
+  xl: "w-[calc(100%-2rem)] max-h-[85vh] sm:max-w-[64rem]",
+  fullscreen: "h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-h-none max-w-none rounded-lg",
 } as const;
 
 /**
@@ -21,6 +23,7 @@ export function Dialog({
   footer,
   children,
   size = "md",
+  className,
 }: DialogProps) {
   return (
     <BaseDialog.Root open={open} onOpenChange={(next) => onOpenChange(next)}>
@@ -28,11 +31,13 @@ export function Dialog({
         <BaseDialog.Backdrop className="fixed inset-0 z-50 bg-black/50 data-[starting-style]:opacity-0 data-[ending-style]:opacity-0" />
         <BaseDialog.Popup
           className={cx(
-            "fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-[var(--border)] bg-[var(--popover)] p-6 text-[var(--popover-foreground)] shadow-lg outline-none",
+            "fixed left-1/2 top-1/2 z-50 flex -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-[var(--border)] bg-[var(--popover)] p-6 text-[var(--popover-foreground)] shadow-lg outline-none",
             "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
             sizeClass[size],
+            className,
           )}
           data-slot="dialog"
+          data-size={size}
         >
           <BaseDialog.Close
             type="button"

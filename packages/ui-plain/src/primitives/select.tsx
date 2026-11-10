@@ -1,4 +1,5 @@
 import type { SelectProps } from "@lynxland/uikit-surfaces/adapter";
+import { cx } from "./cx";
 import { ChevronDown } from "./icons";
 
 /**
@@ -6,6 +7,9 @@ import { ChevronDown } from "./icons";
  * type-ahead — the browser owns all of it. The wrapper only adds a chevron
  * indicator. This is the minimal-adapter trade-off: full a11y for free, but
  * options cannot render rich content.
+ *
+ * `contentClassName` is applied to the native `<select>` because the browser
+ * owns the popup; `className` styles the wrapper (width escapes).
  */
 export function Select({
   value,
@@ -15,14 +19,21 @@ export function Select({
   placeholder,
   disabled = false,
   id,
+  size = "md",
+  className,
+  contentClassName,
   "aria-label": ariaLabel,
 }: SelectProps) {
   return (
-    <span className="ui-plain-select-wrap" data-slot="select">
+    <span
+      className={cx("ui-plain-select-wrap", `ui-plain-select-wrap--${size}`, className)}
+      data-slot="select"
+      data-size={size}
+    >
       <select
         id={id}
         aria-label={ariaLabel}
-        className="ui-plain-select"
+        className={cx("ui-plain-select", contentClassName)}
         value={value}
         defaultValue={defaultValue}
         disabled={disabled}

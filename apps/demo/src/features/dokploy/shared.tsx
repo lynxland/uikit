@@ -280,7 +280,7 @@ export function DeploymentLogDrawer({
       }}
       title={`Logs · ${deployment.serviceName}`}
       description={`${deployment.id} · ${deployment.commit} · ${deployment.environment}`}
-      size="lg"
+      size="xl"
     >
       <LogViewer<DeploymentLogFrame>
         stream={stream}

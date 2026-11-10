@@ -17,7 +17,7 @@ test.describe("Dokploy projects", () => {
 
     await page.getByTestId("project-search").fill("");
     await page.getByTestId("project-tag-filter").click();
-    await page.getByRole("menuitem", { name: "commerce" }).click();
+    await page.getByRole("menuitemradio", { name: "commerce" }).click();
     await expect(page).toHaveURL(/tag=commerce/);
     await expect(page.getByTestId("project-card-proj-nova")).toBeVisible();
     await expect(atlas).toHaveCount(0);
