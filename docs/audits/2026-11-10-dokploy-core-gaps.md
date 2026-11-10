@@ -79,8 +79,9 @@ focus management or is shared by multiple surfaces. Pure display pieces
 
 Home, Projects, Project Environment (service grid), Application General/
 Environment/Domains/Deployments/Logs/Monitoring, Postgres General credentials,
-Deployments global, Traefik, Docker, Requests, Schedules, Settings Servers/
-Web Server/SSH/Git/Users/Notifications/Profile.
+Deployments global, Monitoring (top-level server dashboard), Traefik, Docker,
+Requests, Schedules, Settings Servers/Web Server/SSH/Git/Users/Notifications/
+Profile/Audit Logs/AI/Certificates/Registry/S3 Destinations/License.
 
 ### Partial
 
@@ -92,19 +93,14 @@ Web Server/SSH/Git/Users/Notifications/Profile.
 | Database `Advanced` | Simple list; official has cluster/registry settings |
 | Compose detail | Missing Containers/Backups/Schedules/Volume Backups tabs and provider/compose editor |
 | Project Environment dialog | Read-only info; official can manage the environment |
-| Mobile | Sidebar stays open; h1 disappears; header time clips |
-| Environment selector | No search input, Esc handling, or checked state (official uses a command menu) |
 | Bulk actions | Delete selected is disabled; only select/clear works |
 | Settings Sessions/Deployments/Tags | Placeholders |
 
 ### Not implemented (official screenshots exist)
 
-- Top-level Monitoring (`server-monitoring.webp`): CPU/Memory/Disk/Docker disk/
-  Block I/O/Network cards and charts.
 - Swarm overview/containers.
 - Templates / create-from-template dialog.
-- Settings AI, Audit Logs, Certificates, Registry, S3 Destinations, SSO,
-  License, Whitelabeling.
+- Settings SSO, Whitelabeling.
 - Build-log modal (different from the deployment log drawer).
 - Create Backup and Create Custom Role dialogs.
 - Notification add/edit and most server/git/deploy action flows are local
@@ -679,3 +675,44 @@ corresponding CSS/duplicated implementation, and keeps `pnpm check` +
   consumer's utility layer conflicts with the default `ui-stat-card__value`
   rule; `useSelection` controlled mode expects the parent to echo
   `onSelectedChange`.
+
+## 19. App coverage batch landed (2026-11-11)
+
+This batch is app-level page composition; no core or adapter API changed.
+
+- [x] **Top-level Monitoring** (`/dashboard/monitoring`) — real page matching
+  `server-monitoring.webp`: CPU / Memory / Disk / Docker Disk / Block I/O /
+  Network I/O cards, `Progress` for used-vs-limit, `MetricChart` with y-axis,
+  area fill, units, domains and thresholds, deterministic local series, and a
+  static SVG Docker donut. No metrics API is called. `data-testid=
+  "monitoring-page"`, `monitoring-card` (6) and `monitoring-chart` (5) back the
+  e2e count assertions.
+- [x] **Settings Audit Logs** — 53rem page with user/name text filters, action
+  and resource selects, `DateRangePicker`, `ColumnPicker`, and a `DataTable`
+  with Date/User/Action/Resource/Name/Role/Metadata, local sorting, static rows
+  around Jul 2026, and local date-range filtering.
+- [x] **Settings AI** — `AI Settings` page with the OpenRouter
+  `google/gemini-3-flash-preview` row; add/delete are local state + toast and
+  edit is an honest placeholder.
+- [x] **Settings Certificates** — new `/dashboard/settings/certificates` route
+  with the warning `Alert`, `EmptyState`, and local Add Certificate placeholder.
+- [x] **Settings Registry** — new `/dashboard/settings/registry` route with the
+  Docker Registry card, seeded Mauricio/ECR rows, local add/delete and edit
+  placeholder.
+- [x] **Settings S3 Destinations** — new `/dashboard/settings/s3-destinations`
+  route with created dates, local add/delete and edit placeholder.
+- [x] **Settings License** — new `/dashboard/settings/license` route with the
+  Enabled switch, masked/read-only license input, Deactivate and Validate
+  placeholders.
+- [x] **Navigation** — the four new routes stay out of the screenshot-visible
+  sidebar; `navDestinations` exposes them to the command palette (and the
+  breadcrumb label lookup resolves them).
+- [x] **Docs** — `apps/demo/DOKPLOY_DOGFOOD.md` route map/coverage updated; this
+  section records the remaining coverage.
+- [x] **Verification** — `pnpm check` green; `pnpm --filter demo build` green
+  (existing >500 kB chunk warning only); `pnpm --filter demo e2e` 24/24 green;
+  Biome over `apps/demo/src apps/demo/e2e` clean.
+- Remaining coverage (unchanged): Swarm, Templates, SSO, Whitelabeling,
+  build-log modal, create-backup/custom-role dialogs, partial application/
+  database/compose tabs, Project Environment dialog, bulk delete, and the
+  Sessions/Deployments/Tags settings placeholders.

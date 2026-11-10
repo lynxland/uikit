@@ -1,6 +1,7 @@
 import type { AppShellNavSection } from "@lynxland/uikit-surfaces";
 import {
   Activity,
+  BadgeCheck,
   BarChartHorizontalBig,
   Blocks,
   BookOpen,
@@ -9,6 +10,8 @@ import {
   CircleHelp,
   ClipboardList,
   Clock,
+  CloudUpload,
+  Container,
   Folder,
   Forward,
   GalleryVerticalEnd,
@@ -18,6 +21,7 @@ import {
   Network,
   Rocket,
   Server,
+  ShieldCheck,
   Tags,
   User,
   Users,
@@ -113,17 +117,48 @@ export interface NavDestination {
   icon: ReactNode;
 }
 
-/** Internal destinations only; the command palette does not open external help. */
-export const navDestinations: readonly NavDestination[] = nav.flatMap((section) =>
-  section.items
-    .filter((item) => !item.to.startsWith("http"))
-    .map((item) => ({
-      label: typeof item.label === "string" ? item.label : item.to,
-      to: item.to,
-      section: typeof section.label === "string" ? section.label : "Other",
-      icon: item.icon,
-    })),
-);
+/**
+ * Internal destinations only; the command palette does not open external help.
+ * Certificates, Registry, S3 Destinations and License exist in current Dokploy
+ * but are not in the official sidebar screenshot order, so they stay reachable
+ * from the palette without changing the visible nav list.
+ */
+export const navDestinations: readonly NavDestination[] = [
+  ...nav.flatMap((section) =>
+    section.items
+      .filter((item) => !item.to.startsWith("http"))
+      .map((item) => ({
+        label: typeof item.label === "string" ? item.label : item.to,
+        to: item.to,
+        section: typeof section.label === "string" ? section.label : "Other",
+        icon: item.icon,
+      })),
+  ),
+  {
+    label: "Certificates",
+    to: "/dashboard/settings/certificates",
+    section: "Settings",
+    icon: <ShieldCheck size={16} />,
+  },
+  {
+    label: "Registry",
+    to: "/dashboard/settings/registry",
+    section: "Settings",
+    icon: <Container size={16} />,
+  },
+  {
+    label: "S3 Destinations",
+    to: "/dashboard/settings/s3-destinations",
+    section: "Settings",
+    icon: <CloudUpload size={16} />,
+  },
+  {
+    label: "License",
+    to: "/dashboard/settings/license",
+    section: "Settings",
+    icon: <BadgeCheck size={16} />,
+  },
+];
 
 export function isExternalNav(to: string): boolean {
   return to.startsWith("http://") || to.startsWith("https://");

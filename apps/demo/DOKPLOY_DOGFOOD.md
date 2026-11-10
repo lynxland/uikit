@@ -25,6 +25,7 @@ quickstart, scopes, settings, boom and their libs/features/e2e were deleted.
 | `/dashboard/project/.../services/compose/$serviceId` | Compose detail with compose-file card |
 | `/dashboard/project/.../services/application/new` | Route-page application create |
 | `/dashboard/deployments` | Global deployment table, URL status filter, pagination, streamed logs drawer |
+| `/dashboard/monitoring` | Server telemetry cards, progress bars, metric charts and Docker donut |
 | `/dashboard/traefik` | File tree, Traefik config editor, warning alert |
 | `/dashboard/docker` | Container table with filter + state/status/image columns |
 | `/dashboard/requests` | Cleanup schedule, date range, request table empty state |
@@ -35,8 +36,14 @@ quickstart, scopes, settings, boom and their libs/features/e2e were deleted.
 | `/dashboard/settings/git-providers` | Brand provider buttons + connection rows + toggles |
 | `/dashboard/settings/users` | Members table + invitations empty state |
 | `/dashboard/settings/notifications` | Notification channel rows + add placeholder |
+| `/dashboard/settings/audit-logs` | Filterable audit table with date range and column picker |
+| `/dashboard/settings/ai` | AI Settings card with OpenRouter row and local add/delete |
+| `/dashboard/settings/certificates` | Warning alert + empty certificates state (palette-only) |
+| `/dashboard/settings/registry` | Docker Registry rows and local add/delete (palette-only) |
+| `/dashboard/settings/s3-destinations` | S3 destination rows with created dates (palette-only) |
+| `/dashboard/settings/license` | License key input, enabled switch and actions (palette-only) |
 | `/dashboard/settings/profile` | Account/organization/profile form, theme |
-| `/dashboard/overview`, `/monitoring`, `/settings/sessions`, `/settings/deployments`, `/settings/audit-logs`, `/settings/ai`, `/settings/tags` | Honest placeholders with EmptyState |
+| `/dashboard/overview`, `/settings/sessions`, `/settings/deployments`, `/settings/tags` | Honest placeholders with EmptyState |
 
 `/dashboard` and `/dashboard/settings` redirect to home/profile respectively.
 
@@ -58,8 +65,9 @@ quickstart, scopes, settings, boom and their libs/features/e2e were deleted.
 - Header: desktop collapse toggle / mobile drawer trigger, project/environment/
   service breadcrumb dropdowns, UTC server time. No visible command icon;
   ⌘K/Ctrl+K opens the palette.
-- Command palette is app-level (`src/components/command-palette.tsx`): Dialog +
-  Input + filtered nav destinations, arrow keys, Enter, Escape.
+- Command palette is app-level (`src/components/command-palette.tsx`): surfaces
+  `CommandPalette` over the `navDestinations` list, which also includes the
+  palette-only Certificates/Registry/S3/License settings.
 - Every main page uses the Dokploy card frame: outer `rounded-xl
   bg-[var(--ui-sidebar)] p-2.5` + inner `rounded-xl bg-background`
   (`DokployCard`). Settings pages opt out of viewport fill and use
@@ -87,48 +95,45 @@ quickstart, scopes, settings, boom and their libs/features/e2e were deleted.
   Credentials (masked password/URL with reveal/copy) or Compose file.
 - Deployments: `CollectionPage` + URL status filter/pagination + streamed logs
   drawer.
+- Monitoring: 2×3 server cards with used/limit progress bars, y-axis/area
+  metric charts, thresholds and a CSS/SVG Docker usage donut.
 - Settings: 53rem centred cards for Servers, Web Server, SSH Keys, Git,
-  Users, Notifications and Profile; provider brand colours and brand icons.
+  Users, Notifications, Audit Logs, AI, Certificates, Registry, S3 Destinations,
+  License and Profile; provider brand colours and brand icons.
 
 ## Coverage boundary
 
 Implemented and visually checked: Home, Projects, Project Environment,
 Application General/Environment/Domains/Deployments/Logs/Monitoring, Postgres
-credentials, global Deployments, Traefik, Docker, Requests, Schedules, and
-Settings Servers/Web Server/SSH/Git/Users/Notifications/Profile.
+credentials, global Deployments, top-level Monitoring, Traefik, Docker,
+Requests, Schedules, and Settings Servers/Web Server/SSH/Git/Users/
+Notifications/Audit Logs/AI/Certificates/Registry/S3 Destinations/License/
+Profile.
 
 Partial or placeholder: Application Preview/Schedules/Volume Backups/Patches,
 Application Advanced, database Backups/Advanced, compose Containers/Backups/
-Schedules/Volume Backups, Project Environment dialog, mobile shell, bulk delete,
-and Settings Sessions/Deployments/Tags. Top-level Monitoring, Swarm, Templates,
-Settings AI/Audit Logs/Certificates/Registry/S3/SSO/License/Whitelabeling,
+Schedules/Volume Backups, Project Environment dialog, bulk delete, and
+Settings Sessions/Deployments/Tags. Swarm, Templates, SSO, Whitelabeling,
 build-log modal, Create Backup and Create Custom Role are not implemented.
 The full status and core backlog are in
 [`docs/audits/2026-11-10-dokploy-core-gaps.md`](../../docs/audits/2026-11-10-dokploy-core-gaps.md).
 
 ## Remaining gaps
 
-1. **Command palette primitive** — the adapter has Dialog/Input but no
-   `Command` compound; the palette is app-composed.
-2. **Icon-rail collapse** — `AppShell` hides the sidebar in collapsed mode.
-3. **Breadcrumb link context** — `Breadcrumb` is Router-agnostic; the shell
-   wires `<Link>` per crumb.
-4. **MetricChart is a sparkline** — it already has a legend, last values and
-   x-axis min/max, but no y-axis ticks/hover readout/area mode/thresholds, and
-   series colors are index-based (not stable by `key`); the monitoring tab
-   composes cards + `formatValue`.
-5. **No ContextMenu / CodeEditor / FileTree / Terminal** adapter primitives;
-   Traefik/Docker/compose editing uses app-side monospace textareas.
-6. **Permission matrix** — no `useCan` gating; the clone is a single admin.
-7. **Form host consistency** — dialog forms close via `onSettled`; the route
-   page still uses `FormPage` header cancel.
-8. **Top-level Monitoring** — honest placeholder; application monitoring is
-   implemented.
-9. **Brand marks** — official GitHub/GitLab/Bitbucket/Gitea/Slack marks are
+1. **Uncloned screens** — Swarm overview/containers, Templates (and the
+   create-from-template dialog), Settings SSO and Whitelabeling, the build-log
+   modal, and the Create Backup / Create Custom Role dialogs.
+2. **Partial detail tabs** — Application Preview/Schedules/Volume Backups/
+   Patches and Advanced, database Backups/Advanced, and compose Containers/
+   Backups/Schedules/Volume Backups.
+3. **Interaction gaps** — Project Environment dialog is read-only, bulk delete
+   is disabled, and Settings Sessions/Deployments/Tags remain placeholders.
+4. **Permission matrix** — no `useCan` gating; the clone is a single admin.
+5. **Brand marks** — official GitHub/GitLab/Bitbucket/Gitea/Slack marks are
    inlined; Dokploy's own globe/elephant service icons are approximated with
    Lucide glyphs.
-10. **Data values** — timestamps, server identities and counts are demo data, so
-    absolute numbers differ from the screenshots.
+6. **Data values** — timestamps, server identities and counts are demo data, so
+   absolute numbers differ from the screenshots.
 
 The prioritized core backlog (P0/P1/P2 with proposed APIs and acceptance) is
 in [`docs/audits/2026-11-10-dokploy-core-gaps.md`](../../docs/audits/2026-11-10-dokploy-core-gaps.md).
@@ -139,10 +144,12 @@ in [`docs/audits/2026-11-10-dokploy-core-gaps.md`](../../docs/audits/2026-11-10-
   tests / v3 spikes).
 - `pnpm --filter demo typecheck` — pass.
 - `pnpm --filter demo build` — pass (existing >500 kB chunk warning only).
-- `pnpm --filter demo e2e` — 16 tests pass: root redirect/home/shell,
-  collapse, command palette, placeholders vs Web Server, fleet pages, project
-  filters/create/action menu/delete, environment switch/create, application
-  tabs/env reveal/logs/monitoring/edit drawer, database/compose detail,
-  deployments filter/pagination/logs, remote servers add/remove,
-  SSH/Git/profile, Web Server/Users/Notifications.
+- `pnpm --filter demo e2e` — 24 tests pass: root redirect/home/shell,
+  collapse, command palette, placeholders vs Web Server, fleet pages, top-level
+  monitoring, project filters/create/action menu/delete, environment
+  switch/create, application tabs/env reveal/logs/monitoring/edit drawer,
+  database/compose detail, deployments filter/pagination/logs, remote servers
+  add/remove, SSH/Git/profile, Web Server/Users/Notifications, audit log
+  filters/date range/columns, AI/certificates/registry/S3/license, and
+  palette-only settings navigation.
 - `pnpm exec biome check apps/demo/src apps/demo/e2e` — pass.

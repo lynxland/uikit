@@ -27,10 +27,14 @@ import { Route as DashboardProjectsIndexRouteImport } from './routes/dashboard.p
 import { Route as DashboardSettingsIndexRouteImport } from './routes/dashboard.settings.index'
 import { Route as DashboardSettingsAiRouteImport } from './routes/dashboard.settings.ai'
 import { Route as DashboardSettingsAuditLogsRouteImport } from './routes/dashboard.settings.audit-logs'
+import { Route as DashboardSettingsCertificatesRouteImport } from './routes/dashboard.settings.certificates'
 import { Route as DashboardSettingsDeploymentsRouteImport } from './routes/dashboard.settings.deployments'
 import { Route as DashboardSettingsGitProvidersRouteImport } from './routes/dashboard.settings.git-providers'
+import { Route as DashboardSettingsLicenseRouteImport } from './routes/dashboard.settings.license'
 import { Route as DashboardSettingsNotificationsRouteImport } from './routes/dashboard.settings.notifications'
 import { Route as DashboardSettingsProfileRouteImport } from './routes/dashboard.settings.profile'
+import { Route as DashboardSettingsRegistryRouteImport } from './routes/dashboard.settings.registry'
+import { Route as DashboardSettingsS3DestinationsRouteImport } from './routes/dashboard.settings.s3-destinations'
 import { Route as DashboardSettingsServersRouteImport } from './routes/dashboard.settings.servers'
 import { Route as DashboardSettingsSessionsRouteImport } from './routes/dashboard.settings.sessions'
 import { Route as DashboardSettingsSshKeysRouteImport } from './routes/dashboard.settings.ssh-keys'
@@ -126,6 +130,12 @@ const DashboardSettingsAuditLogsRoute =
     path: '/settings/audit-logs',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardSettingsCertificatesRoute =
+  DashboardSettingsCertificatesRouteImport.update({
+    id: '/settings/certificates',
+    path: '/settings/certificates',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardSettingsDeploymentsRoute =
   DashboardSettingsDeploymentsRouteImport.update({
     id: '/settings/deployments',
@@ -138,6 +148,12 @@ const DashboardSettingsGitProvidersRoute =
     path: '/settings/git-providers',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardSettingsLicenseRoute =
+  DashboardSettingsLicenseRouteImport.update({
+    id: '/settings/license',
+    path: '/settings/license',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardSettingsNotificationsRoute =
   DashboardSettingsNotificationsRouteImport.update({
     id: '/settings/notifications',
@@ -148,6 +164,18 @@ const DashboardSettingsProfileRoute =
   DashboardSettingsProfileRouteImport.update({
     id: '/settings/profile',
     path: '/settings/profile',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardSettingsRegistryRoute =
+  DashboardSettingsRegistryRouteImport.update({
+    id: '/settings/registry',
+    path: '/settings/registry',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardSettingsS3DestinationsRoute =
+  DashboardSettingsS3DestinationsRouteImport.update({
+    id: '/settings/s3-destinations',
+    path: '/settings/s3-destinations',
     getParentRoute: () => DashboardRoute,
   } as any)
 const DashboardSettingsServersRoute =
@@ -258,10 +286,14 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/settings/ai': typeof DashboardSettingsAiRoute
   '/dashboard/settings/audit-logs': typeof DashboardSettingsAuditLogsRoute
+  '/dashboard/settings/certificates': typeof DashboardSettingsCertificatesRoute
   '/dashboard/settings/deployments': typeof DashboardSettingsDeploymentsRoute
   '/dashboard/settings/git-providers': typeof DashboardSettingsGitProvidersRoute
+  '/dashboard/settings/license': typeof DashboardSettingsLicenseRoute
   '/dashboard/settings/notifications': typeof DashboardSettingsNotificationsRoute
   '/dashboard/settings/profile': typeof DashboardSettingsProfileRoute
+  '/dashboard/settings/registry': typeof DashboardSettingsRegistryRoute
+  '/dashboard/settings/s3-destinations': typeof DashboardSettingsS3DestinationsRoute
   '/dashboard/settings/servers': typeof DashboardSettingsServersRoute
   '/dashboard/settings/sessions': typeof DashboardSettingsSessionsRoute
   '/dashboard/settings/ssh-keys': typeof DashboardSettingsSshKeysRoute
@@ -292,10 +324,14 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/settings/ai': typeof DashboardSettingsAiRoute
   '/dashboard/settings/audit-logs': typeof DashboardSettingsAuditLogsRoute
+  '/dashboard/settings/certificates': typeof DashboardSettingsCertificatesRoute
   '/dashboard/settings/deployments': typeof DashboardSettingsDeploymentsRoute
   '/dashboard/settings/git-providers': typeof DashboardSettingsGitProvidersRoute
+  '/dashboard/settings/license': typeof DashboardSettingsLicenseRoute
   '/dashboard/settings/notifications': typeof DashboardSettingsNotificationsRoute
   '/dashboard/settings/profile': typeof DashboardSettingsProfileRoute
+  '/dashboard/settings/registry': typeof DashboardSettingsRegistryRoute
+  '/dashboard/settings/s3-destinations': typeof DashboardSettingsS3DestinationsRoute
   '/dashboard/settings/servers': typeof DashboardSettingsServersRoute
   '/dashboard/settings/sessions': typeof DashboardSettingsSessionsRoute
   '/dashboard/settings/ssh-keys': typeof DashboardSettingsSshKeysRoute
@@ -327,10 +363,14 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/settings/ai': typeof DashboardSettingsAiRoute
   '/dashboard/settings/audit-logs': typeof DashboardSettingsAuditLogsRoute
+  '/dashboard/settings/certificates': typeof DashboardSettingsCertificatesRoute
   '/dashboard/settings/deployments': typeof DashboardSettingsDeploymentsRoute
   '/dashboard/settings/git-providers': typeof DashboardSettingsGitProvidersRoute
+  '/dashboard/settings/license': typeof DashboardSettingsLicenseRoute
   '/dashboard/settings/notifications': typeof DashboardSettingsNotificationsRoute
   '/dashboard/settings/profile': typeof DashboardSettingsProfileRoute
+  '/dashboard/settings/registry': typeof DashboardSettingsRegistryRoute
+  '/dashboard/settings/s3-destinations': typeof DashboardSettingsS3DestinationsRoute
   '/dashboard/settings/servers': typeof DashboardSettingsServersRoute
   '/dashboard/settings/sessions': typeof DashboardSettingsSessionsRoute
   '/dashboard/settings/ssh-keys': typeof DashboardSettingsSshKeysRoute
@@ -364,10 +404,14 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/dashboard/settings/ai'
     | '/dashboard/settings/audit-logs'
+    | '/dashboard/settings/certificates'
     | '/dashboard/settings/deployments'
     | '/dashboard/settings/git-providers'
+    | '/dashboard/settings/license'
     | '/dashboard/settings/notifications'
     | '/dashboard/settings/profile'
+    | '/dashboard/settings/registry'
+    | '/dashboard/settings/s3-destinations'
     | '/dashboard/settings/servers'
     | '/dashboard/settings/sessions'
     | '/dashboard/settings/ssh-keys'
@@ -398,10 +442,14 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/dashboard/settings/ai'
     | '/dashboard/settings/audit-logs'
+    | '/dashboard/settings/certificates'
     | '/dashboard/settings/deployments'
     | '/dashboard/settings/git-providers'
+    | '/dashboard/settings/license'
     | '/dashboard/settings/notifications'
     | '/dashboard/settings/profile'
+    | '/dashboard/settings/registry'
+    | '/dashboard/settings/s3-destinations'
     | '/dashboard/settings/servers'
     | '/dashboard/settings/sessions'
     | '/dashboard/settings/ssh-keys'
@@ -432,10 +480,14 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/dashboard/settings/ai'
     | '/dashboard/settings/audit-logs'
+    | '/dashboard/settings/certificates'
     | '/dashboard/settings/deployments'
     | '/dashboard/settings/git-providers'
+    | '/dashboard/settings/license'
     | '/dashboard/settings/notifications'
     | '/dashboard/settings/profile'
+    | '/dashboard/settings/registry'
+    | '/dashboard/settings/s3-destinations'
     | '/dashboard/settings/servers'
     | '/dashboard/settings/sessions'
     | '/dashboard/settings/ssh-keys'
@@ -572,6 +624,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsAuditLogsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/settings/certificates': {
+      id: '/dashboard/settings/certificates'
+      path: '/settings/certificates'
+      fullPath: '/dashboard/settings/certificates'
+      preLoaderRoute: typeof DashboardSettingsCertificatesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/settings/deployments': {
       id: '/dashboard/settings/deployments'
       path: '/settings/deployments'
@@ -586,6 +645,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsGitProvidersRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/settings/license': {
+      id: '/dashboard/settings/license'
+      path: '/settings/license'
+      fullPath: '/dashboard/settings/license'
+      preLoaderRoute: typeof DashboardSettingsLicenseRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/settings/notifications': {
       id: '/dashboard/settings/notifications'
       path: '/settings/notifications'
@@ -598,6 +664,20 @@ declare module '@tanstack/react-router' {
       path: '/settings/profile'
       fullPath: '/dashboard/settings/profile'
       preLoaderRoute: typeof DashboardSettingsProfileRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/settings/registry': {
+      id: '/dashboard/settings/registry'
+      path: '/settings/registry'
+      fullPath: '/dashboard/settings/registry'
+      preLoaderRoute: typeof DashboardSettingsRegistryRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/settings/s3-destinations': {
+      id: '/dashboard/settings/s3-destinations'
+      path: '/settings/s3-destinations'
+      fullPath: '/dashboard/settings/s3-destinations'
+      preLoaderRoute: typeof DashboardSettingsS3DestinationsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/settings/servers': {
@@ -737,10 +817,14 @@ interface DashboardRouteChildren {
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardSettingsAiRoute: typeof DashboardSettingsAiRoute
   DashboardSettingsAuditLogsRoute: typeof DashboardSettingsAuditLogsRoute
+  DashboardSettingsCertificatesRoute: typeof DashboardSettingsCertificatesRoute
   DashboardSettingsDeploymentsRoute: typeof DashboardSettingsDeploymentsRoute
   DashboardSettingsGitProvidersRoute: typeof DashboardSettingsGitProvidersRoute
+  DashboardSettingsLicenseRoute: typeof DashboardSettingsLicenseRoute
   DashboardSettingsNotificationsRoute: typeof DashboardSettingsNotificationsRoute
   DashboardSettingsProfileRoute: typeof DashboardSettingsProfileRoute
+  DashboardSettingsRegistryRoute: typeof DashboardSettingsRegistryRoute
+  DashboardSettingsS3DestinationsRoute: typeof DashboardSettingsS3DestinationsRoute
   DashboardSettingsServersRoute: typeof DashboardSettingsServersRoute
   DashboardSettingsSessionsRoute: typeof DashboardSettingsSessionsRoute
   DashboardSettingsSshKeysRoute: typeof DashboardSettingsSshKeysRoute
@@ -765,10 +849,14 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardSettingsAiRoute: DashboardSettingsAiRoute,
   DashboardSettingsAuditLogsRoute: DashboardSettingsAuditLogsRoute,
+  DashboardSettingsCertificatesRoute: DashboardSettingsCertificatesRoute,
   DashboardSettingsDeploymentsRoute: DashboardSettingsDeploymentsRoute,
   DashboardSettingsGitProvidersRoute: DashboardSettingsGitProvidersRoute,
+  DashboardSettingsLicenseRoute: DashboardSettingsLicenseRoute,
   DashboardSettingsNotificationsRoute: DashboardSettingsNotificationsRoute,
   DashboardSettingsProfileRoute: DashboardSettingsProfileRoute,
+  DashboardSettingsRegistryRoute: DashboardSettingsRegistryRoute,
+  DashboardSettingsS3DestinationsRoute: DashboardSettingsS3DestinationsRoute,
   DashboardSettingsServersRoute: DashboardSettingsServersRoute,
   DashboardSettingsSessionsRoute: DashboardSettingsSessionsRoute,
   DashboardSettingsSshKeysRoute: DashboardSettingsSshKeysRoute,

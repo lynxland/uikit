@@ -155,6 +155,22 @@ test.describe("Dokploy shell and home", () => {
     await expect(page.getByText("frontend")).toBeVisible();
   });
 
+  test("top-level monitoring renders the server cards and charts", async ({ page }) => {
+    await page.goto("/dashboard/monitoring");
+    await expect(page.getByRole("heading", { level: 1, name: "Monitoring" })).toBeVisible();
+    await expect(page.getByTestId("monitoring-page")).toBeVisible();
+    await expect(page.getByTestId("monitoring-card")).toHaveCount(6);
+    await expect(page.getByTestId("monitoring-chart")).toHaveCount(5);
+    await expect(page.getByTestId("docker-disk-donut")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "CPU Usage" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Memory Usage" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Disk Space" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Docker Disk Usage" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Block I/O" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Network I/O" })).toBeVisible();
+    await expect(page.getByRole("progressbar")).toHaveCount(3);
+  });
+
   test("column pickers hide and restore table columns", async ({ page }) => {
     await page.goto("/dashboard/docker");
     await expect(page.getByRole("columnheader", { name: /Image/ })).toBeVisible();
