@@ -4,6 +4,7 @@ import {
   LoadingState,
   PageLayout,
   RelativeTime,
+  StatCard,
   StatusDot,
   type StatusTone,
   useUiAdapter,
@@ -33,21 +34,14 @@ function HomeStat({
   delta: string;
   to?: string;
 }) {
-  const content = (
-    <div className="flex min-h-[140px] h-full flex-col justify-between rounded-xl border border-[var(--border)] bg-background p-5">
-      <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
-      <div className="flex flex-col gap-1">
-        <span className="text-3xl font-semibold tracking-tight">{value}</span>
-        <span className="text-xs text-muted-foreground">{delta}</span>
-      </div>
-    </div>
-  );
-
-  if (to === undefined) return content;
   return (
-    <Link to={to as never} className="block h-full transition-colors hover:bg-muted/20">
-      {content}
-    </Link>
+    <StatCard
+      label={<span className="uppercase tracking-wider">{label}</span>}
+      value={value}
+      hint={delta}
+      {...(to !== undefined ? { href: to } : {})}
+      className="h-full min-h-[140px]"
+    />
   );
 }
 
@@ -111,7 +105,7 @@ function RecentDeploymentRow({
         {statusLabel(deployment.status)}
       </span>
       <span className="hidden w-24 text-right text-xs text-muted-foreground md:inline">
-        <RelativeTime locale="en" numeric="always" format="long" value={deployment.startedAt} />
+        <RelativeTime locale="en" format="distance" value={deployment.startedAt} />
       </span>
       <span className="text-xs text-muted-foreground">logs →</span>
     </>

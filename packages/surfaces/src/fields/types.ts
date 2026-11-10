@@ -109,6 +109,11 @@ export interface FieldInput<I extends object> {
   placeholder?: string;
   /** Convenience validation; complex rules belong to a Standard Schema on the form. */
   required?: boolean | string;
+  /**
+   * Declared but not rendered by `FieldInputs`. The value still lives in the
+   * form/defaultValues and is submitted; useful for hidden foreign keys.
+   */
+  hidden?: boolean;
   /** Custom control for this field (wins over the default kind renderer). */
   input?: (args: FieldInputSlotArgs<I>) => ReactNode;
   options?: readonly FieldOption[];

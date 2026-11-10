@@ -22,7 +22,13 @@ export interface SettingsSection {
   title?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
-  items: readonly SettingsItem[];
+  /** Label/control rows; ignored when `content` is provided. */
+  items?: readonly SettingsItem[];
+  /**
+   * Free-form section body for grids, danger zones, invitations or provider
+   * rows. When present it replaces the label/control list.
+   */
+  content?: ReactNode;
 }
 
 export interface SettingsPageProps {
@@ -85,19 +91,23 @@ export function SettingsPage({
             {...(section.description !== undefined ? { description: section.description } : {})}
             {...(section.actions !== undefined ? { actions: section.actions } : {})}
           >
-            <ul className="ui-settings-page__items">
-              {section.items.map((item) => (
-                <li key={item.key} className="ui-settings-page__item" data-setting={item.key}>
-                  <div className="ui-settings-page__text">
-                    <span className="ui-settings-page__label">{item.label}</span>
-                    {item.description !== undefined ? (
-                      <span className="ui-settings-page__description">{item.description}</span>
-                    ) : null}
-                  </div>
-                  <div className="ui-settings-page__control">{item.control}</div>
-                </li>
-              ))}
-            </ul>
+            {section.content !== undefined ? (
+              section.content
+            ) : (
+              <ul className="ui-settings-page__items">
+                {(section.items ?? []).map((item) => (
+                  <li key={item.key} className="ui-settings-page__item" data-setting={item.key}>
+                    <div className="ui-settings-page__text">
+                      <span className="ui-settings-page__label">{item.label}</span>
+                      {item.description !== undefined ? (
+                        <span className="ui-settings-page__description">{item.description}</span>
+                      ) : null}
+                    </div>
+                    <div className="ui-settings-page__control">{item.control}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </SectionCard>
         ))}
       </div>

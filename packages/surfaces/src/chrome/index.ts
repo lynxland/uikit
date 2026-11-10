@@ -28,6 +28,7 @@ export { ScopeSwitcher, type ScopeSwitcherItem, type ScopeSwitcherProps } from "
 export { SectionCard, type SectionCardProps } from "./section-card";
 export { Stepper, type StepperProps, type StepperStep } from "./stepper";
 export {
+  type ResolvedTheme,
   type Theme,
   type ThemeContextValue,
   ThemeProvider,

@@ -5,15 +5,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { UiAdapterProvider } from "../src/adapter";
 import type { FieldView } from "../src/fields";
 import {
+  Avatar,
   CodeEditor,
   EmptyState,
   ErrorState,
   FieldValue,
+  formatRelativeTime,
   JsonField,
   MetricChart,
   type MetricSeries,
   RelativeTime,
   SecretValue,
+  Separator,
+  StatCard,
   StatusBadge,
   StatusDot,
   statusTone,
@@ -100,6 +104,102 @@ describe("RelativeTime", () => {
   it("renders a fallback for invalid dates", () => {
     render(withAdapter(<RelativeTime value="not-a-date" fallback="unknown" />));
     expect(screen.getByText("unknown")).toBeTruthy();
+  });
+
+  it("uses bounded date-fns-like distance wording", () => {
+    const now = new Date("2026-01-01T12:00:00Z");
+    const ago = (milliseconds: number) =>
+      formatRelativeTime(new Date(now.getTime() - milliseconds), now, "en", "auto", "distance");
+
+    expect(ago(20_000)).toBe("less than a minute ago");
+    expect(ago(60_000)).toBe("1 minute ago");
+    expect(ago(5 * 60_000)).toBe("5 minutes ago");
+    expect(ago(60 * 60_000)).toBe("about 1 hour ago");
+    expect(ago(3 * 60 * 60_000)).toBe("about 3 hours ago");
+    expect(ago(26 * 60 * 60_000)).toBe("1 day ago");
+    expect(ago(3 * 24 * 60 * 60_000)).toBe("3 days ago");
+    expect(ago(40 * 24 * 60 * 60_000)).toBe("about 1 month ago");
+    expect(ago(100 * 24 * 60 * 60_000)).toBe("3 months ago");
+    expect(ago(13 * 30 * 24 * 60 * 60_000)).toBe("about 1 year ago");
+    expect(ago(2 * 365 * 24 * 60 * 60_000)).toBe("2 years ago");
+    expect(
+      formatRelativeTime(new Date(now.getTime() + 5 * 60_000), now, "en", "auto", "distance"),
+    ).toBe("in 5 minutes");
+  });
+});
+
+describe("Avatar", () => {
+  it("derives initials and exposes the alt label", () => {
+    render(withAdapter(<Avatar alt="Ada Lovelace" />));
+    expect(screen.getByRole("img", { name: "Ada Lovelace" })).toBeTruthy();
+    expect(screen.getByText("AL")).toBeTruthy();
+  });
+
+  it("falls back on an image error and can show a status dot", () => {
+    render(withAdapter(<Avatar src="broken.png" alt="Ada Lovelace" status="success" />));
+    const image = document.querySelector(".ui-avatar__image");
+    expect(image).toBeTruthy();
+    fireEvent.error(image as HTMLImageElement);
+    expect(document.querySelector(".ui-avatar__image")).toBeNull();
+    expect(screen.getByText("AL")).toBeTruthy();
+    expect(document.querySelector(".ui-avatar__status")).toBeTruthy();
+  });
+
+  it("accepts an explicit fallback and numeric size", () => {
+    render(withAdapter(<Avatar alt="Ada" fallback="?" size={40} />));
+    const avatar = document.querySelector(".ui-avatar") as HTMLElement;
+    expect(avatar.style.width).toBe("40px");
+    expect(avatar.getAttribute("data-size")).toBe("custom");
+    expect(screen.getByText("?")).toBeTruthy();
+  });
+});
+
+describe("Separator", () => {
+  it("is decorative by default", () => {
+    render(withAdapter(<Separator orientation="vertical" />));
+    const separator = document.querySelector(".ui-separator") as HTMLElement;
+    expect(separator.getAttribute("aria-hidden")).toBe("true");
+    expect(separator.getAttribute("role")).toBeNull();
+    expect(separator.className).toContain("ui-separator--vertical");
+  });
+
+  it("exposes role and orientation when non-decorative", () => {
+    render(withAdapter(<Separator decorative={false} label="or" />));
+    const separator = document.querySelector(".ui-separator") as HTMLElement;
+    expect(separator.getAttribute("role")).toBe("separator");
+    expect(separator.getAttribute("aria-orientation")).toBe("horizontal");
+    expect(screen.getByText("or")).toBeTruthy();
+  });
+});
+
+describe("StatCard", () => {
+  it("renders icon, actions, footer and an anchor when href is set", () => {
+    render(
+      withAdapter(
+        <StatCard
+          label="Deploys"
+          value={42}
+          hint="last week"
+          icon={<span data-testid="stat-icon">*</span>}
+          actions={<button type="button">Open</button>}
+          footer={<span>footer</span>}
+          href="/deployments"
+          className="stat-custom"
+          valueClassName="stat-value-custom"
+        />,
+      ),
+    );
+
+    expect(screen.getByTestId("stat-icon")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open" })).toBeTruthy();
+    const link = screen.getByRole("link");
+    expect(link.getAttribute("href")).toBe("/deployments");
+    expect(link.textContent).toContain("Deploys");
+    expect(link.textContent).toContain("42");
+    expect(link.textContent).not.toContain("Open");
+    expect(screen.getByText("footer")).toBeTruthy();
+    expect(screen.getByText("42").className).toContain("stat-value-custom");
+    expect(document.querySelector(".ui-stat-card")?.className).toContain("stat-custom");
   });
 });
 

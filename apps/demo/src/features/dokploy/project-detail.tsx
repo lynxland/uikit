@@ -8,6 +8,7 @@ import {
   PageLayout,
   RelativeTime,
   StatusDot,
+  useSelection,
   useUiAdapter,
 } from "@lynxland/uikit-surfaces";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -173,8 +174,7 @@ function ServiceCard({
 
       <div className="mt-auto flex items-center gap-1 pt-4 text-xs text-muted-foreground">
         <span>
-          Created{" "}
-          <RelativeTime locale="en" numeric="always" format="long" value={service.createdAt} />
+          Created <RelativeTime locale="en" format="distance" value={service.createdAt} />
         </span>
       </div>
     </article>
@@ -210,7 +210,6 @@ export function DokployProjectEnvironmentPage({
   const [sort, setSort] = useState<ServiceSort>("lastDeploy-desc");
   const [typeFilter, setTypeFilter] = useState<ServiceTypeFilter>("all");
   const [serverFilter, setServerFilter] = useState("all");
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
 
   const environments = environmentsFor(projectId);
   const filtered = useMemo(() => {
@@ -228,6 +227,10 @@ export function DokployProjectEnvironmentPage({
     });
     return sortServices(matches, sort);
   }, [services.rows, query, sort, typeFilter, serverFilter]);
+
+  const selection = useSelection<string>({
+    ids: filtered.map((service) => service.id),
+  });
 
   const pending = services.status === "loading" || services.status === "idle";
 
@@ -274,15 +277,6 @@ export function DokployProjectEnvironmentPage({
   }
 
   const row = project.data;
-  const allSelected = filtered.length > 0 && filtered.every((service) => selected.has(service.id));
-  const toggleSelected = (id: string) => {
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   return (
     <DokployCard>
@@ -355,9 +349,12 @@ export function DokployProjectEnvironmentPage({
         <div className="flex flex-col items-stretch gap-3 xl:flex-row xl:items-center">
           <div className="flex shrink-0 items-center gap-2">
             <ui.Checkbox
-              checked={allSelected ? true : selected.size > 0 ? "indeterminate" : false}
+              checked={
+                selection.allSelected ? true : selection.someSelected ? "indeterminate" : false
+              }
               onCheckedChange={(checked) => {
-                setSelected(checked ? new Set(filtered.map((service) => service.id)) : new Set());
+                if (checked === true) selection.selectAll();
+                else selection.clear();
               }}
               aria-label="Select all services"
             />
@@ -373,18 +370,18 @@ export function DokployProjectEnvironmentPage({
               items={[
                 {
                   label: "Select all visible",
-                  onSelect: () => setSelected(new Set(filtered.map((service) => service.id))),
+                  onSelect: () => selection.selectAll(),
                 },
                 {
                   label: "Clear selection",
-                  disabled: selected.size === 0,
-                  onSelect: () => setSelected(new Set()),
+                  disabled: selection.selected.size === 0,
+                  onSelect: () => selection.clear(),
                 },
                 {
                   label:
-                    selected.size === 0
+                    selection.selected.size === 0
                       ? "Delete selected (select services)"
-                      : `Delete ${selected.size} selected (demo)`,
+                      : `Delete ${selection.selected.size} selected (demo)`,
                   disabled: true,
                   separator: true,
                 },
@@ -455,8 +452,8 @@ export function DokployProjectEnvironmentPage({
               <ServiceCard
                 key={service.id}
                 service={service}
-                selected={selected.has(service.id)}
-                onToggle={toggleSelected}
+                selected={selection.isSelected(service.id)}
+                onToggle={selection.toggle}
               />
             ))}
           </div>

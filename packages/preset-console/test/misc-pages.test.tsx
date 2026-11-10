@@ -54,6 +54,32 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("button", { name: "Theme: dark" })).toBeTruthy();
     expect(JSON.parse(window.localStorage.getItem("preset.test.theme") ?? "null")).toBe("dark");
   });
+
+  it("renders free-form section content instead of the item list", async () => {
+    renderWithKit(
+      <PresetProvider>
+        <SettingsPage
+          title="Settings"
+          sections={[
+            {
+              key: "danger",
+              title: "Danger zone",
+              content: (
+                <div data-testid="free-form">
+                  <button type="button">Delete workspace</button>
+                </div>
+              ),
+            },
+          ]}
+        />
+      </PresetProvider>,
+      { path: "/" },
+    );
+
+    expect(await screen.findByTestId("free-form")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Delete workspace" })).toBeTruthy();
+    expect(document.querySelector(".ui-settings-page__items")).toBeNull();
+  });
 });
 
 const steps: WizardStep[] = [

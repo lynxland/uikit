@@ -20,7 +20,7 @@
 
 | 呈现层（L5–L7） | 角色 |
 |---|---|
-| **Value** | 纯展示：StatusBadge / StatusDot / Alert / Progress / Toast / Kbd / RelativeTime / StatCard / states |
+| **Value** | 纯展示：StatusBadge / StatusDot / Avatar / Separator / Alert / Progress / Toast / Kbd / RelativeTime / StatCard / states |
 | **Control** | 受控 props：DataTable / FilterBar / Pager / Tabs / Form |
 | **View** | 绑定句柄 → 控件 props：CollectionView / RecordView / FormView |
 | **Chrome** | 页壳：PageLayout / AppShell / SectionCard（唯一 h1 所有者） |
@@ -384,8 +384,11 @@ trigger，`contentClassName` 作用于选项弹层（ui-plain 的原生 select �
 
 **Light/Dark**：`@lynxland/uikit-ui-shadcn/tokens.css` 提供 `:root` 亮色与 `.dark`
 覆盖。`@lynxland/uikit-surfaces` 提供 `ThemeProvider` / `useTheme` / `ThemeToggle`，
-统一处理 class、localStorage 与默认值；SSR/静态 HTML 可用 `themeScript()` 在首屏前
-注入，避免闪白。
+统一处理 class、localStorage 与默认值；`Theme` 为 `light | dark | system`，
+`resolvedTheme` 是解析后的 `light | dark`。`system` 会监听
+`prefers-color-scheme`；`toggle()` 会把当前解析结果取反并显式存成 light/dark
+（不是 system）。SSR/静态 HTML 可用 `themeScript()` 在首屏前注入，脚本同样
+会用 `matchMedia` 解析 `system`，避免闪白。
 
 ### 5.2 Controls（全部受控）
 
@@ -434,6 +437,19 @@ trigger，`contentClassName` 作用于选项弹层（ui-plain 的原生 select �
   默认忽略 input/textarea/select/contenteditable）。
 - `RelativeTime` 默认 `Intl` short（`2 min. ago`）；`format="long"` 输出
   `2 minutes ago`，`numeric="always"` 可避免 “yesterday” 之类的自动措辞。
+  `format="distance"` 使用 date-fns 风格的英文近似措辞（如
+  `less than a minute ago` / `1 minute ago` / `about 1 hour ago` /
+  `about 3 hours ago` / `1 day ago` / `3 days ago` / `about 1 month ago` /
+  `3 months ago` / `about 1 year ago` / `2 years ago`）。阈值有意固定为
+  30 秒→分钟、45 分钟→小时、90 分钟→1 小时、24 小时→天、42 小时→1 天、
+  30 天→月、60 天→1 月、12/18 个月→年；需要精确复数/本地化时继续用
+  `format="long"`。
+- `Avatar`（`src`/`alt`/`fallback`/`size`/`status`）失败时回退到首字母；
+  `Separator`（`orientation`/`decorative`/`label`）是无数据、无 adapter 的纯值。
+- `useSelection<ID>({ ids, selected?, defaultSelected?, onSelectedChange? })`
+  提供 `selected/isSelected/toggle/selectAll/clear/allSelected/someSelected`，
+  用于卡片/自定义列表；`ids` 是当前可见范围，`DataTable` 的行选择仍走自己的
+  `selection` props。
 
 **数据展示控件**：
 
@@ -671,6 +687,8 @@ const fields = crudFields<Widget, CreateWidget, UpdateWidget>({
 ```
 
 - `FieldView<Row>` 只列表/详情；`FieldInput<Input>` 只表单；`FilterField` 只过滤。
+- `FieldInput.hidden` 让 `FieldInputs` 跳过渲染，但值仍留在
+  `defaultValues`/form state 并随提交发送（隐藏外键等）。
 - `Input` 类型独立于 Row；Row → Input 必须显式 `toUpdateInput`。
 - `ReferenceValue` / `ReferenceInput` 在 `fields/` 里用 `useLookup`；控件层不取数。
 
@@ -755,6 +773,12 @@ import {
 | `SettingsPage` | PageLayout + SectionCard × n + PreferenceItem | 手装 |
 | `WizardPage` | PageLayout + Stepper + step slots | 手装 |
 | `EventsPage` | backlog useCollection × useStream × EventFeed | 手装 |
+
+- `SettingsSection` 支持 `items`（label/control 行）或自由 `content`；两者同时
+  出现时 `content` 优先。设置页的 form grid/danger zone/invitation/provider
+  行直接放进 `content`，不需要 fork `SettingsPage`。
+- `FormPage.cancel` 是页头插槽（通常是 Router `Link`）；`onCancel` 是
+  `FormView` 底部的取消回调，两者可以同时使用。
 
 叠加宿主（preset 导出）：`CommandDialog` / `CommandDrawer`（打开时跑 command form，ok 自动关闭）
 与 `ConfirmCommandDialog`（bare command 的确认/危险操作）。`PresetProvider` 还会安装

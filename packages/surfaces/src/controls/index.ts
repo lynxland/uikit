@@ -56,3 +56,8 @@ export {
   filterCommandItems,
   useCommandList,
 } from "./use-command-list";
+export {
+  type SelectionState,
+  type UseSelectionOptions,
+  useSelection,
+} from "./use-selection";

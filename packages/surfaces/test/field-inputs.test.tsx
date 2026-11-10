@@ -1,7 +1,7 @@
 import type { CommandFormApi } from "@lynxland/uikit-react";
 import { useForm } from "@tanstack/react-form";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { UiAdapterProvider } from "../src/adapter";
 import { FieldInputs } from "../src/controls";
 import type { FieldFormApi, FieldInput } from "../src/fields";
@@ -72,6 +72,28 @@ function RequiredHarness() {
   );
 }
 
+function HiddenHarness({
+  onSubmit,
+}: {
+  onSubmit: (values: { name: string; token: string }) => void;
+}) {
+  const form = useForm({ defaultValues: { name: "", token: "secret" } });
+  return (
+    <UiAdapterProvider adapter={testAdapter}>
+      <FieldInputs
+        form={form}
+        fields={[
+          { name: "name", kind: "text", label: "Name" },
+          { name: "token", kind: "text", label: "Token", hidden: true },
+        ]}
+      />
+      <button type="button" onClick={() => onSubmit(form.state.values)}>
+        Read values
+      </button>
+    </UiAdapterProvider>
+  );
+}
+
 describe("FieldInputs", () => {
   it("accepts the command form API structurally", () => {
     expectTypeOf<CommandFormApi<Values>>().toMatchTypeOf<FieldFormApi<Values>>();
@@ -112,5 +134,13 @@ describe("FieldInputs", () => {
     expect(screen.getByText("Name *")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     expect(await screen.findByText("Required")).toBeTruthy();
+  });
+
+  it("skips hidden fields while keeping their default value in the form", () => {
+    const onSubmit = vi.fn();
+    render(<HiddenHarness onSubmit={onSubmit} />);
+    expect(screen.queryByLabelText("Token")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Read values" }));
+    expect(onSubmit).toHaveBeenCalledWith({ name: "", token: "secret" });
   });
 });

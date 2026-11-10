@@ -76,9 +76,7 @@ export function DokployDeploymentsPage({ from }: { from: string }) {
       header: "Started",
       accessor: (row) => row.startedAt,
       sortField: "startedAt",
-      cell: (row) => (
-        <RelativeTime locale="en" numeric="always" format="long" value={row.startedAt} />
-      ),
+      cell: (row) => <RelativeTime locale="en" format="distance" value={row.startedAt} />,
     },
     {
       id: "duration",

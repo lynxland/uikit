@@ -228,27 +228,29 @@ export function FieldInputs<I extends object>({
 
   return (
     <div className={cx("ui-field-inputs", className, classNames?.root)}>
-      {fields.map((field) => {
-        const validators = field.required
-          ? {
-              onChange: requiredValidator(field.required === true ? "Required" : field.required),
-              onSubmit: requiredValidator(field.required === true ? "Required" : field.required),
-            }
-          : undefined;
-        return (
-          <Field key={field.name} name={field.name} validators={validators}>
-            {(api) => (
-              <FieldRow<I>
-                form={form}
-                field={field}
-                api={api}
-                slot={renderInput}
-                classNames={classNames}
-              />
-            )}
-          </Field>
-        );
-      })}
+      {fields
+        .filter((field) => field.hidden !== true)
+        .map((field) => {
+          const validators = field.required
+            ? {
+                onChange: requiredValidator(field.required === true ? "Required" : field.required),
+                onSubmit: requiredValidator(field.required === true ? "Required" : field.required),
+              }
+            : undefined;
+          return (
+            <Field key={field.name} name={field.name} validators={validators}>
+              {(api) => (
+                <FieldRow<I>
+                  form={form}
+                  field={field}
+                  api={api}
+                  slot={renderInput}
+                  classNames={classNames}
+                />
+              )}
+            </Field>
+          );
+        })}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   findActiveNavItem,
   PageLayout,
   RouteErrorBoundary,
+  Separator,
   useUiAdapter,
 } from "@lynxland/uikit-surfaces";
 import {
@@ -117,7 +118,7 @@ function RootLayout() {
                 <PanelLeft size={16} aria-hidden="true" />
               </ui.Button>
             </div>
-            <span className="h-4 w-px shrink-0 bg-[var(--border)]" aria-hidden="true" />
+            <Separator orientation="vertical" className="h-4 shrink-0" />
             <div className="min-w-0 flex-1">
               <ShellBreadcrumb />
             </div>

@@ -3,6 +3,11 @@ import { cx } from "./classes";
 
 export type RelativeTimeNumeric = "always" | "auto";
 export type RelativeTimeStyle = "long" | "short" | "narrow";
+/**
+ * `distance` mimics date-fns `formatDistance` English wording ("about 1 hour
+ * ago"), intentionally bounded to the thresholds documented in docs/SKILL.md.
+ */
+export type RelativeTimeFormat = RelativeTimeStyle | "distance";
 
 export interface RelativeTimeProps {
   value: string | number | Date;
@@ -10,8 +15,8 @@ export interface RelativeTimeProps {
   now?: Date | number;
   locale?: string;
   numeric?: RelativeTimeNumeric;
-  /** Intl style: `long` reads "2 minutes ago", `short` reads "2 min. ago". */
-  format?: RelativeTimeStyle;
+  /** Intl style, or `distance` for date-fns-like approximate wording. */
+  format?: RelativeTimeFormat;
   /** Re-render cadence; 0 disables the timer. Ignored when `now` is injected. */
   refreshMs?: number;
   timeZone?: string;
@@ -43,20 +48,62 @@ function relativeUnit(diff: number): { value: number; unit: Intl.RelativeTimeFor
 }
 
 /**
- * `Intl.RelativeTimeFormat` based relative label. `now` is injectable so tests
- * and server rendering are deterministic; the DOM interval only updates the
- * label, never the value.
+ * date-fns-compatible English distance wording. Thresholds are deliberately
+ * bounded (1 min / 45 min / 90 min / 24 h / 42 h / 30 d / 60 d / 12/18
+ * months); the caller can still use `format="long"` when exact pluralisation
+ * matters.
+ */
+function formatDistance(diff: number): string {
+  const past = diff <= 0;
+  const minutes = Math.floor(Math.abs(diff) / MINUTE);
+  let phrase: string;
+
+  if (minutes < 1) {
+    phrase = "less than a minute";
+  } else if (minutes < 45) {
+    phrase = `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  } else if (minutes < 90) {
+    phrase = "about 1 hour";
+  } else if (minutes < 1440) {
+    phrase = `about ${Math.round(minutes / 60)} hours`;
+  } else if (minutes < 2520) {
+    phrase = "1 day";
+  } else if (minutes < 43200) {
+    const days = Math.round(minutes / 1440);
+    phrase = `${days} days`;
+  } else if (minutes < 86400) {
+    phrase = "about 1 month";
+  } else {
+    const months = Math.floor(Math.abs(diff) / MONTH);
+    if (months < 12) {
+      phrase = `${months} months`;
+    } else if (months < 18) {
+      phrase = "about 1 year";
+    } else {
+      const years = Math.round(months / 12);
+      phrase = `${years} years`;
+    }
+  }
+
+  return past ? `${phrase} ago` : `in ${phrase}`;
+}
+
+/**
+ * `Intl.RelativeTimeFormat` based relative label (or date-fns-like distance
+ * wording). `now` is injectable so tests and server rendering are
+ * deterministic; the DOM interval only updates the label, never the value.
  */
 export function formatRelativeTime(
   value: string | number | Date,
   now: Date | number = Date.now(),
   locale?: string,
   numeric: RelativeTimeNumeric = "auto",
-  format: RelativeTimeStyle = "short",
+  format: RelativeTimeFormat = "short",
 ): string | null {
   const target = toMillis(value);
   const reference = toMillis(now);
   if (!Number.isFinite(target) || !Number.isFinite(reference)) return null;
+  if (format === "distance") return formatDistance(target - reference);
   const { value: amount, unit } = relativeUnit(target - reference);
   const formatter = new Intl.RelativeTimeFormat(locale, { numeric, style: format });
   return formatter.format(amount, unit);

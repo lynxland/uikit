@@ -1,4 +1,10 @@
 export { Alert, type AlertProps, type AlertTone } from "./alert";
+export {
+  Avatar,
+  type AvatarProps,
+  type AvatarSize,
+  avatarInitials,
+} from "./avatar";
 export type { ClassValue } from "./classes";
 export { cx } from "./classes";
 export {
@@ -29,12 +35,18 @@ export { Progress, type ProgressProps, type ProgressTone } from "./progress";
 export {
   formatRelativeTime,
   RelativeTime,
+  type RelativeTimeFormat,
   type RelativeTimeNumeric,
   type RelativeTimeProps,
   type RelativeTimeStyle,
 } from "./relative-time";
 export { SecretReveal, type SecretRevealProps } from "./secret-reveal";
 export { SecretValue, type SecretValueProps } from "./secret-value";
+export {
+  Separator,
+  type SeparatorOrientation,
+  type SeparatorProps,
+} from "./separator";
 export { StatCard, type StatCardProps, type StatTone } from "./stat-card";
 export {
   describeApiError,

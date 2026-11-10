@@ -8,7 +8,11 @@
       // Apply the persisted theme before first paint (no flash).
       (() => {
         const stored = localStorage.getItem("uikit.demo.theme");
-        const dark = stored === null ? true : stored === "dark";
+        const theme = stored === null ? "dark" : stored;
+        const dark =
+          theme === "system"
+            ? window.matchMedia("(prefers-color-scheme: dark)").matches
+            : theme === "dark";
         document.documentElement.classList.toggle("dark", dark);
       })();
     </script>

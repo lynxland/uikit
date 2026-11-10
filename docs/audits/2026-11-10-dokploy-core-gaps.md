@@ -617,3 +617,65 @@ corresponding CSS/duplicated implementation, and keeps `pnpm check` +
   `DateRangePicker` is date-only (no timezone/time-of-day) and presets are
   static data, not relative-date helpers. No remaining P1 item from §6 is
   unaddressed.
+
+## 18. P2-A lower-risk polish landed (2026-11-11)
+
+- [x] **Avatar** — `packages/surfaces/src/values/avatar.tsx`: `src`, `alt`,
+  `fallback` (default initials via `avatarInitials`), `size` (`sm|md|lg` or a
+  pixel number), optional `status` dot and `className`; image errors fall back
+  without losing the accessible name. Demo account footer/profile avatars use
+  it with the existing `AL`/labels intact.
+- [x] **Separator** — `packages/surfaces/src/values/separator.tsx`:
+  `orientation`, `decorative` (default true → `aria-hidden`), optional
+  horizontal `label`, `className`. Demo header divider and the three log-toolbar
+  group dividers use it.
+- [x] **StatCard** — `icon`, `actions`, `href`, `footer`, `className`,
+  `valueClassName` added while keeping `label/value/tone/hint`. `href` renders a
+  plain anchor; no Router import. Demo `HomeStat` is now `StatCard`, preserving
+  the `Projects`/`Services`/`Deploys / 7d` numbers and the `Go to projects`
+  header action; the old bespoke min-height card markup is gone.
+- [x] **RelativeTime distance wording** — `format="distance"` returns bounded
+  date-fns-style English wording (`less than a minute ago`, `1 minute ago`,
+  `about 1 hour ago`, `about X hours ago`, `1 day ago`, `X days ago`,
+  `about 1 month ago`, `X months ago`, `about 1 year ago`, `X years ago`, plus
+  future `in …`). Existing `long|short|narrow` behaviour is unchanged; demo
+  home/project/service/deployment timestamps use `distance`.
+- [x] **ThemeProvider system** — `Theme = light | dark | system` and
+  `resolvedTheme: ResolvedTheme`; `system` installs a `prefers-color-scheme`
+  listener with cleanup, `toggle()` stores the explicit opposite of the
+  resolved theme, and `themeScript()` resolves stored `system` through
+  `matchMedia`. Demo pre-paint script and account menu gained the system option
+  without changing existing test ids.
+- [x] **useSelection** — `packages/surfaces/src/controls/use-selection.ts`:
+  controlled/uncontrolled generic selection with `selected`, `isSelected`,
+  `toggle`, `selectAll`, `clear`, `allSelected`, `someSelected`; `ids` scopes
+  select-all/indeterminate to the visible rows. Demo service-card bulk
+  selection now uses it (same checkboxes/menu/test ids).
+- [x] **FieldInput.hidden** — `FieldInputs` filters hidden fields from render
+  but form state/`defaultValues` still submit them; test covers the hidden
+  value. The broader per-field `meta` object was deliberately left out.
+- [x] **SettingsPage free-form sections** — `SettingsSection.content` renders
+  inside `SectionCard` and takes precedence over `items` (now optional).
+  `FormPage.onCancel` mirrors the `FormView` footer cancel callback, so the
+  header `cancel` slot and footer action can coexist.
+- [x] **Docs** — `docs/SKILL.md` (values, theme/system, RelativeTime distance
+  thresholds, fields, settings/form API) and `docs/design.md` (controls,
+  values, theme, preset notes) updated.
+- [x] **Verification** — `pnpm check` green (core 44, react 34, testing 7,
+  surfaces 156, ui-shadcn 41, ui-plain 38, preset 36, cli 5, spike 10);
+  `pnpm --filter demo build` green (only the pre-existing >500 kB chunk
+  warning); `pnpm --filter demo e2e` 20/20 green; Biome over
+  `packages/surfaces/src packages/ui-shadcn/src packages/ui-plain/src
+  packages/preset-console/src apps/demo/src apps/demo/e2e` has no errors (only
+  pre-existing CSS descending-specificity warnings).
+- **Deferred (unchanged):** `Terminal`, `ContextMenu`, `Dropzone`.
+  `Combobox` is documented as deferred: `CommandMenu` already covers searchable
+  single-select with checked state, but a true editable-input/multi-select
+  combobox needs a dedicated adapter+surface contract and was not composed in
+  this batch. `CollectionPage` card-grid layout remains app/page-template work;
+  only `SettingsPage` free-form sections were added. Per-field `FieldInput.meta`
+  is also deferred. Remaining risks: distance wording is English-only and uses
+  fixed thresholds; `StatCard.valueClassName` may need specificity/`!` when a
+  consumer's utility layer conflicts with the default `ui-stat-card__value`
+  rule; `useSelection` controlled mode expects the parent to echo
+  `onSelectedChange`.

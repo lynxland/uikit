@@ -910,6 +910,23 @@ export function scopeReady(
 - 排序/过滤/分页状态由调用方给；表内只保留列可见性等瞬态（可受控）。
 - 行选择仍是受控 `RowSelection`；批量动作编排归页面。
 
+#### useSelection
+
+```tsx
+const selection = useSelection<string>({ ids: visibleIds });
+selection.isSelected(id);
+selection.toggle(id);
+selection.selectAll(); // ids scope
+selection.clear();
+selection.allSelected; // false when ids is empty
+selection.someSelected; // partial selection inside ids
+```
+
+- 卡片/自定义列表的 headless 选择状态，受控（`selected`）或非受控
+  （`defaultSelected`）；`ids` 是当前可见范围，驱动 `allSelected`/
+  `someSelected`/无参 `selectAll()`。
+- 不依赖 collection/query/Router；`DataTable` 行选择仍用 `RowSelection`。
+
 #### FilterBar
 
 ```tsx
@@ -1106,17 +1123,27 @@ export interface FilterField {
 
 - `Form` 是提交壳（submit/error box/footer）；不创建表单。
 - `FieldInputs` 按 `FieldInput<I>[]` 渲染；不接收 Row 类型。
+- `FieldInput.hidden: true` 的字段不渲染，但值仍在 form state/`defaultValues`
+  中并随提交发送；用于隐藏外键/上下文，不是删除字段。
 - `TextField`/`SelectField`/`DateTimeInput`/`CheckboxField`/`ReferenceInput` 是控件；
   日期时间由 UI adapter 自绘，不依赖浏览器原生 `datetime-local` 弹窗。
 - `ReferenceInput` 接受 `LookupSource` 或 `options` 回调，不内嵌 Resource。
 
 #### Values
 
-- `StatusBadge`、`StatusDot`（tone + 可选无障碍标签 + pulse）、`Alert`
+- `StatusBadge`、`StatusDot`（tone + 可选无障碍标签 + pulse）、`Avatar`
+  （`src`/`alt`/`fallback`/`size`/`status`，图片失败回退首字母）、`Separator`
+  （horizontal/vertical + decorative + 可选 label，纯值无 adapter）、`Alert`
   （info/success/warning/danger + 可选 title/description/icon/action + `live`）、
   `Progress`（value/max/tone/indeterminate/label）、`RelativeTime`、`Kbd`、
   `CopyButton`、`SecretReveal`、`DiffView`、`JsonField`、`StatCard`、`MetricChart`、
   `CodeEditor`、`FieldValue`、`LoadingState`/`EmptyState`/`ErrorState`。
+- `StatCard` 的 `icon`/`actions`/`href`/`footer`/`valueClassName` 是展示槽；
+  `href` 只渲染普通 `<a>`，不 import Router。
+- `RelativeTime` 除 `Intl` long/short/narrow 外提供 `format="distance"`：
+  date-fns 风格英文近似措辞（`less than a minute ago`、`about 1 hour ago`、
+  `about 3 hours ago`、`1 day ago`、`about 1 month ago`、`about 1 year ago`），
+  阈值有意固定并在 SKILL 中列出；需要精确/本地化措辞时用 `format="long"`。
 - `MetricChart` 的 series 颜色由 `series.key` 稳定推导（同图内避让冲突），
   `series.color` 显式覆盖；增强项为 `showLegend`（默认 true）、`showYAxis`、
   `area`、`tooltip`（pointer 竖线 + readout）、`unit`、`thresholds`、`domain`、
@@ -1300,6 +1327,10 @@ export interface FilterField {
 | `SettingsPage` | `PageLayout` + `SectionCard × n` + `usePreference` | 手装 |
 | `WizardPage` | `PageLayout` + `Stepper` + `FormView`/Stream 等待步 | 手装 |
 | `EventsPage` | backlog `useCollection` 定锚 × `useStream` 续订 × `EventFeed` | 手装 |
+
+- `SettingsSection.content` 允许自由 ReactNode（form grid、danger zone、
+  invitations、provider rows）；`items` 仍保留，`content` 存在时优先。
+  card-grid 版 `CollectionPage` 仍是应用层/页面模板，不在本次 preset 范围。
 
 `PresetProvider` 同时安装 surfaces 的 `ToastProvider`（`toast.*` viewport），
 这是反馈壳而不是数据 provider；QueryClient/Router/Scope 仍由应用拥有。
@@ -1726,7 +1757,9 @@ ui-shadcn / ui-plain (peer: React; type-only import surfaces.UiAdapter)
    结构 class 必须可被 `classNames` 槽覆盖。
    **Light/Dark**：`ui-shadcn/tokens.css` 同时提供 `:root` 亮色与 `.dark` 覆盖；
    surfaces Chrome 提供 `ThemeProvider` / `useTheme` / `ThemeToggle`（class + storage +
-   `themeScript()` 首屏脚本）。主题切换是应用策略，不是 core 原语。
+   `themeScript()` 首屏脚本）。`Theme` 包含 `system`，`resolvedTheme` 是解析后的
+   light/dark；system 监听 `prefers-color-scheme`，`toggle()` 写回显式 light/dark。
+   主题切换是应用策略，不是 core 原语。
 8. **v2 devtool/token profile 已删除**；copy-owned 改由 `uikit eject` 负责。
    `doctor` 只校验 UI adapter contract 是否齐全、token 变量是否定义。
 9. **`StatusBadge`/`StatusDot`/`StatCard` 的 `tone`** 映射到 `ok/warn/err/neutral`

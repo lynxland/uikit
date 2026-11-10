@@ -287,12 +287,7 @@ export function DokployProjectsPage({ from }: { from: string }) {
                       <div className="mt-auto flex items-center justify-between gap-2 pt-5 text-xs text-muted-foreground">
                         <span>
                           Created{" "}
-                          <RelativeTime
-                            locale="en"
-                            numeric="always"
-                            format="long"
-                            value={project.createdAt}
-                          />
+                          <RelativeTime locale="en" format="distance" value={project.createdAt} />
                         </span>
                         <span>
                           {count} {count === 1 ? "service" : "services"}

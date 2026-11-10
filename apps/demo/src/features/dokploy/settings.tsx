@@ -1,4 +1,5 @@
 import {
+  Avatar,
   EmptyState,
   PageLayout,
   SectionCard,
@@ -669,9 +670,7 @@ export function DokployProfilePage() {
           <SectionCard title="Account" description="Displayed across the dashboard.">
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-3">
-                <span className="inline-flex size-12 items-center justify-center rounded-full bg-[var(--secondary)] text-base font-semibold">
-                  AL
-                </span>
+                <Avatar alt={name} size={48} className="text-base" />
                 <div className="min-w-0">
                   <div className="inline-flex items-center gap-1.5 text-sm font-medium">
                     <User size={14} aria-hidden /> {name}

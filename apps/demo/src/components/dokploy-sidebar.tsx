@@ -1,4 +1,4 @@
-import { StatusDot, useTheme, useUiAdapter } from "@lynxland/uikit-surfaces";
+import { Avatar, StatusDot, useTheme, useUiAdapter } from "@lynxland/uikit-surfaces";
 import { useNavigate } from "@tanstack/react-router";
 import { Bell, ChevronsUpDown, Download } from "lucide-react";
 import { useState } from "react";
@@ -87,7 +87,7 @@ export function DokploySidebarHeader() {
 export function DokploySidebarFooter() {
   const ui = useUiAdapter();
   const navigate = useNavigate();
-  const { theme, toggle } = useTheme();
+  const { theme, resolvedTheme, setTheme, toggle } = useTheme();
   const [updateOpen, setUpdateOpen] = useState(false);
 
   return (
@@ -117,9 +117,7 @@ export function DokploySidebarFooter() {
             className="h-auto w-full justify-start gap-2 px-2 py-1.5"
             aria-label="Open account menu"
           >
-            <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--secondary)] text-[11px] font-semibold">
-              AL
-            </span>
+            <Avatar alt="Ada Lovelace" fallback="AL" size="sm" className="size-7 text-[11px]" />
             <span className="min-w-0 flex-1 text-left">
               <span className="block truncate text-xs font-semibold">Account</span>
               <span className="block truncate text-[11px] text-muted-foreground">
@@ -149,7 +147,13 @@ export function DokploySidebarFooter() {
             },
           },
           {
-            label: `Switch to ${theme === "dark" ? "light" : "dark"} theme`,
+            label: theme === "system" ? "System theme (active)" : "Use system theme",
+            disabled: theme === "system",
+            onSelect: () => setTheme("system"),
+            separator: true,
+          },
+          {
+            label: `Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`,
             onSelect: toggle,
           },
           { label: "Log out", disabled: true, separator: true },

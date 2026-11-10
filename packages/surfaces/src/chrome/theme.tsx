@@ -10,13 +10,16 @@ import {
 import { useUiAdapter } from "../adapter";
 import { cx } from "../values/classes";
 
-export type Theme = "light" | "dark";
+export type Theme = "light" | "dark" | "system";
+export type ResolvedTheme = "light" | "dark";
 
 export interface ThemeContextValue {
+  /** Stored preference, including `system`. */
   theme: Theme;
-  /** Currently identical to `theme`; kept for system-theme extensions. */
-  resolvedTheme: Theme;
+  /** The actual light/dark theme after resolving `system`. */
+  resolvedTheme: ResolvedTheme;
   setTheme(theme: Theme): void;
+  /** Switches the resolved theme and stores explicit light/dark (not system). */
   toggle(): void;
 }
 
@@ -36,7 +39,12 @@ export interface ThemeToggleProps {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function isTheme(value: unknown): value is Theme {
-  return value === "light" || value === "dark";
+  return value === "light" || value === "dark" || value === "system";
+}
+
+function systemPrefersDark(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
 /** Inline pre-paint script for SSR/static HTML (prevents a light flash). */
@@ -45,7 +53,11 @@ export function themeScript(options: { storageKey?: string; defaultTheme?: Theme
   const defaultTheme = options.defaultTheme ?? "dark";
   return `(() => {
   const stored = localStorage.getItem(${JSON.stringify(storageKey)});
-  const dark = stored === null ? ${defaultTheme === "dark"} : stored === "dark";
+  const theme = stored === null ? ${JSON.stringify(defaultTheme)} : stored;
+  const dark =
+    theme === "system"
+      ? window.matchMedia("(prefers-color-scheme: dark)").matches
+      : theme === "dark";
   document.documentElement.classList.toggle("dark", dark);
 })();`;
 }
@@ -57,33 +69,51 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof document === "undefined") return defaultTheme;
-    if (document.documentElement.classList.contains("dark")) return "dark";
     try {
       const stored = window.localStorage.getItem(storageKey);
       if (isTheme(stored)) return stored;
     } catch {
       // localStorage can be unavailable (privacy mode); fall through.
     }
+    if (document.documentElement.classList.contains("dark")) return "dark";
     return defaultTheme;
   });
+  const [systemDark, setSystemDark] = useState(systemPrefersDark);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
+    if (
+      theme !== "system" ||
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function"
+    ) {
+      return;
+    }
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = (event: MediaQueryListEvent) => setSystemDark(event.matches);
+    setSystemDark(media.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, [theme]);
+
+  const resolvedTheme: ResolvedTheme = theme === "system" ? (systemDark ? "dark" : "light") : theme;
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
     try {
       window.localStorage.setItem(storageKey, theme);
     } catch {
       // Best effort; the in-memory theme still applies.
     }
-  }, [theme, storageKey]);
+  }, [resolvedTheme, theme, storageKey]);
 
   const setTheme = useCallback((next: Theme) => setThemeState(next), []);
   const toggle = useCallback(
-    () => setThemeState((current) => (current === "dark" ? "light" : "dark")),
-    [],
+    () => setThemeState(resolvedTheme === "dark" ? "light" : "dark"),
+    [resolvedTheme],
   );
   const value = useMemo<ThemeContextValue>(
-    () => ({ theme, resolvedTheme: theme, setTheme, toggle }),
-    [theme, setTheme, toggle],
+    () => ({ theme, resolvedTheme, setTheme, toggle }),
+    [theme, resolvedTheme, setTheme, toggle],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
@@ -124,8 +154,14 @@ function MoonIcon() {
  */
 export function ThemeToggle({ className, showLabel = true }: ThemeToggleProps) {
   const ui = useUiAdapter();
-  const { theme, toggle } = useTheme();
-  const next = theme === "dark" ? "light" : "dark";
+  const { theme, resolvedTheme, toggle } = useTheme();
+  const next = resolvedTheme === "dark" ? "light" : "dark";
+  const label =
+    theme === "system"
+      ? `System · ${resolvedTheme === "dark" ? "Dark" : "Light"}`
+      : resolvedTheme === "dark"
+        ? "Dark"
+        : "Light";
   const merge = ui.cx ?? cx;
 
   return (
@@ -135,14 +171,14 @@ export function ThemeToggle({ className, showLabel = true }: ThemeToggleProps) {
       size="sm"
       className={merge("ui-theme-toggle", className)}
       aria-label={`Switch to ${next} theme`}
-      aria-pressed={theme === "dark"}
+      aria-pressed={resolvedTheme === "dark"}
       data-testid="theme-toggle"
       onClick={toggle}
     >
-      <span className="ui-theme-toggle__icon">{theme === "dark" ? <MoonIcon /> : <SunIcon />}</span>
-      {showLabel ? (
-        <span className="ui-theme-toggle__label">{theme === "dark" ? "Dark" : "Light"}</span>
-      ) : null}
+      <span className="ui-theme-toggle__icon">
+        {resolvedTheme === "dark" ? <MoonIcon /> : <SunIcon />}
+      </span>
+      {showLabel ? <span className="ui-theme-toggle__label">{label}</span> : null}
       <span className="ui-theme-toggle__hint">theme</span>
     </ui.Button>
   );

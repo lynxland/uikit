@@ -11,6 +11,7 @@ import {
   type MetricSeries,
   Progress,
   RelativeTime,
+  Separator,
   StatusDot,
   type StreamViewSource,
   useStreamFrames,
@@ -481,12 +482,7 @@ function GeneralTab({ service }: { service: Service }) {
             </InfoRow>
             <InfoRow label="Last deploy">
               {service.lastDeployAt !== undefined ? (
-                <RelativeTime
-                  locale="en"
-                  numeric="always"
-                  format="long"
-                  value={service.lastDeployAt}
-                />
+                <RelativeTime locale="en" format="distance" value={service.lastDeployAt} />
               ) : (
                 "never"
               )}
@@ -853,12 +849,7 @@ function DeploymentsTab({
               </div>
               <div className="flex flex-col items-end gap-2">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <RelativeTime
-                    locale="en"
-                    numeric="always"
-                    format="long"
-                    value={deployment.startedAt}
-                  />
+                  <RelativeTime locale="en" format="distance" value={deployment.startedAt} />
                   <span className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-1.5 py-0.5">
                     <Pause size={10} aria-hidden /> {formatDuration(deployment.durationMs)}
                   </span>
@@ -1007,24 +998,27 @@ export function LogsTab({ service }: { service: Service }) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex overflow-hidden rounded-md border border-[var(--border)] text-xs">
+              <div className="inline-flex overflow-hidden rounded-md border border-[var(--border)] text-xs">
                 <span className="bg-[var(--background)] px-2 py-1.5 text-muted-foreground">
                   Limit to
                 </span>
-                <span className="border-l border-[var(--border)] px-2 py-1.5">100 lines</span>
-              </span>
-              <span className="inline-flex overflow-hidden rounded-md border border-[var(--border)] text-xs">
+                <Separator orientation="vertical" className="self-stretch" />
+                <span className="px-2 py-1.5">100 lines</span>
+              </div>
+              <div className="inline-flex overflow-hidden rounded-md border border-[var(--border)] text-xs">
                 <span className="bg-[var(--background)] px-2 py-1.5 text-muted-foreground">
                   Time range
                 </span>
-                <span className="border-l border-[var(--border)] px-2 py-1.5">All time</span>
-              </span>
-              <span className="inline-flex overflow-hidden rounded-md border border-[var(--border)] text-xs">
+                <Separator orientation="vertical" className="self-stretch" />
+                <span className="px-2 py-1.5">All time</span>
+              </div>
+              <div className="inline-flex overflow-hidden rounded-md border border-[var(--border)] text-xs">
                 <span className="bg-[var(--background)] px-2 py-1.5 text-muted-foreground">
                   Log type
                 </span>
-                <span className="border-l border-[var(--border)] px-2 py-1.5">All</span>
-              </span>
+                <Separator orientation="vertical" className="self-stretch" />
+                <span className="px-2 py-1.5">All</span>
+              </div>
 
               <div className="ml-auto flex flex-wrap items-center gap-2">
                 <ui.Button type="button" size="sm" variant="secondary" onClick={copy}>

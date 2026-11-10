@@ -23,7 +23,10 @@ export interface FormPageProps<I extends object, O> {
   defaultValues?: Partial<I>;
   schema?: StandardSchemaV1<I>;
   onSuccess?: (payload: O) => void;
+  /** Page-header cancel slot (usually a Router `Link`). */
   cancel?: ReactNode;
+  /** Footer cancel handler; mirrors `FormView.cancel`/`Form.onCancel`. */
+  onCancel?: () => void;
   submitLabel?: string;
   scope?: Scope;
   entity?: CommandEntity;
@@ -42,6 +45,7 @@ export function FormPage<I extends object, O>({
   schema,
   onSuccess,
   cancel,
+  onCancel,
   submitLabel,
   scope,
   entity,
@@ -79,6 +83,7 @@ export function FormPage<I extends object, O>({
       <FormView
         form={form}
         fields={fields}
+        {...(onCancel !== undefined ? { cancel: onCancel } : {})}
         {...(submitLabel !== undefined ? { submitLabel } : {})}
       />
     </PageLayout>
