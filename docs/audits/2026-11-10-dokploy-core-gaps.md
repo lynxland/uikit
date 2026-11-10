@@ -454,3 +454,55 @@ corresponding CSS/duplicated implementation, and keeps `pnpm check` +
   the module queue is process-global (fine for one app root, not multi-tenant
   SSR); `CommandMenu.contentClassName` replaces the default popover
   width/padding class rather than layering on top of it.
+
+## 15. P0 batch 3 landed (2026-11-10)
+
+- [x] **6.7 CodeEditor** — `packages/surfaces/src/values/code-editor.tsx`:
+  dependency-free textarea + scroll-synced line-number gutter; `value`,
+  `onChange`, `language` metadata (`text|properties|yaml|json|shell|compose`),
+  `lineNumbers` (default true), `wrap` (default false), `readOnly`, `masked`,
+  `onMaskedChange` (renders the built-in reveal action), `minHeight`,
+  `placeholder`, `aria-label`, `className` and a `render` escape hatch for
+  CodeMirror/Monaco. Masking keeps the real value in the textarea, makes its
+  text transparent and paints an aria-hidden dot overlay with the same font,
+  padding and scroll offset, so reveal/hide never rewrites the draft and line
+  alignment survives. Demo Environment (properties, masked, external
+  `env-reveal`), Traefik (YAML, locked/unlocked) and Compose (read-only) all use
+  it; the `.dokploy-editor*` CSS is gone. E2E now asserts `data-masked` plus the
+  real draft value instead of expecting dot characters in `.value`.
+- [x] **6.8 MetricChart** — `showLegend` (default true), `showYAxis`,
+  `area`, `tooltip` (pointer guide + readout, default true), `unit`,
+  `thresholds`, optional `domain`, `series.color` and `series.formatValue`.
+  Colours no longer use `colorIndex`; a deterministic key hash assigns a
+  `--ui-chart-*` slot, and keys are sorted with collision probing so two series
+  in one chart differ while array reordering never recolours a line. An
+  sr-only per-series summary table backs the hover readout; `chart` remains the
+  Recharts/donut escape hatch. Demo MetricPanel uses y-axis, area for CPU/
+  memory, `unit="%"`, an 80% CPU threshold and 80% memory threshold.
+- [x] **6.9 InputGroup + SecretInput** — adapter `InputProps`/`TextareaProps`
+  gained `variant="default|bare"` in both `ui-shadcn` and `ui-plain` (bare drops
+  border/background/focus ring and padding). `InputGroup` is a semantic
+  `<fieldset>` frame with start/end addons, focus-within ring and
+  disabled/invalid propagation to the direct control. `SecretInput` composes
+  `InputGroup` + masked input + reveal + `CopyButton`; read-only values render
+  dots, editable values use `type=password`, and `onChange` always receives the
+  real draft. Demo `CredentialField` uses `InputGroup` for every read-only value
+  and `SecretInput` for passwords/connection URLs; `internal-password`,
+  `Reveal Password` and the masked/reveal e2e behaviour are preserved.
+  `SecretValue` remains the display-cell primitive.
+- [x] **Docs** — `docs/SKILL.md` §5.1 adapter variant, §5.2
+  credential/editor/chart examples; `docs/design.md` §6.1 InputGroup/
+  SecretInput + CodeEditor rules and the extended MetricChart/values list.
+- [x] **Verification** — `pnpm check` green (core 44, react 34, testing 7,
+  surfaces 132, ui-shadcn 33, ui-plain 28, preset 35, cli 5, spike 10);
+  `pnpm --filter demo build` green (only the existing >500 kB warning);
+  `pnpm --filter demo e2e` 18/18 green; Biome over
+  `packages/surfaces/src packages/ui-shadcn/src packages/ui-plain/src
+  apps/demo/src apps/demo/e2e` has no errors.
+- Remaining risks: the masked editor is a textarea overlay, not a syntax
+  highlighter, and `wrap` + line numbers can still misalign wrapped logical
+  lines (default is no-wrap); the overlay assumes monospace metrics. Chart
+  colours repeat after five implicit series (explicit `series.color` is the
+  way out) and the hover readout is pointer-only — keyboard/screen-reader users
+  get the sr-only summary table instead. InputGroup uses native `fieldset`
+  semantics, which also disable descendant addon buttons when `disabled`.

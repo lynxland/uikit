@@ -26,7 +26,9 @@ export {
   type FilterBarText,
 } from "./filter-bar";
 export { Form, type FormProps, type FormSubmitHandle } from "./form";
+export { InputGroup, type InputGroupProps } from "./input-group";
 export { Pager, type PagerLabels, type PagerPaging, type PagerProps } from "./pager";
+export { SecretInput, type SecretInputProps } from "./secret-input";
 export { Tabs, type TabsControlProps } from "./tabs";
 export {
   type CommandGroup,

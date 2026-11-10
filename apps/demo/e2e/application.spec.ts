@@ -22,8 +22,11 @@ test.describe("Dokploy application detail", () => {
     await page.getByRole("tab", { name: "Environment" }).click();
     await expect(page).toHaveURL(/tab=environment/);
     const editor = page.getByRole("textbox", { name: "Environment variables" });
-    await expect(editor).toHaveValue(/••••••/);
+    await expect(editor).toHaveAttribute("data-masked", "true");
+    await expect(editor).toHaveValue(/DATABASE_URL=postgres:\/\/atlas/);
+    await expect(editor).toHaveCSS("-webkit-text-security", "disc");
     await page.getByTestId("env-reveal").click();
+    await expect(editor).not.toHaveAttribute("data-masked", "true");
     await expect(editor).toHaveValue(/DATABASE_URL=postgres:\/\/atlas/);
 
     await page.getByRole("tab", { name: "Domains" }).click();

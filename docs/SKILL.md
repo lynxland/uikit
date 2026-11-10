@@ -364,6 +364,8 @@ import { shadcnAdapter } from "@lynxland/uikit-ui-shadcn";
 Router `<Link>` 渲染成按钮；`Tooltip` 的 `trigger` 同样按元素渲染，不嵌套按钮。
 `Tabs` 的 variant 为 `underline | pills | filter | segmented`。`Popover` 的
 `className` 只作用于内容面板（宽度/padding 逃生口），不作用于 trigger。
+`Input`/`Textarea` 的 `variant` 为 `default | bare`：`bare` 去掉自身边框/
+背景/焦点环，由 `InputGroup` 提供统一外框。
 具体 UI 库的 compound API 不泄漏到 surfaces。
 
 - 默认：`@lynxland/uikit-ui-shadcn`（Base UI 1.9 + shadcn）。
@@ -422,6 +424,49 @@ Router `<Link>` 渲染成按钮；`Tooltip` 的 `trigger` 同样按元素渲染�
   默认忽略 input/textarea/select/contenteditable）。
 - `RelativeTime` 默认 `Intl` short（`2 min. ago`）；`format="long"` 输出
   `2 minutes ago`，`numeric="always"` 可避免 “yesterday” 之类的自动措辞。
+
+**凭据、编辑器与指标图**（受控值组件/控件）：
+
+```tsx
+<InputGroup endAddon={<CopyButton value={url} label="Copy connection URL" />}>
+  <ui.Input variant="bare" readOnly value={url} aria-label="Connection URL" />
+</InputGroup>
+
+<SecretInput
+  label="Password"
+  value={password}
+  onChange={setPassword} // 永远收到真实值，不是圆点
+  masked
+/>
+
+<CodeEditor
+  value={env}
+  onChange={setEnv}
+  language="properties" // text | properties | yaml | json | shell | compose
+  masked={!revealed}
+  minHeight="22rem"
+  aria-label="Environment variables"
+/>
+
+<MetricChart
+  series={series} // series[].key 决定稳定颜色；series[].color 可覆盖
+  showYAxis
+  area
+  unit="%"
+  thresholds={[80]}
+  formatValue={(value) => value.toFixed(0)}
+/>
+```
+
+- `InputGroup` 的 `startAddon`/`endAddon` 放前缀、按钮；`disabled`/`invalid`
+  同时写到 group 状态和最内层控件。`SecretInput` = `InputGroup` + 遮罩 +
+  reveal/copy；只读遮罩显示圆点，可编辑遮罩用 `type=password` 且保留 draft。
+- `CodeEditor` 是 textarea + 行号 gutter 的零依赖实现；`language` 只是元数据，
+  不内置语法引擎。遮罩用 aria-hidden 圆点覆盖层（textarea 文本透明），
+  因此 reveal/hide 不重置 draft；需要 CodeMirror/Monaco 时用 `render` 逃生口。
+- `MetricChart` 颜色由 `series.key` 稳定推导（同图内会避让冲突），
+  `showYAxis/area/tooltip/unit/thresholds/series.formatValue` 都是可选增强；
+  SVG 下方始终有 sr-only 表格摘要，`chart` 仍可替换为 Recharts/donut。
 
 ### 5.3 Views
 

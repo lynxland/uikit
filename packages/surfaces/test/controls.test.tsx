@@ -1,17 +1,19 @@
 import type { FilterValue } from "@lynxland/uikit-core";
 import { ApiError } from "@lynxland/uikit-core";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { UiAdapterProvider } from "../src/adapter";
+import { UiAdapterProvider, useUiAdapter } from "../src/adapter";
 import {
   AsyncState,
   type Column,
   DataTable,
   FilterBar,
   Form,
+  InputGroup,
   Pager,
   type RowSelection,
+  SecretInput,
   Tabs,
 } from "../src/controls";
 import type { FilterField } from "../src/fields";
@@ -21,6 +23,11 @@ afterEach(cleanup);
 
 function withAdapter(node: ReactNode) {
   return <UiAdapterProvider adapter={testAdapter}>{node}</UiAdapterProvider>;
+}
+
+function SecretInputHarness() {
+  const [value, setValue] = useState("draft");
+  return <SecretInput aria-label="API key" value={value} onChange={setValue} />;
 }
 
 interface Row {
@@ -442,5 +449,80 @@ describe("Form", () => {
     expect(screen.getByText("custom footer")).toBeTruthy();
     fireEvent.submit(screen.getByLabelText("Name").closest("form") as HTMLFormElement);
     expect(handleSubmit).toHaveBeenCalled();
+  });
+});
+
+function AdapterInput(props: {
+  "aria-label"?: string;
+  disabled?: boolean;
+  "aria-invalid"?: boolean | "true" | "false";
+}) {
+  const ui = useUiAdapter();
+  return <ui.Input variant="bare" {...props} />;
+}
+
+describe("InputGroup", () => {
+  it("renders the group frame, addons and a bare control", () => {
+    render(
+      withAdapter(
+        <InputGroup startAddon={<span>https://</span>} endAddon={<span>copy</span>}>
+          <AdapterInput aria-label="Host" />
+        </InputGroup>,
+      ),
+    );
+    const group = screen.getByRole("group");
+    expect(group.className).toContain("ui-input-group");
+    expect(screen.getByText("https://")).toBeTruthy();
+    expect(screen.getByText("copy")).toBeTruthy();
+    const input = screen.getByRole("textbox", { name: "Host" });
+    expect(input.getAttribute("data-variant")).toBe("bare");
+  });
+
+  it("propagates disabled and invalid state", () => {
+    render(
+      withAdapter(
+        <InputGroup disabled invalid>
+          <AdapterInput aria-label="Secret" />
+        </InputGroup>,
+      ),
+    );
+    const group = screen.getByRole("group");
+    expect(group.getAttribute("data-disabled")).toBe("true");
+    expect(group.getAttribute("data-invalid")).toBe("true");
+    const input = screen.getByRole("textbox", { name: "Secret" }) as HTMLInputElement;
+    expect(input.disabled).toBe(true);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+  });
+});
+
+describe("SecretInput", () => {
+  it("masks read-only values, reveals in place and copies the real value", () => {
+    render(
+      withAdapter(<SecretInput label="Password" value="s3cret" readOnly testId="password-field" />),
+    );
+    const input = screen.getByTestId("password-field") as HTMLInputElement;
+    expect(input.value).toBe("••••••••••••");
+    expect(input.type).toBe("text");
+
+    fireEvent.click(screen.getByRole("button", { name: "Reveal Password" }));
+    expect(input.value).toBe("s3cret");
+    expect(screen.getByRole("button", { name: "Copy Password" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide Password" }));
+    expect(input.value).toBe("••••••••••••");
+  });
+
+  it("uses a password field for editable masked values and keeps the draft", () => {
+    render(withAdapter(<SecretInputHarness />));
+    const input = screen.getByLabelText("API key") as HTMLInputElement;
+    expect(input.type).toBe("password");
+    expect(input.value).toBe("draft");
+
+    fireEvent.change(input, { target: { value: "next-draft" } });
+    expect(input.value).toBe("next-draft");
+
+    fireEvent.click(screen.getByRole("button", { name: "Reveal API key" }));
+    expect(input.type).toBe("text");
+    expect(input.value).toBe("next-draft");
   });
 });

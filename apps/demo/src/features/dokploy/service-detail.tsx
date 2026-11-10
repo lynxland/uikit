@@ -1,13 +1,16 @@
 import { useRecord } from "@lynxland/uikit-react";
 import {
+  CodeEditor,
   CopyButton,
   ErrorState,
+  InputGroup,
   LoadingState,
+  SecretInput,
   StatusDot,
   useUiAdapter,
 } from "@lynxland/uikit-surfaces";
 import { useNavigate } from "@tanstack/react-router";
-import { Eye, EyeOff, Globe, Pencil, RefreshCw, Square, Terminal, Trash2 } from "lucide-react";
+import { Globe, Pencil, RefreshCw, Square, Terminal, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { BrandMark } from "@/components/brand-mark";
 import { DokployCard } from "@/components/page-card";
@@ -95,45 +98,40 @@ function CredentialField({
   label,
   value,
   masked = false,
-  secret = false,
   monospace = true,
   testId,
 }: {
   label: string;
   value: string;
   masked?: boolean;
-  secret?: boolean;
   monospace?: boolean;
   testId?: string;
 }) {
   const ui = useUiAdapter();
-  const [revealed, setRevealed] = useState(!secret);
-  const shown = revealed ? value : "••••••••••••••••";
   return (
     <div className="min-w-0">
       <div className="mb-1.5 text-xs font-medium">{label}</div>
-      <div className="flex min-w-0 items-center gap-1.5">
-        <ui.Input
-          aria-label={label}
+      {masked ? (
+        <SecretInput
+          label={label}
+          value={value}
           readOnly
-          value={shown}
-          className={monospace ? "font-mono text-xs" : undefined}
-          data-testid={testId}
+          masked
+          inputClassName={monospace ? "font-mono text-xs" : undefined}
+          {...(testId !== undefined ? { testId } : {})}
         />
-        {masked ? (
-          <ui.Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="size-8 shrink-0"
-            aria-label={revealed ? `Hide ${label}` : `Reveal ${label}`}
-            onClick={() => setRevealed((current) => !current)}
-          >
-            {revealed ? <EyeOff size={14} aria-hidden /> : <Eye size={14} aria-hidden />}
-          </ui.Button>
-        ) : null}
-        <CopyButton value={value} label={`Copy ${label}`} size="icon" className="size-8 shrink-0" />
-      </div>
+      ) : (
+        <InputGroup endAddon={<CopyButton value={value} label={`Copy ${label}`} />}>
+          <ui.Input
+            aria-label={label}
+            readOnly
+            variant="bare"
+            value={value}
+            className={monospace ? "font-mono text-xs" : undefined}
+            {...(testId !== undefined ? { "data-testid": testId } : {})}
+          />
+        </InputGroup>
+      )}
     </div>
   );
 }
@@ -153,20 +151,13 @@ function CredentialsCard({ service }: { service: Service }) {
         <div className="grid gap-4 md:grid-cols-2">
           <CredentialField label="User" value={user} monospace={false} />
           <CredentialField label="Database Name" value={database} monospace={false} />
-          <CredentialField
-            label="Password"
-            value={password}
-            masked
-            secret
-            testId="internal-password"
-          />
+          <CredentialField label="Password" value={password} masked testId="internal-password" />
           <CredentialField label="Internal Port (Container)" value={String(port)} />
           <CredentialField label="Internal Host" value={host} monospace={false} />
           <CredentialField
             label="Internal Connection URL"
             value={isRedis ? `redis://default:${password}@${host}:${port}` : internalUrl}
             masked
-            secret
           />
         </div>
       </Panel>
@@ -182,7 +173,6 @@ function CredentialsCard({ service }: { service: Service }) {
             label="External Connection URL"
             value={`postgresql://${user}:${password}@31.220.107.5:5432/${database}`}
             masked
-            secret
           />
         </div>
       </Panel>
@@ -191,21 +181,26 @@ function CredentialsCard({ service }: { service: Service }) {
 }
 
 function ComposeCard({ service }: { service: Service }) {
-  return (
-    <Panel
-      title="Compose File"
-      description={`/etc/dokploy/compose/${service.name}/docker-compose.yml`}
-    >
-      <pre className="overflow-auto rounded-lg border border-[var(--border)] bg-black/20 p-4 font-mono text-xs leading-relaxed text-foreground/90">
-        {`services:
+  const compose = `services:
   app:
     image: ghcr.io/${service.projectId.replace("proj-", "")}/${service.name}:latest
     restart: unless-stopped
     ports:
       - "80:3000"
     environment:
-      NODE_ENV: production`}
-      </pre>
+      NODE_ENV: production`;
+  return (
+    <Panel
+      title="Compose File"
+      description={`/etc/dokploy/compose/${service.name}/docker-compose.yml`}
+    >
+      <CodeEditor
+        value={compose}
+        language="compose"
+        readOnly
+        minHeight="14rem"
+        aria-label="Compose file"
+      />
     </Panel>
   );
 }

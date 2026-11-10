@@ -125,7 +125,7 @@ test.describe("Dokploy shell and home", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Traefik File System" }),
     ).toBeVisible();
-    await expect(page.getByLabel("Traefik configuration")).toContainText("providers:");
+    await expect(page.getByLabel("Traefik configuration")).toHaveValue(/providers:/);
 
     await page.goto("/dashboard/docker");
     await expect(page.getByRole("heading", { level: 1, name: "Docker Containers" })).toBeVisible();

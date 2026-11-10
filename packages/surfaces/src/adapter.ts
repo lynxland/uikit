@@ -20,9 +20,20 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   asChild?: boolean;
 }
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+/**
+ * `bare` drops the adapter's own border/background so a grouped control
+ * (`InputGroup`) can own the frame and focus ring. `default` keeps the
+ * standalone field styling.
+ */
+export type FieldControlVariant = "default" | "bare";
 
-export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  variant?: FieldControlVariant;
+}
+
+export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  variant?: FieldControlVariant;
+}
 
 export interface SelectOption {
   value: string;

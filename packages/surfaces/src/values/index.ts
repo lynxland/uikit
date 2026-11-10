@@ -1,6 +1,12 @@
 export { Alert, type AlertProps, type AlertTone } from "./alert";
 export type { ClassValue } from "./classes";
 export { cx } from "./classes";
+export {
+  CodeEditor,
+  type CodeEditorLanguage,
+  type CodeEditorProps,
+  type CodeEditorRenderProps,
+} from "./code-editor";
 export { CopyButton, type CopyButtonProps, type CopyState } from "./copy-button";
 export {
   type ChangedSpans,

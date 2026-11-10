@@ -178,6 +178,27 @@
   color: var(--muted-foreground);
 }
 
+/* Grouped control: the InputGroup surface owns the frame/focus ring. */
+.ui-plain-input--bare,
+.ui-plain-textarea--bare {
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ui-plain-input--bare:focus-visible,
+.ui-plain-textarea--bare:focus-visible {
+  outline: none;
+}
+
+.ui-plain-textarea--bare {
+  min-height: 0;
+  resize: none;
+}
+
 .ui-plain-input:disabled,
 .ui-plain-textarea:disabled,
 .ui-plain-select:disabled {

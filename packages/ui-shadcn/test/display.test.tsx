@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Badge, Button, Card, Field, Input, Table } from "../src";
+import { Badge, Button, Card, Field, Input, Table, Textarea } from "../src";
 import "./setup";
 
 describe("Badge", () => {
@@ -79,6 +79,37 @@ describe("Field", () => {
     const error = screen.getByText("Required");
     expect(error.getAttribute("data-slot")).toBe("field-error");
     expect(screen.queryByText("Used for alerts.")).toBeNull();
+  });
+});
+
+describe("Input / Textarea", () => {
+  it("renders standalone controls with the field frame", () => {
+    render(
+      <>
+        <Input aria-label="Name" />
+        <Textarea aria-label="Notes" rows={3} />
+      </>,
+    );
+    const input = screen.getByRole("textbox", { name: "Name" });
+    expect(input.className).toContain("border-[var(--input)]");
+    expect(input.getAttribute("data-variant")).toBe("default");
+    expect(screen.getByRole("textbox", { name: "Notes" }).className).toContain("min-h-20");
+  });
+
+  it("drops the frame for grouped controls", () => {
+    render(
+      <>
+        <Input aria-label="Grouped" variant="bare" />
+        <Textarea aria-label="Grouped notes" variant="bare" rows={2} />
+      </>,
+    );
+    const input = screen.getByRole("textbox", { name: "Grouped" });
+    expect(input.className).toContain("border-0");
+    expect(input.className).not.toContain("border-[var(--input)]");
+    expect(input.getAttribute("data-variant")).toBe("bare");
+    const textarea = screen.getByRole("textbox", { name: "Grouped notes" });
+    expect(textarea.className).toContain("resize-none");
+    expect(textarea.getAttribute("data-variant")).toBe("bare");
   });
 });
 

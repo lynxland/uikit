@@ -75,6 +75,21 @@ describe("Input / Textarea", () => {
     expect(textarea.className).toContain("ui-plain-textarea");
     expect(textarea.getAttribute("rows")).toBe("3");
   });
+
+  it("exposes a bare variant for grouped controls", () => {
+    render(
+      <>
+        <Input aria-label="Grouped" variant="bare" />
+        <Textarea aria-label="Grouped notes" variant="bare" />
+      </>,
+    );
+    const input = screen.getByRole("textbox", { name: "Grouped" });
+    expect(input.className).toContain("ui-plain-input--bare");
+    expect(input.getAttribute("data-variant")).toBe("bare");
+    const textarea = screen.getByRole("textbox", { name: "Grouped notes" });
+    expect(textarea.className).toContain("ui-plain-textarea--bare");
+    expect(textarea.getAttribute("data-variant")).toBe("bare");
+  });
 });
 
 describe("Field", () => {

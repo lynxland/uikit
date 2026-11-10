@@ -1,4 +1,4 @@
-import { Alert, PageLayout, useUiAdapter } from "@lynxland/uikit-surfaces";
+import { Alert, CodeEditor, PageLayout, useUiAdapter } from "@lynxland/uikit-surfaces";
 import {
   ArrowUpDown,
   Check,
@@ -53,7 +53,7 @@ export function DokployTraefikPage() {
   const [selected, setSelected] = useState("traefik.yml");
   const [unlocked, setUnlocked] = useState(false);
   const [copied, setCopied] = useState(false);
-  const lines = TRAEFIK_FILE.split("\n");
+  const [config, setConfig] = useState(TRAEFIK_FILE);
 
   return (
     <DokployCard>
@@ -98,7 +98,7 @@ export function DokployTraefikPage() {
                     type="button"
                     className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-xs"
                     onClick={() => {
-                      void navigator.clipboard?.writeText(TRAEFIK_FILE);
+                      void navigator.clipboard?.writeText(config);
                       setCopied(true);
                     }}
                   >
@@ -115,18 +115,14 @@ export function DokployTraefikPage() {
                 </div>
               </div>
             </div>
-            <div className="dokploy-editor">
-              <div className="dokploy-editor__gutter" aria-hidden="true">
-                {lines.map((_, index) => String(index + 1)).join("\n")}
-              </div>
-              <textarea
-                className="dokploy-editor__textarea"
-                aria-label="Traefik configuration"
-                readOnly={!unlocked}
-                defaultValue={TRAEFIK_FILE}
-                spellCheck={false}
-              />
-            </div>
+            <CodeEditor
+              value={config}
+              onChange={setConfig}
+              language="yaml"
+              readOnly={!unlocked}
+              minHeight="22rem"
+              aria-label="Traefik configuration"
+            />
           </div>
         </div>
       </PageLayout>

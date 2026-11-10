@@ -1,6 +1,7 @@
 import { useCollection, useRecord, useStream } from "@lynxland/uikit-react";
 import {
   Alert,
+  CodeEditor,
   CopyButton,
   EmptyState,
   ErrorState,
@@ -44,7 +45,7 @@ import {
   Wrench,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BrandMark } from "@/components/brand-mark";
 import { DokployCard } from "@/components/page-card";
 import {
@@ -497,13 +498,6 @@ function GeneralTab({ service }: { service: Service }) {
   );
 }
 
-function maskEnv(content: string): string {
-  return content
-    .split("\n")
-    .map((line) => "•".repeat(line.length))
-    .join("\n");
-}
-
 export function EnvironmentTab({ service }: { service: Service }) {
   const ui = useUiAdapter();
   const envVars = useCollection(envVarsEntity.collection!, {
@@ -514,16 +508,12 @@ export function EnvironmentTab({ service }: { service: Service }) {
   const [revealed, setRevealed] = useState(false);
   const [draft, setDraft] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const gutterRef = useRef<HTMLDivElement | null>(null);
 
   const initial = useMemo(
     () => envVars.rows.map((row) => `${row.key}=${row.value}`).join("\n"),
     [envVars.rows],
   );
   const content = draft ?? initial;
-  const visible = revealed ? content : maskEnv(content);
-  const lineCount = Math.max(visible.split("\n").length, 1);
-  const numbers = Array.from({ length: lineCount }, (_, index) => String(index + 1)).join("\n");
 
   useEffect(() => {
     setSaved(false);
@@ -547,27 +537,18 @@ export function EnvironmentTab({ service }: { service: Service }) {
         </ui.Button>
       }
     >
-      <div className="dokploy-editor">
-        <div ref={gutterRef} className="dokploy-editor__gutter" aria-hidden="true">
-          {numbers}
-        </div>
-        <textarea
-          className="dokploy-editor__textarea"
-          aria-label="Environment variables"
-          value={visible}
-          readOnly={!revealed}
-          spellCheck={false}
-          onChange={(event) => {
-            setDraft(event.target.value);
-            setSaved(false);
-          }}
-          onScroll={(event) => {
-            if (gutterRef.current !== null) {
-              gutterRef.current.scrollTop = event.currentTarget.scrollTop;
-            }
-          }}
-        />
-      </div>
+      <CodeEditor
+        value={content}
+        onChange={(next) => {
+          setDraft(next);
+          setSaved(false);
+        }}
+        language="properties"
+        masked={!revealed}
+        minHeight="22rem"
+        aria-label="Environment variables"
+        placeholder="KEY=value"
+      />
       <div className="mt-3 flex items-center justify-end gap-3">
         {saved ? (
           <span role="status" className="text-xs text-muted-foreground">
@@ -1117,12 +1098,18 @@ function MetricPanel({
   percent,
   series,
   formatValue,
+  unit,
+  area = false,
+  thresholds,
 }: {
   title: string;
   used: string;
   percent?: number;
   series: readonly MetricSeries[];
   formatValue: (value: number) => string;
+  unit?: string;
+  area?: boolean;
+  thresholds?: readonly number[];
 }) {
   return (
     <section className="dokploy-panel p-5">
@@ -1137,6 +1124,10 @@ function MetricPanel({
           height={150}
           formatValue={formatValue}
           ariaLabel={`${title} chart`}
+          showYAxis
+          area={area}
+          {...(unit !== undefined ? { unit } : {})}
+          {...(thresholds !== undefined ? { thresholds } : {})}
         />
       </div>
     </section>
@@ -1167,7 +1158,10 @@ export function MonitoringTab({ service }: { service: Service }) {
           used={`Used: ${cpu.toFixed(2)}%`}
           percent={cpu}
           series={metrics.cpu}
-          formatValue={(value) => `${value.toFixed(0)}%`}
+          formatValue={(value) => value.toFixed(0)}
+          unit="%"
+          area
+          thresholds={[80]}
         />
         <MetricPanel
           title="Memory Usage"
@@ -1175,6 +1169,8 @@ export function MonitoringTab({ service }: { service: Service }) {
           percent={(memory / memoryLimit) * 100}
           series={metrics.memory}
           formatValue={formatBytes}
+          area
+          thresholds={[memoryLimit * 0.8]}
         />
         <MetricPanel
           title="Block I/O"

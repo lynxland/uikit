@@ -134,47 +134,6 @@
     0 12px 32px rgb(0 0 0 / 0.08);
 }
 
-/* Code editor used by the Environment tab. */
-.dokploy-editor {
-  display: flex;
-  min-height: 22rem;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  background: color-mix(in oklab, var(--background) 94%, var(--foreground));
-}
-
-.dokploy-editor__gutter {
-  flex: none;
-  min-width: 2.75rem;
-  padding: 0.75rem 0.5rem;
-  overflow: hidden;
-  border-right: 1px solid color-mix(in oklab, var(--foreground) 6%, transparent);
-  color: color-mix(in oklab, var(--status-info) 72%, var(--muted-foreground));
-  font-family: var(--ui-font-mono);
-  font-size: 0.75rem;
-  line-height: 1.65;
-  text-align: right;
-  white-space: pre;
-  user-select: none;
-}
-
-.dokploy-editor__textarea {
-  flex: 1;
-  min-width: 0;
-  min-height: 22rem;
-  padding: 0.75rem;
-  border: 0;
-  outline: none;
-  background: transparent;
-  color: var(--foreground);
-  font-family: var(--ui-font-mono);
-  font-size: 0.75rem;
-  line-height: 1.65;
-  resize: vertical;
-  tab-size: 2;
-}
-
 /* Monitoring cards mimic Dokploy's flat, near-background panels. */
 .dokploy-panel {
   border: 1px solid var(--border);

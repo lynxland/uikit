@@ -3,29 +3,35 @@ import { forwardRef } from "react";
 import { cx } from "./cx";
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { className, type = "text", ...props },
+  { className, type = "text", variant = "default", ...props },
   ref,
 ) {
   return (
     <input
       ref={ref}
       type={type}
-      className={cx("ui-plain-input", className)}
+      className={cx("ui-plain-input", variant === "bare" && "ui-plain-input--bare", className)}
       data-slot="input"
+      data-variant={variant}
       {...props}
     />
   );
 });
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
-  { className, ...props },
+  { className, variant = "default", ...props },
   ref,
 ) {
   return (
     <textarea
       ref={ref}
-      className={cx("ui-plain-textarea", className)}
+      className={cx(
+        "ui-plain-textarea",
+        variant === "bare" && "ui-plain-textarea--bare",
+        className,
+      )}
       data-slot="textarea"
+      data-variant={variant}
       {...props}
     />
   );

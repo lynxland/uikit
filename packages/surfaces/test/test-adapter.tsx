@@ -74,12 +74,24 @@ function Button({
   );
 }
 
-function Input({ className, ...rest }: InputProps) {
-  return <input {...rest} className={join("test-input", className)} />;
+function Input({ className, variant = "default", ...rest }: InputProps) {
+  return (
+    <input
+      {...rest}
+      className={join("test-input", variant === "bare" && "test-input--bare", className)}
+      data-variant={variant}
+    />
+  );
 }
 
-function Textarea({ className, ...rest }: TextareaProps) {
-  return <textarea {...rest} className={join("test-textarea", className)} />;
+function Textarea({ className, variant = "default", ...rest }: TextareaProps) {
+  return (
+    <textarea
+      {...rest}
+      className={join("test-textarea", variant === "bare" && "test-textarea--bare", className)}
+      data-variant={variant}
+    />
+  );
 }
 
 function Select({

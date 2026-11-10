@@ -987,6 +987,49 @@ export interface FilterField {
 - 不新增 adapter `Command` 基元；`Command` 名字属于数据写原语。
 - 选择动作由调用方 `onSelect` 完成，控件不 import Router。
 
+#### InputGroup / SecretInput
+
+```tsx
+<InputGroup endAddon={<CopyButton value={url} label="Copy connection URL" />}>
+  <ui.Input variant="bare" readOnly value={url} aria-label="Connection URL" />
+</InputGroup>
+
+<SecretInput label="Password" value={password} onChange={setPassword} masked />
+```
+
+- adapter 的 `Input`/`Textarea` 增加 `variant="default" | "bare"`；`bare` 去掉自身
+  边框/背景/焦点环，由 `InputGroup` 统一提供外框、focus-within ring、invalid 与
+  disabled 状态。`InputGroup` 本身不取数、不碰 Router。
+- `InputGroup` 收单个 input/textarea + `startAddon`/`endAddon`；`disabled`/`invalid`
+  同时写 group 状态与直接控件（`data-*`、`aria-disabled`、`aria-invalid`）。
+- `SecretInput` 是受控值（`value`/`onChange` 收真实值）+ reveal + `CopyButton`；
+  只读遮罩显示圆点，可编辑遮罩用 `type=password`，reveal 不重置 draft。
+  表格/详情展示仍用 `SecretValue`，一次性命令结果用 `SecretReveal`。
+
+#### CodeEditor
+
+```tsx
+<CodeEditor
+  value={env}
+  onChange={setEnv}
+  language="properties" // text | properties | yaml | json | shell | compose
+  lineNumbers
+  wrap={false}
+  masked={!revealed}
+  minHeight="22rem"
+  aria-label="Environment variables"
+/>
+```
+
+- surfaces 自带的零依赖实现：textarea + 行号 gutter（滚动同步），`language`
+  只是元数据，不内置语法引擎；`render({ value, onChange, language, … })`
+  是 CodeMirror/Monaco 的可选逃生口。
+- `masked` 不修改 `value`：textarea 文本透明 + aria-hidden 圆点覆盖层，
+  reveal/hide 只切展示；`onMaskedChange` 存在时渲染内置 reveal 按钮，
+  否则由消费方控制（例如页面 header 的 reveal action）。
+- `lineNumbers` 默认 true，`wrap` 默认 false（保证 gutter/遮罩行对齐）；
+  `readOnly`、`placeholder`、`minHeight`、`className` 与控制台编辑器共用。
+
 #### AsyncState
 
 ```tsx
@@ -1023,7 +1066,12 @@ export interface FilterField {
   （info/success/warning/danger + 可选 title/description/icon/action + `live`）、
   `Progress`（value/max/tone/indeterminate/label）、`RelativeTime`、`Kbd`、
   `CopyButton`、`SecretReveal`、`DiffView`、`JsonField`、`StatCard`、`MetricChart`、
-  `FieldValue`、`LoadingState`/`EmptyState`/`ErrorState`。
+  `CodeEditor`、`FieldValue`、`LoadingState`/`EmptyState`/`ErrorState`。
+- `MetricChart` 的 series 颜色由 `series.key` 稳定推导（同图内避让冲突），
+  `series.color` 显式覆盖；增强项为 `showLegend`（默认 true）、`showYAxis`、
+  `area`、`tooltip`（pointer 竖线 + readout）、`unit`、`thresholds`、`domain`、
+  `series.formatValue`。SVG 下方始终输出 sr-only 表格摘要；`chart` 仍可替换为
+  Recharts/donut，surfaces 不新增图表依赖。
 - `ToastProvider` / `useToast` / 命令式 `toast.*` 是 surfaces 级反馈队列：
   viewport 用 `aria-live`，支持关闭、duration、hover/focus 暂停与栈上限；
   不需要 adapter toast 基元。`PresetProvider` 默认安装 viewport。
@@ -1572,7 +1620,7 @@ ui-shadcn / ui-plain (peer: React; type-only import surfaces.UiAdapter)
    | 基元 | 受控 props（最小） | 说明 |
    |---|---|---|
    | Button | `variant/size/disabled/loading/onClick/children` | 受控按钮 |
-   | Input / Textarea | `value/onChange/placeholder/type/disabled` | 原生控件语义 |
+   | Input / Textarea | `value/onChange/placeholder/type/disabled/variant` | 原生控件语义；`variant="bare"` 供 InputGroup 去边框 |
    | Select | `value/onValueChange/options/placeholder/disabled` | 不暴露 Base UI compound API |
    | Checkbox | `checked/onCheckedChange/disabled` | `boolean \| "indeterminate"` |
    | DateTimeInput | `value/onChange/disabled/min/max` | 值用 `YYYY-MM-DDTHH:mm`；adapter 自绘 picker，不依赖原生弹窗 |
