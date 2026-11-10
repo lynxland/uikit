@@ -57,6 +57,7 @@ function RadioRun({ entries }: { entries: readonly RadioEntry[] }) {
           disabled={item.disabled}
           closeOnClick
           onClick={item.onSelect}
+          data-testid={item.testId}
           className={cx(checkableClass, dangerClass(item))}
         >
           {itemContent(item)}
@@ -126,6 +127,7 @@ function renderMenuItems(items: readonly MenuItem[]): ReactNode[] {
           disabled={item.disabled}
           onClick={item.onSelect}
           onCheckedChange={(checked) => item.onCheckedChange?.(checked)}
+          data-testid={item.testId}
           className={cx(checkableClass, dangerClass(item))}
         >
           {itemContent(item)}
@@ -142,6 +144,7 @@ function renderMenuItems(items: readonly MenuItem[]): ReactNode[] {
         <BaseMenu.SubmenuRoot key={index}>
           <BaseMenu.SubmenuTrigger
             disabled={item.disabled}
+            data-testid={item.testId}
             className={cx(itemClass, dangerClass(item))}
           >
             {itemContent(item)}
@@ -164,6 +167,7 @@ function renderMenuItems(items: readonly MenuItem[]): ReactNode[] {
         key={index}
         disabled={item.disabled}
         onClick={item.onSelect}
+        data-testid={item.testId}
         className={cx(itemClass, dangerClass(item))}
       >
         {itemContent(item)}

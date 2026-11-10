@@ -559,3 +559,61 @@ corresponding CSS/duplicated implementation, and keeps `pnpm check` +
   inner `.ui-section-card__body` wrapper. `SectionCard` titles render through
   the adapter’s `Card` heading (`h3`), which is why the demo e2e now asserts
   the heading by name rather than level.
+
+## 17. P1-B data-display controls landed (2026-11-10)
+
+- [x] **ColumnPicker** — `packages/surfaces/src/controls/column-picker.tsx`:
+  controlled `columns` (`id`/`label`/`hideable`), `visibility`
+  (`Record<string, boolean>`, same shape as `DataTable.columnVisibility`),
+  `onVisibilityChange`, `triggerLabel` (default “Columns”), `align`,
+  `className`. Reuses adapter `Menu` checkbox items; absent visibility keys are
+  visible and `hideable: false` renders checked + disabled. `MenuItem.testId`
+  was added (both adapters) so the menu item itself carries
+  `data-testid="column-toggle-<id>"`; the trigger is `columns-picker`. Demo
+  Docker and Requests tables now conditionally render headers/cells; Docker
+  hides Image/State/Status while Name stays fixed, Requests hides Level/Time
+  while Message stays fixed.
+- [x] **LogViewer slots** — `renderLine(frame, index): ReactNode` renders rich
+  content inside the view-owned line wrapper (`data-line` stays on the wrapper);
+  `toolbar` is a full-width row between the header and the log body while the
+  built-in follow/pause/download/clear controls remain; `hideHeader` hides the
+  header + toolbar and leaves pause/follow to the caller. `formatLine`, `limit`
+  and download behaviour are unchanged. Demo LogsTab uses `renderLine` for the
+  coloured timestamp/level lines and `toolbar` for the container select,
+  Native switch, limit/time/log-type chips, search and Copy/AI actions; the
+  filtered stream keeps a cached snapshot so `useSyncExternalStore` does not
+  loop, and pause/resume/download/clear come from LogViewer. Selectors
+  `log-viewer`, `log-toolbar`, `log-status`, `log-pause`, `log-download` remain.
+- [x] **FileTree** — controlled `items`
+  (`{ id, label, type, icon?, children? }`), `expanded`/`onExpandedChange`,
+  `selected`/`onSelect`, `folderIcon`/`fileIcon`, `className`, `aria-label`.
+  WAI-ARIA tree keyboard: ArrowUp/Down, Home/End, ArrowRight expand or enter
+  first child, ArrowLeft collapse or move to parent, Enter/Space select; emits
+  `role="tree"`/`treeitem`/`group`, `aria-level`, `aria-expanded`,
+  `aria-selected`, roving tabindex. Demo Traefik replaces the static folder
+  markup; selecting `traefik.yml` keeps the editor and path behaviour.
+- [x] **DateRangePicker** — controlled date-only `{ start?, end? }` strings
+  (`YYYY-MM-DD`), optional `presets` (plain data), trigger label formatting,
+  adapter `Popover` + two `Input type="date"` (no calendar dependency), Clear
+  action and `date-range-picker`/`date-range-start`/`date-range-end`/
+  `date-range-preset-<n>` test ids. Demo Requests replaces the old toggle
+  button; “Reset to Last 3 Days” remains and presets update the same state.
+- [x] **Docs** — `docs/SKILL.md` §5.1 Menu `testId`, §5.2 ColumnPicker/FileTree/
+  DateRangePicker + LogViewer slots; `docs/design.md` §6.1 control contracts,
+  stream-view LogViewer rules and source tree listing updated.
+- [x] **Verification** — `pnpm check` green (core 44, react 34, testing 7,
+  surfaces 144, ui-shadcn 41, ui-plain 38, preset 35, cli 5, spike 10);
+  `pnpm --filter demo build` green (existing >500 kB warning only);
+  `pnpm --filter demo e2e` 20/20 green; Biome over
+  `packages/surfaces/src packages/ui-shadcn/src packages/ui-plain/src
+  apps/demo/src apps/demo/e2e` has no errors (only pre-existing CSS
+  descending-specificity warnings).
+- Remaining risks: `ColumnPicker` relies on the adapter Menu staying open for
+  checkbox items (both adapters implement this; a custom adapter must too);
+  `FileTree` uses roving tabindex on a div `role="treeitem"` rather than native
+  buttons, so adapters must keep the focus ring visible; `LogViewer.toolbar` is
+  a full-width row, not a replacement for the built-in controls, and
+  `hideHeader` deliberately removes the built-in state readout;
+  `DateRangePicker` is date-only (no timezone/time-of-day) and presets are
+  static data, not relative-date helpers. No remaining P1 item from §6 is
+  unaddressed.

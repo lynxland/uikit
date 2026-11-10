@@ -958,6 +958,56 @@ export interface FilterField {
 - 空尾页仍渲染分页栏；Prev 在首页禁用。
 - 页大小切换保留游标/位置语义，由 `useCollectionPage` 实现。
 
+#### ColumnPicker / FileTree / DateRangePicker
+
+```tsx
+<ColumnPicker
+  columns={[
+    { id: "name", label: "Name", hideable: false },
+    { id: "image", label: "Image" },
+  ]}
+  visibility={visibility}
+  onVisibilityChange={setVisibility}
+/>
+
+<FileTree
+  items={[
+    {
+      id: "dynamic",
+      label: "dynamic",
+      type: "directory",
+      children: [{ id: "traefik.yml", label: "traefik.yml", type: "file" }],
+    },
+  ]}
+  expanded={expanded}
+  onExpandedChange={setExpanded}
+  selected={selected}
+  onSelect={(id, item) => item.type === "file" && setSelected(id)}
+  folderIcon={<FolderIcon />}
+  fileIcon={<FileIcon />}
+  aria-label="Traefik files"
+/>
+
+<DateRangePicker
+  start={range.start}
+  end={range.end}
+  onChange={setRange}
+  presets={[{ label: "Last 7 days", start: "2026-07-01", end: "2026-07-08" }]}
+/>
+```
+
+- `ColumnPicker` 复用 adapter `Menu` 的 checkbox item；`visibility` 与
+  `DataTable.columnVisibility` 同形（缺省 key = 可见），`hideable: false`
+  渲染为 checked + disabled。它不拥有状态，也不取数。
+- `FileTree` 是受控树：`expanded`/`selected` 由调用方持有；键盘遵循
+  WAI-ARIA tree（ArrowUp/Down、Home/End、ArrowRight 展开/首子项、ArrowLeft
+  收起/父项、Enter/Space 选择），`aria-level`/`aria-expanded`/`aria-selected`
+  与嵌套 `role="group"` 由控件输出。图标默认是内置 SVG，可用
+  `folderIcon`/`fileIcon` 或 item `icon` 覆盖。
+- `DateRangePicker` 只处理日期字符串（`YYYY-MM-DD`），不引入日历库；
+  两个 `Input type="date"` + 可选 presets，通过 adapter `Popover` 承载，
+  `onChange` 始终收到 `{ start?, end? }`。
+
 #### Tabs
 
 ```tsx
@@ -1146,6 +1196,12 @@ export interface FilterField {
 - `LogViewer`、`EventFeed`、`StageTimeline` 是视图；消费 `StreamHandle`。
 - 帧订阅在视图内完成（`subscribeFrames/getFrames`），页面级只读状态。
 - `LogViewer` 的跟随/暂停/下载/清空是视图内交互；虚拟滚动是视图内实现。
+- `LogViewer` 的行有两个逃生口：`formatLine(frame,index): string` 用于纯文本
+  和下载，`renderLine(frame,index): ReactNode` 用于彩色级别/时间戳等富行；
+  行外壳与 `data-line` 仍由视图提供。`toolbar` 是 header 与日志体之间的
+  整行插槽（内置 follow/pause/download/clear 不受影响）；`hideHeader` 隐藏
+  整个 header + toolbar，此时调用方自己渲染工具栏并负责 pause/follow。
+  `limit` 在过滤/渲染前截取最新 N 帧，下载使用同一窗口和 `formatLine`。
 
 ### 6.3 壳（L6 Chrome）
 
@@ -1448,7 +1504,7 @@ packages/
 
   surfaces/            @lynxland/uikit-surfaces
     src/values/        纯值视图
-    src/controls/      DataTable/FilterBar/Pager/Tabs/Form/FieldInputs/...
+    src/controls/      DataTable/FilterBar/Pager/Tabs/Form/FieldInputs/ColumnPicker/FileTree/DateRangePicker/...
     src/views/         CollectionView/RecordView/FormView/LogViewer/EventFeed/...
     src/chrome/        PageLayout/AppShell/SectionCard/...
     src/fields/        FieldView/FieldInput/FilterField/CrudFields

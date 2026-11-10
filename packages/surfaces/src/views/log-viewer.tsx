@@ -20,6 +20,12 @@ import {
 export interface LogViewerProps<F> {
   stream: StreamViewSource<F>;
   formatLine?: (frame: F, index: number) => string;
+  /** Rich line renderer; rendered inside the line wrapper and takes precedence over `formatLine`. */
+  renderLine?: (frame: F, index: number) => ReactNode;
+  /** Extra controls rendered as a full-width row between the header and the log body. */
+  toolbar?: ReactNode;
+  /** Hide the built-in header and toolbar; the caller owns follow/pause controls. */
+  hideHeader?: boolean;
   /** Render cap: only the newest N frames are shown (default 500). */
   limit?: number;
   height?: number;
@@ -34,6 +40,9 @@ export interface LogViewerProps<F> {
 export function LogViewer<F>({
   stream,
   formatLine,
+  renderLine,
+  toolbar,
+  hideHeader = false,
   limit = 500,
   height = 420,
   wrap = true,
@@ -73,59 +82,69 @@ export function LogViewer<F>({
   };
 
   return (
-    <div className={merge("ui-log-viewer", className)} data-testid="log-viewer">
-      <div className="ui-log-viewer__header">
-        <div className="ui-log-viewer__heading">
-          <span className="ui-log-viewer__title">{title}</span>
-          <span data-testid="log-status">
-            <StatusBadge status={state.status} map={STREAM_STATUS_TONES} />
-          </span>
-          <span className="ui-log-viewer__count" data-testid="log-count">
-            {visible.length} / {frames.length} lines
-          </span>
-        </div>
-        <div className="ui-log-viewer__controls">
-          <ui.Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setFollowing((current) => !current)}
-            aria-pressed={following}
-            data-testid="log-follow"
-          >
-            {following ? "Following" : "Follow"}
-          </ui.Button>
-          <ui.Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => (paused ? stream.resume() : stream.pause())}
-            data-testid="log-pause"
-          >
-            {paused ? "Resume" : "Pause"}
-          </ui.Button>
-          {downloadFileName !== undefined ? (
+    <div
+      className={merge("ui-log-viewer", hideHeader && "ui-log-viewer--no-header", className)}
+      data-testid="log-viewer"
+    >
+      {hideHeader ? null : (
+        <div className="ui-log-viewer__header">
+          <div className="ui-log-viewer__heading">
+            <span className="ui-log-viewer__title">{title}</span>
+            <span data-testid="log-status">
+              <StatusBadge status={state.status} map={STREAM_STATUS_TONES} />
+            </span>
+            <span className="ui-log-viewer__count" data-testid="log-count">
+              {visible.length} / {frames.length} lines
+            </span>
+          </div>
+          <div className="ui-log-viewer__controls">
             <ui.Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={download}
-              data-testid="log-download"
+              onClick={() => setFollowing((current) => !current)}
+              aria-pressed={following}
+              data-testid="log-follow"
             >
-              Download
+              {following ? "Following" : "Follow"}
             </ui.Button>
-          ) : null}
-          <ui.Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => stream.clear()}
-            data-testid="log-clear"
-          >
-            Clear
-          </ui.Button>
+            <ui.Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => (paused ? stream.resume() : stream.pause())}
+              data-testid="log-pause"
+            >
+              {paused ? "Resume" : "Pause"}
+            </ui.Button>
+            {downloadFileName !== undefined ? (
+              <ui.Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={download}
+                data-testid="log-download"
+              >
+                Download
+              </ui.Button>
+            ) : null}
+            <ui.Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => stream.clear()}
+              data-testid="log-clear"
+            >
+              Clear
+            </ui.Button>
+          </div>
         </div>
-      </div>
+      )}
+      {!hideHeader && toolbar !== undefined ? (
+        <div className="ui-log-viewer__toolbar" data-testid="log-toolbar">
+          {toolbar}
+        </div>
+      ) : null}
       <div
         ref={containerRef}
         className={merge("ui-log-viewer__body", !wrap && "ui-log-viewer__body--nowrap")}
@@ -143,7 +162,9 @@ export function LogViewer<F>({
           visible.map((frame, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: log lines are append-only; position is their identity
             <div key={offset + index} className="ui-log-viewer__line" data-line={offset + index}>
-              {format(frame, offset + index)}
+              {renderLine !== undefined
+                ? renderLine(frame, offset + index)
+                : format(frame, offset + index)}
             </div>
           ))
         )}

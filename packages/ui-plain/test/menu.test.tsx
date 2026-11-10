@@ -16,7 +16,10 @@ describe("plain Menu", () => {
       <Menu
         aria-label="Project actions"
         trigger={trigger}
-        items={[{ label: "Open", onSelect: onOpen }, { label: "Delete", danger: true }]}
+        items={[
+          { label: "Open", onSelect: onOpen },
+          { label: "Delete", danger: true },
+        ]}
       />,
     );
 
@@ -57,7 +60,13 @@ describe("plain Menu", () => {
       <Menu
         trigger={trigger}
         items={[
-          { kind: "checkbox", label: "Production", checked: false, onCheckedChange },
+          {
+            kind: "checkbox",
+            label: "Production",
+            checked: false,
+            onCheckedChange,
+            testId: "toggle-production",
+          },
           { kind: "checkbox", label: "Staging", checked: true, onCheckedChange },
         ]}
       />,
@@ -66,9 +75,10 @@ describe("plain Menu", () => {
     fireEvent.click(screen.getByRole("button", { name: "Actions" }));
     const production = await screen.findByRole("menuitemcheckbox", { name: "Production" });
     expect(production.getAttribute("aria-checked")).toBe("false");
-    expect(screen.getByRole("menuitemcheckbox", { name: "Staging" }).getAttribute("aria-checked")).toBe(
-      "true",
-    );
+    expect(production.getAttribute("data-testid")).toBe("toggle-production");
+    expect(
+      screen.getByRole("menuitemcheckbox", { name: "Staging" }).getAttribute("aria-checked"),
+    ).toBe("true");
 
     fireEvent.click(production);
     expect(onCheckedChange).toHaveBeenCalledWith(true);
@@ -101,11 +111,7 @@ describe("plain Menu", () => {
     render(
       <Menu
         trigger={trigger}
-        items={[
-          { label: "First" },
-          { label: "Second" },
-          { label: "Third" },
-        ]}
+        items={[{ label: "First" }, { label: "Second" }, { label: "Third" }]}
       />,
     );
 

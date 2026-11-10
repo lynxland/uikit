@@ -1,8 +1,20 @@
-import { Alert, CodeEditor, PageLayout, useUiAdapter } from "@lynxland/uikit-surfaces";
+import {
+  Alert,
+  CodeEditor,
+  ColumnPicker,
+  type ColumnPickerColumn,
+  type ColumnVisibility,
+  DateRangePicker,
+  type DateRangePreset,
+  type DateRangeValue,
+  FileTree,
+  type FileTreeItem,
+  PageLayout,
+  useUiAdapter,
+} from "@lynxland/uikit-surfaces";
 import {
   ArrowUpDown,
   Check,
-  ChevronRight,
   CircleAlert,
   Clock,
   Copy,
@@ -49,8 +61,18 @@ certificatesResolvers:
       httpChallenge:
         entryPoint: web`;
 
+const TRAEFIK_TREE: readonly FileTreeItem[] = [
+  {
+    id: "dynamic",
+    label: "dynamic",
+    type: "directory",
+    children: [{ id: "traefik.yml", label: "traefik.yml", type: "file" }],
+  },
+];
+
 export function DokployTraefikPage() {
   const [selected, setSelected] = useState("traefik.yml");
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(["dynamic"]));
   const [unlocked, setUnlocked] = useState(false);
   const [copied, setCopied] = useState(false);
   const [config, setConfig] = useState(TRAEFIK_FILE);
@@ -71,19 +93,18 @@ export function DokployTraefikPage() {
 
         <div className="grid gap-4 lg:grid-cols-[17rem_minmax(0,1fr)]">
           <div className="rounded-xl border border-[var(--border)] p-2">
-            <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
-              <ChevronRight size={12} className="text-muted-foreground" aria-hidden />
-              <Folder size={14} className="text-muted-foreground" aria-hidden />
-              dynamic
-            </div>
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-md bg-[var(--foreground)]/8 px-2 py-1.5 pl-7 text-sm"
-              onClick={() => setSelected("traefik.yml")}
-            >
-              <FileCode size={14} className="text-muted-foreground" aria-hidden />
-              traefik.yml
-            </button>
+            <FileTree
+              items={TRAEFIK_TREE}
+              expanded={expanded}
+              onExpandedChange={setExpanded}
+              selected={selected}
+              onSelect={(id, item) => {
+                if (item.type === "file") setSelected(id);
+              }}
+              folderIcon={<Folder size={14} aria-hidden />}
+              fileIcon={<FileCode size={14} aria-hidden />}
+              aria-label="Traefik files"
+            />
           </div>
 
           <div className="min-w-0">
@@ -187,9 +208,18 @@ const CONTAINERS = [
   },
 ] as const;
 
+const DOCKER_COLUMNS: readonly ColumnPickerColumn[] = [
+  { id: "name", label: "Name", hideable: false },
+  { id: "state", label: "State" },
+  { id: "status", label: "Status" },
+  { id: "image", label: "Image" },
+];
+
 export function DokployDockerPage() {
   const ui = useUiAdapter();
   const [query, setQuery] = useState("");
+  const [visibility, setVisibility] = useState<ColumnVisibility>({});
+  const show = (id: string) => visibility[id] !== false;
   const rows = CONTAINERS.filter((row) =>
     `${row.name} ${row.image}`.toLowerCase().includes(query.trim().toLowerCase()),
   );
@@ -203,9 +233,11 @@ export function DokployDockerPage() {
         title="Docker Containers"
         description="See all the containers of your dokploy server"
         actions={
-          <ui.Button type="button" size="sm" variant="outline">
-            Columns
-          </ui.Button>
+          <ColumnPicker
+            columns={DOCKER_COLUMNS}
+            visibility={visibility}
+            onVisibilityChange={setVisibility}
+          />
         }
       >
         <div className="flex items-center gap-3">
@@ -224,27 +256,54 @@ export function DokployDockerPage() {
           <table className="w-full min-w-[54rem] text-sm">
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-xs text-muted-foreground">
-                {["Name", "State", "Status", "Image"].map((label) => (
-                  <th key={label} className="px-4 py-3 font-medium">
+                {show("name") ? (
+                  <th className="px-4 py-3 font-medium">
                     <span className="inline-flex items-center gap-1">
-                      {label} <ArrowUpDown size={11} aria-hidden />
+                      Name <ArrowUpDown size={11} aria-hidden />
                     </span>
                   </th>
-                ))}
+                ) : null}
+                {show("state") ? (
+                  <th className="px-4 py-3 font-medium">
+                    <span className="inline-flex items-center gap-1">
+                      State <ArrowUpDown size={11} aria-hidden />
+                    </span>
+                  </th>
+                ) : null}
+                {show("status") ? (
+                  <th className="px-4 py-3 font-medium">
+                    <span className="inline-flex items-center gap-1">
+                      Status <ArrowUpDown size={11} aria-hidden />
+                    </span>
+                  </th>
+                ) : null}
+                {show("image") ? (
+                  <th className="px-4 py-3 font-medium">
+                    <span className="inline-flex items-center gap-1">
+                      Image <ArrowUpDown size={11} aria-hidden />
+                    </span>
+                  </th>
+                ) : null}
                 <th className="w-10 px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.name} className="border-b border-[var(--border)] last:border-b-0">
-                  <td className="px-4 py-3 font-mono text-xs">{row.name}</td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex rounded-full bg-[var(--foreground)] px-2 py-0.5 text-[11px] font-medium text-[var(--background)]">
-                      {row.state}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs">{row.status}</td>
-                  <td className="px-4 py-3 font-mono text-xs">{row.image}</td>
+                  {show("name") ? (
+                    <td className="px-4 py-3 font-mono text-xs">{row.name}</td>
+                  ) : null}
+                  {show("state") ? (
+                    <td className="px-4 py-3">
+                      <span className="inline-flex rounded-full bg-[var(--foreground)] px-2 py-0.5 text-[11px] font-medium text-[var(--background)]">
+                        {row.state}
+                      </span>
+                    </td>
+                  ) : null}
+                  {show("status") ? <td className="px-4 py-3 text-xs">{row.status}</td> : null}
+                  {show("image") ? (
+                    <td className="px-4 py-3 font-mono text-xs">{row.image}</td>
+                  ) : null}
                   <td className="px-4 py-3">
                     <ui.Tooltip
                       content={`Actions for ${row.name}`}
@@ -269,11 +328,29 @@ export function DokployDockerPage() {
   );
 }
 
+const REQUEST_COLUMNS: readonly ColumnPickerColumn[] = [
+  { id: "level", label: "Level" },
+  { id: "message", label: "Message", hideable: false },
+  { id: "time", label: "Time" },
+];
+
+const REQUEST_RANGE_PRESETS: readonly DateRangePreset[] = [
+  { label: "Last 3 days", start: "2026-07-03", end: "2026-07-06" },
+  { label: "Last 7 days", start: "2026-07-01", end: "2026-07-08" },
+  { label: "Last 30 days", start: "2026-06-08", end: "2026-07-08" },
+];
+
 export function DokployRequestsPage() {
   const ui = useUiAdapter();
   const [schedule, setSchedule] = useState("0 0 * * *");
   const [query, setQuery] = useState("");
-  const [range, setRange] = useState("Jul 03, 2026 - Jul 06, 2026");
+  const [range, setRange] = useState<DateRangeValue>({
+    start: "2026-07-03",
+    end: "2026-07-06",
+  });
+  const [visibility, setVisibility] = useState<ColumnVisibility>({});
+  const show = (id: string) => visibility[id] !== false;
+  const columnCount = REQUEST_COLUMNS.filter((column) => show(column.id)).length;
 
   return (
     <DokployCard className="mx-auto w-full max-w-[70rem]">
@@ -311,17 +388,18 @@ export function DokployRequestsPage() {
             <ui.Button
               type="button"
               size="sm"
-              variant="outline"
-              onClick={() =>
-                setRange((current) =>
-                  current.startsWith("Jul 03")
-                    ? "Jul 06, 2026 - Jul 09, 2026"
-                    : "Jul 03, 2026 - Jul 06, 2026",
-                )
-              }
+              variant="secondary"
+              onClick={() => setRange({ start: "2026-07-03", end: "2026-07-06" })}
             >
-              {range}
+              Reset to Last 3 Days
             </ui.Button>
+            <DateRangePicker
+              start={range.start}
+              end={range.end}
+              onChange={setRange}
+              presets={REQUEST_RANGE_PRESETS}
+              align="end"
+            />
           </div>
         </div>
 
@@ -339,9 +417,11 @@ export function DokployRequestsPage() {
             <ui.Button type="button" size="sm" variant="secondary">
               Status
             </ui.Button>
-            <ui.Button type="button" size="sm" variant="secondary">
-              Columns
-            </ui.Button>
+            <ColumnPicker
+              columns={REQUEST_COLUMNS}
+              visibility={visibility}
+              onVisibilityChange={setVisibility}
+            />
           </div>
         </div>
 
@@ -349,22 +429,29 @@ export function DokployRequestsPage() {
           <table className="w-full min-w-[50rem] text-sm">
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-xs text-muted-foreground">
-                <th className="px-4 py-3 font-medium">Level</th>
-                <th className="px-4 py-3 font-medium">
-                  <span className="inline-flex items-center gap-1">
-                    Message <ArrowUpDown size={11} aria-hidden />
-                  </span>
-                </th>
-                <th className="px-4 py-3 font-medium">
-                  <span className="inline-flex items-center gap-1">
-                    Time <ArrowUpDown size={11} aria-hidden />
-                  </span>
-                </th>
+                {show("level") ? <th className="px-4 py-3 font-medium">Level</th> : null}
+                {show("message") ? (
+                  <th className="px-4 py-3 font-medium">
+                    <span className="inline-flex items-center gap-1">
+                      Message <ArrowUpDown size={11} aria-hidden />
+                    </span>
+                  </th>
+                ) : null}
+                {show("time") ? (
+                  <th className="px-4 py-3 font-medium">
+                    <span className="inline-flex items-center gap-1">
+                      Time <ArrowUpDown size={11} aria-hidden />
+                    </span>
+                  </th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td colSpan={3} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                <td
+                  colSpan={Math.max(columnCount, 1)}
+                  className="px-4 py-16 text-center text-sm text-muted-foreground"
+                >
                   {query.trim() === "" ? "No requests yet." : `No requests match “${query}”.`}
                 </td>
               </tr>

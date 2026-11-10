@@ -236,22 +236,54 @@ function Menu({ trigger, items, "aria-label": ariaLabel }: MenuProps) {
       </span>
       {open ? (
         <div role="menu" aria-label={ariaLabel}>
-          {items.map((item, index) => (
-            <Fragment key={typeof item.label === "string" ? item.label : index}>
-              {item.separator === true ? <hr /> : null}
-              <button
-                type="button"
-                role="menuitem"
-                disabled={item.disabled}
-                onClick={() => {
-                  setOpen(false);
-                  item.onSelect?.();
-                }}
-              >
-                {item.label}
-              </button>
-            </Fragment>
-          ))}
+          {items.map((item, index) => {
+            const kind = item.kind ?? "item";
+            return (
+              <Fragment key={typeof item.label === "string" ? item.label : index}>
+                {item.separator === true || kind === "separator" ? <hr /> : null}
+                {kind === "separator" ? null : kind === "checkbox" ? (
+                  <button
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={item.checked === true}
+                    disabled={item.disabled}
+                    data-testid={item.testId}
+                    onClick={() => item.onCheckedChange?.(item.checked !== true)}
+                  >
+                    {item.label}
+                  </button>
+                ) : kind === "radio" ? (
+                  <button
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={item.checked === true}
+                    disabled={item.disabled}
+                    data-testid={item.testId}
+                    onClick={() => {
+                      item.onCheckedChange?.(true);
+                      item.onSelect?.();
+                      setOpen(false);
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={item.disabled}
+                    data-testid={item.testId}
+                    onClick={() => {
+                      setOpen(false);
+                      item.onSelect?.();
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                )}
+              </Fragment>
+            );
+          })}
         </div>
       ) : null}
     </div>
@@ -330,7 +362,9 @@ function Card({
 }: CardProps) {
   return (
     <section className={join("test-card", className)}>
-      {title !== undefined ? <header data-divider={headerDivider || undefined}>{title}</header> : null}
+      {title !== undefined ? (
+        <header data-divider={headerDivider || undefined}>{title}</header>
+      ) : null}
       {description !== undefined ? <p>{description}</p> : null}
       <div className={join("test-card-body", bodyClassName)}>{children}</div>
       {actions}

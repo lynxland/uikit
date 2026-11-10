@@ -127,6 +127,21 @@ test.describe("Dokploy shell and home", () => {
     ).toBeVisible();
     await expect(page.getByLabel("Traefik configuration")).toHaveValue(/providers:/);
 
+    const tree = page.getByRole("tree", { name: "Traefik files" });
+    const directory = tree.getByRole("treeitem", { name: "dynamic" });
+    await expect(directory).toHaveAttribute("aria-expanded", "true");
+    await directory.focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(directory).toHaveAttribute("aria-expanded", "false");
+    await expect(tree.getByRole("treeitem", { name: "traefik.yml" })).toHaveCount(0);
+    await page.keyboard.press("ArrowRight");
+    await expect(directory).toHaveAttribute("aria-expanded", "true");
+    await tree.getByRole("treeitem", { name: "traefik.yml" }).click();
+    await expect(tree.getByRole("treeitem", { name: "traefik.yml" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
     await page.goto("/dashboard/docker");
     await expect(page.getByRole("heading", { level: 1, name: "Docker Containers" })).toBeVisible();
     await expect(page.getByRole("row").nth(1)).toContainText("tools-storage");
@@ -138,5 +153,45 @@ test.describe("Dokploy shell and home", () => {
     await page.goto("/dashboard/schedules");
     await expect(page.getByRole("heading", { level: 1, name: "Scheduled Tasks" })).toBeVisible();
     await expect(page.getByText("frontend")).toBeVisible();
+  });
+
+  test("column pickers hide and restore table columns", async ({ page }) => {
+    await page.goto("/dashboard/docker");
+    await expect(page.getByRole("columnheader", { name: /Image/ })).toBeVisible();
+
+    await page.getByTestId("columns-picker").click();
+    const imageToggle = page.getByTestId("column-toggle-image");
+    await expect(imageToggle).toHaveAttribute("aria-checked", "true");
+    await imageToggle.click();
+    await expect(imageToggle).toHaveAttribute("aria-checked", "false");
+    await expect(page.getByRole("columnheader", { name: /Image/ })).toHaveCount(0);
+    await expect(page.getByRole("row").nth(1)).not.toContainText("quay.io");
+    // Checkbox items keep the menu open so another column can be toggled.
+    await expect(page.getByTestId("column-toggle-status")).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await page.goto("/dashboard/requests");
+    await expect(page.getByRole("columnheader", { name: "Time" })).toBeVisible();
+    await page.getByTestId("columns-picker").click();
+    await page.getByTestId("column-toggle-time").click();
+    await expect(page.getByRole("columnheader", { name: "Time" })).toHaveCount(0);
+    await expect(page.getByTestId("column-toggle-message")).toBeDisabled();
+  });
+
+  test("requests date range picker edits and applies presets", async ({ page }) => {
+    await page.goto("/dashboard/requests");
+    const trigger = page.getByTestId("date-range-picker");
+    await expect(trigger).toContainText("Jul 03, 2026");
+    await trigger.click();
+
+    const start = page.getByTestId("date-range-start");
+    await expect(start).toHaveValue("2026-07-03");
+    await start.fill("2026-07-01");
+    await expect(trigger).not.toContainText("Jul 03, 2026");
+
+    await page.getByTestId("date-range-preset-1").click();
+    await expect(trigger).toContainText("Jul 01, 2026");
+    await expect(trigger).toContainText("Jul 08, 2026");
+    await expect(page.getByTestId("date-range-start")).toHaveCount(0);
   });
 });

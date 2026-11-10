@@ -7,7 +7,13 @@ import { UiAdapterProvider, useUiAdapter } from "../src/adapter";
 import {
   AsyncState,
   type Column,
+  ColumnPicker,
+  type ColumnVisibility,
   DataTable,
+  DateRangePicker,
+  type DateRangeValue,
+  FileTree,
+  type FileTreeItem,
   FilterBar,
   Form,
   InputGroup,
@@ -153,6 +159,204 @@ describe("DataTable", () => {
       ),
     );
     expect(screen.getByText("Nothing here")).toBeTruthy();
+  });
+});
+
+function ColumnPickerHarness({ onChange }: { onChange?: (visibility: ColumnVisibility) => void }) {
+  const [visibility, setVisibility] = useState<ColumnVisibility>({});
+  return (
+    <ColumnPicker
+      columns={[
+        { id: "name", label: "Name", hideable: false },
+        { id: "status", label: "Status" },
+        { id: "image", label: "Image" },
+      ]}
+      visibility={visibility}
+      onVisibilityChange={(next) => {
+        setVisibility(next);
+        onChange?.(next);
+      }}
+    />
+  );
+}
+
+describe("ColumnPicker", () => {
+  it("toggles visibility, treats absent keys as visible and keeps the menu open", () => {
+    const onChange = vi.fn();
+    render(withAdapter(<ColumnPickerHarness onChange={onChange} />));
+
+    fireEvent.click(screen.getByTestId("columns-picker"));
+    const image = screen.getByTestId("column-toggle-image");
+    expect(image.getAttribute("aria-checked")).toBe("true");
+
+    fireEvent.click(image);
+    expect(onChange).toHaveBeenLastCalledWith({ image: false });
+    expect(image.getAttribute("aria-checked")).toBe("false");
+    // Checkbox items keep the menu open so several columns can be toggled.
+    expect(screen.getByTestId("column-toggle-status")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("column-toggle-status"));
+    expect(onChange).toHaveBeenLastCalledWith({ image: false, status: false });
+
+    fireEvent.click(screen.getByTestId("column-toggle-image"));
+    expect(onChange).toHaveBeenLastCalledWith({ image: true, status: false });
+  });
+
+  it("renders non-hideable columns as checked and disabled", () => {
+    render(withAdapter(<ColumnPickerHarness />));
+    fireEvent.click(screen.getByTestId("columns-picker"));
+    const name = screen.getByTestId("column-toggle-name") as HTMLButtonElement;
+    expect(name.getAttribute("aria-checked")).toBe("true");
+    expect(name.disabled).toBe(true);
+  });
+});
+
+const treeItems: FileTreeItem[] = [
+  {
+    id: "dynamic",
+    label: "dynamic",
+    type: "directory",
+    children: [
+      { id: "traefik.yml", label: "traefik.yml", type: "file" },
+      { id: "acme.json", label: "acme.json", type: "file" },
+    ],
+  },
+];
+
+function FileTreeHarness({
+  initialExpanded = ["dynamic"],
+  onSelect,
+}: {
+  initialExpanded?: readonly string[];
+  onSelect?: (id: string) => void;
+}) {
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set(initialExpanded));
+  const [selected, setSelected] = useState("traefik.yml");
+  return (
+    <FileTree
+      items={treeItems}
+      expanded={expanded}
+      onExpandedChange={setExpanded}
+      selected={selected}
+      onSelect={(id) => {
+        setSelected(id);
+        onSelect?.(id);
+      }}
+      aria-label="Traefik files"
+    />
+  );
+}
+
+describe("FileTree", () => {
+  it("renders expanded state, selection and nesting semantics", () => {
+    render(withAdapter(<FileTreeHarness />));
+    const tree = screen.getByRole("tree", { name: "Traefik files" });
+    expect(tree).toBeTruthy();
+
+    const directory = screen.getByRole("treeitem", { name: "dynamic" });
+    expect(directory.getAttribute("aria-expanded")).toBe("true");
+    expect(directory.getAttribute("aria-level")).toBe("1");
+    const file = screen.getByRole("treeitem", { name: "traefik.yml" });
+    expect(file.getAttribute("aria-selected")).toBe("true");
+    expect(file.getAttribute("aria-level")).toBe("2");
+    expect(screen.getByRole("group")).toBeTruthy();
+
+    fireEvent.click(directory);
+    expect(directory.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("treeitem", { name: "traefik.yml" })).toBeNull();
+  });
+
+  it("selects files by click and Enter/Space", () => {
+    const onSelect = vi.fn();
+    render(withAdapter(<FileTreeHarness onSelect={onSelect} />));
+
+    const file = screen.getByRole("treeitem", { name: "traefik.yml" });
+    fireEvent.click(file);
+    expect(onSelect).toHaveBeenLastCalledWith("traefik.yml");
+
+    const other = screen.getByRole("treeitem", { name: "acme.json" });
+    other.focus();
+    fireEvent.keyDown(other, { key: "Enter" });
+    expect(onSelect).toHaveBeenLastCalledWith("acme.json");
+    fireEvent.keyDown(other, { key: " " });
+    expect(onSelect).toHaveBeenLastCalledWith("acme.json");
+  });
+
+  it("expands/collapses with ArrowLeft/ArrowRight and moves focus with arrows", () => {
+    render(withAdapter(<FileTreeHarness initialExpanded={[]} />));
+    const directory = screen.getByRole("treeitem", { name: "dynamic" });
+    directory.focus();
+    expect(directory.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("treeitem", { name: "traefik.yml" })).toBeNull();
+
+    fireEvent.keyDown(directory, { key: "ArrowRight" });
+    expect(directory.getAttribute("aria-expanded")).toBe("true");
+    const file = screen.getByRole("treeitem", { name: "traefik.yml" });
+    expect(file).toBeTruthy();
+
+    fireEvent.keyDown(directory, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(file);
+
+    fireEvent.keyDown(file, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(directory);
+    fireEvent.keyDown(directory, { key: "ArrowLeft" });
+    expect(directory.getAttribute("aria-expanded")).toBe("false");
+  });
+});
+
+function DateRangeHarness({ onChange }: { onChange?: (value: DateRangeValue) => void }) {
+  const [range, setRange] = useState<DateRangeValue>({
+    start: "2026-07-03",
+    end: "2026-07-06",
+  });
+  return (
+    <>
+      <DateRangePicker
+        start={range.start}
+        end={range.end}
+        onChange={(next) => {
+          setRange(next);
+          onChange?.(next);
+        }}
+        presets={[{ label: "Last 7 days", start: "2026-07-01", end: "2026-07-08" }]}
+      />
+      <output data-testid="range-value">
+        {range.start ?? "—"} / {range.end ?? "—"}
+      </output>
+    </>
+  );
+}
+
+describe("DateRangePicker", () => {
+  it("edits start/end dates through the controlled value", () => {
+    const onChange = vi.fn();
+    render(withAdapter(<DateRangeHarness onChange={onChange} />));
+
+    const trigger = screen.getByTestId("date-range-picker");
+    expect(trigger.textContent).toContain("2026");
+
+    fireEvent.click(trigger);
+    const startInput = screen.getByTestId("date-range-start") as HTMLInputElement;
+    expect(startInput.value).toBe("2026-07-03");
+    fireEvent.change(startInput, { target: { value: "2026-07-01" } });
+    expect(onChange).toHaveBeenLastCalledWith({ start: "2026-07-01", end: "2026-07-06" });
+    expect(screen.getByTestId("range-value").textContent).toBe("2026-07-01 / 2026-07-06");
+    expect(trigger.textContent).not.toBe("Select date range");
+  });
+
+  it("applies a preset and clears the range", () => {
+    render(withAdapter(<DateRangeHarness />));
+
+    fireEvent.click(screen.getByTestId("date-range-picker"));
+    fireEvent.click(screen.getByTestId("date-range-preset-0"));
+    expect(screen.getByTestId("range-value").textContent).toBe("2026-07-01 / 2026-07-08");
+    expect(screen.queryByTestId("date-range-start")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("date-range-picker"));
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(screen.getByTestId("range-value").textContent).toBe("— / —");
+    expect(screen.getByTestId("date-range-picker").textContent).toBe("Select date range");
+    expect(screen.queryByTestId("date-range-start")).toBeNull();
   });
 });
 

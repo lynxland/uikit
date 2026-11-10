@@ -193,6 +193,8 @@ export interface MenuItem {
   onCheckedChange?: (checked: boolean) => void;
   /** Children for `kind: "submenu"`. */
   items?: readonly MenuItem[];
+  /** Optional `data-testid` for the rendered item; menu semantics are unchanged. */
+  testId?: string;
 }
 
 export interface MenuProps {

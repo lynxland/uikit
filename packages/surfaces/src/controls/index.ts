@@ -3,6 +3,11 @@ export {
   type AsyncStateProps,
   type AsyncStatus,
 } from "./async-state";
+export {
+  ColumnPicker,
+  type ColumnPickerColumn,
+  type ColumnPickerProps,
+} from "./column-picker";
 export { CommandMenu, type CommandMenuProps } from "./command-menu";
 export { CommandPalette, type CommandPaletteProps } from "./command-palette";
 export {
@@ -15,10 +20,21 @@ export {
   type RowSelection,
 } from "./data-table";
 export {
+  DateRangePicker,
+  type DateRangePickerProps,
+  type DateRangePreset,
+  type DateRangeValue,
+} from "./date-range-picker";
+export {
   FieldInputs,
   type FieldInputsClassNames,
   type FieldInputsProps,
 } from "./field-inputs";
+export {
+  FileTree,
+  type FileTreeItem,
+  type FileTreeProps,
+} from "./file-tree";
 export {
   FilterBar,
   type FilterBarClassNames,

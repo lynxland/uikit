@@ -372,6 +372,125 @@
   white-space: nowrap;
 }
 
+/* ---- column picker ----------------------------------------------------- */
+
+.ui-column-picker {
+  white-space: nowrap;
+}
+
+/* ---- file tree --------------------------------------------------------- */
+
+.ui-file-tree {
+  width: 100%;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg);
+}
+
+.ui-file-tree__list,
+.ui-file-tree__group {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-file-tree__group {
+  padding-left: var(--ui-space-3);
+}
+
+.ui-file-tree__row {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  min-height: 1.75rem;
+  padding: 2px var(--ui-space-2);
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+  outline: none;
+}
+
+.ui-file-tree__row:hover {
+  background: var(--ui-muted);
+}
+
+.ui-file-tree__row:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--ui-accent) 55%, transparent);
+  outline-offset: -1px;
+}
+
+.ui-file-tree__row--selected {
+  background: color-mix(in oklab, var(--ui-accent) 10%, transparent);
+  font-weight: 500;
+}
+
+.ui-file-tree__chevron {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  color: var(--ui-muted-fg);
+  transition: transform 120ms ease;
+}
+
+.ui-file-tree__chevron[data-expanded="true"] {
+  transform: rotate(90deg);
+}
+
+.ui-file-tree__icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--ui-muted-fg);
+}
+
+.ui-file-tree__row--selected .ui-file-tree__icon {
+  color: inherit;
+}
+
+.ui-file-tree__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- date range picker ------------------------------------------------- */
+
+.ui-date-range-picker {
+  white-space: nowrap;
+}
+
+.ui-date-range-picker__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+}
+
+.ui-date-range-picker__fields {
+  display: grid;
+  gap: var(--ui-space-2);
+}
+
+.ui-date-range-picker__field {
+  display: grid;
+  gap: var(--ui-space-1);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-muted-fg);
+}
+
+.ui-date-range-picker__presets,
+.ui-date-range-picker__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-1);
+}
+
+.ui-date-range-picker__actions {
+  justify-content: flex-end;
+  border-top: 1px solid var(--ui-border);
+  padding-top: var(--ui-space-2);
+}
+
 /* ---- tabs wrapper ------------------------------------------------------ */
 
 .ui-tabs {
@@ -1486,6 +1605,19 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--ui-space-1);
+}
+
+.ui-log-viewer__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.ui-log-viewer--no-header .ui-log-viewer__body {
+  border-radius: inherit;
 }
 
 .ui-log-viewer__body {

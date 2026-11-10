@@ -1,7 +1,7 @@
 import type { StreamState } from "@lynxland/uikit-core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { UiAdapterProvider } from "../src/adapter";
 import {
   EventFeed,
@@ -113,6 +113,122 @@ describe("LogViewer", () => {
 
     fireEvent.click(screen.getByTestId("log-clear"));
     expect(screen.getByText("Waiting for frames…")).toBeTruthy();
+  });
+
+  it("renders arbitrary React per line through renderLine", () => {
+    const stream = createStream<number>();
+    act(() => {
+      stream.push(1);
+      stream.push(2);
+      stream.push(3);
+    });
+    render(
+      withAdapter(
+        <LogViewer
+          stream={stream}
+          limit={2}
+          formatLine={(frame) => `plain ${frame}`}
+          renderLine={(frame, index) => (
+            <span data-testid={`rich-${frame}`}>
+              #{index} line {frame}
+            </span>
+          )}
+        />,
+      ),
+    );
+
+    expect(screen.getByTestId("rich-2").textContent).toBe("#1 line 2");
+    expect(screen.getByTestId("rich-3").textContent).toBe("#2 line 3");
+    expect(screen.queryByText("plain 2")).toBeNull();
+  });
+
+  it("renders a toolbar while keeping the built-in pause/clear controls", () => {
+    const stream = createStream<number>();
+    act(() => {
+      stream.push(1);
+    });
+    render(
+      withAdapter(
+        <LogViewer
+          stream={stream}
+          toolbar={
+            <button type="button" data-testid="custom-action">
+              Search
+            </button>
+          }
+        />,
+      ),
+    );
+
+    expect(screen.getByTestId("log-toolbar").textContent).toContain("Search");
+    expect(screen.getByTestId("custom-action")).toBeTruthy();
+    expect(screen.getByTestId("log-status")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("log-pause"));
+    expect(stream.status).toBe("paused");
+    expect(screen.getByTestId("log-pause").textContent).toBe("Resume");
+    fireEvent.click(screen.getByTestId("log-clear"));
+    expect(screen.getByText("Waiting for frames…")).toBeTruthy();
+  });
+
+  it("hides the built-in header and toolbar when hideHeader is set", () => {
+    const stream = createStream<number>();
+    act(() => {
+      stream.push(7);
+    });
+    render(
+      withAdapter(
+        <LogViewer
+          stream={stream}
+          hideHeader
+          title="Hidden title"
+          toolbar={<span>hidden toolbar</span>}
+          formatLine={(frame) => `line ${frame}`}
+        />,
+      ),
+    );
+
+    expect(screen.queryByTestId("log-status")).toBeNull();
+    expect(screen.queryByTestId("log-pause")).toBeNull();
+    expect(screen.queryByTestId("log-toolbar")).toBeNull();
+    expect(screen.queryByText("Hidden title")).toBeNull();
+    expect(screen.getByText("line 7")).toBeTruthy();
+  });
+
+  it("downloads the same bounded window through formatLine", () => {
+    const stream = createStream<number>();
+    act(() => {
+      stream.push(1);
+      stream.push(2);
+      stream.push(3);
+    });
+    const createObjectURL = vi.fn(() => "blob:logs");
+    const revokeObjectURL = vi.fn();
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL;
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    try {
+      render(
+        withAdapter(
+          <LogViewer
+            stream={stream}
+            limit={2}
+            formatLine={(frame) => `line ${frame}`}
+            downloadFileName="logs.txt"
+          />,
+        ),
+      );
+      fireEvent.click(screen.getByTestId("log-download"));
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:logs");
+      expect(click).toHaveBeenCalledTimes(1);
+    } finally {
+      click.mockRestore();
+      URL.createObjectURL = originalCreate;
+      URL.revokeObjectURL = originalRevoke;
+    }
   });
 });
 

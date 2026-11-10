@@ -372,7 +372,8 @@ trigger，`contentClassName` 作用于选项弹层（ui-plain 的原生 select �
 `kind` 为 `item | checkbox | radio | separator | label | submenu`；
 `checked`/`onCheckedChange` 是受控状态，submenu 用 `items` 嵌套；旧的
 `separator: true` 仍是“在此项前画分隔线”的 v3 简写，与 `kind:"separator"`
-并存但不引入别名层。`Dialog`/`Drawer` 的 `size` 为
+并存但不引入别名层。Menu item 可选 `testId` 落到渲染项（`data-testid`），
+用于列开关等稳定测试选择器。`Dialog`/`Drawer` 的 `size` 为
 `sm | md | lg | xl | fullscreen`，`className` 只作用于弹层/面板。`Card`
 的 `headerDivider`/`footer`/`bodyClassName` 提供分节线、页脚和内容区逃生口。
 具体 UI 库的 compound API 不泄漏到 surfaces。
@@ -433,6 +434,65 @@ trigger，`contentClassName` 作用于选项弹层（ui-plain 的原生 select �
   默认忽略 input/textarea/select/contenteditable）。
 - `RelativeTime` 默认 `Intl` short（`2 min. ago`）；`format="long"` 输出
   `2 minutes ago`，`numeric="always"` 可避免 “yesterday” 之类的自动措辞。
+
+**数据展示控件**：
+
+```tsx
+<ColumnPicker
+  columns={[
+    { id: "name", label: "Name", hideable: false },
+    { id: "image", label: "Image" },
+  ]}
+  visibility={visibility}
+  onVisibilityChange={setVisibility}
+/>
+
+<FileTree
+  items={items} // { id, label, type: "file" | "directory", icon?, children? }
+  expanded={expanded}
+  onExpandedChange={setExpanded}
+  selected={selected}
+  onSelect={(id, item) => item.type === "file" && setSelected(id)}
+  folderIcon={<FolderIcon />}
+  fileIcon={<FileIcon />}
+  aria-label="Traefik files"
+/>
+
+<DateRangePicker
+  start={range.start} // YYYY-MM-DD
+  end={range.end}
+  onChange={({ start, end }) => setRange({ start, end })}
+  presets={[{ label: "Last 7 days", start: "2026-07-01", end: "2026-07-08" }]}
+/>
+```
+
+- `ColumnPicker` 与 `DataTable.columnVisibility` 同形；缺省 key 视为可见，
+  `hideable:false` 的列渲染为 checked + disabled。菜单用 adapter checkbox
+  item，所以勾选后菜单保持打开。
+- `FileTree` 完全受控（`expanded`/`selected`）；键盘为 ArrowUp/Down、
+  Home/End、ArrowRight 展开/进入首子项、ArrowLeft 收起/回父项、Enter/Space
+  选择。控件输出 `role="tree"`/`treeitem`/`group` 与 `aria-level`/
+  `aria-expanded`/`aria-selected`，图标可用 props 或 item `icon` 覆盖。
+- `DateRangePicker` 只用 `YYYY-MM-DD` 字符串和 adapter `Input type="date"`，
+  不引入日历依赖；presets 是纯数据，选择后关闭面板。
+
+**LogViewer 富行与工具栏**：
+
+```tsx
+<LogViewer
+  stream={stream}
+  limit={100}
+  formatLine={formatLogLine} // download / plain fallback
+  renderLine={(frame, index) => <LogLine frame={frame} index={index} />}
+  toolbar={<LogToolbar />} // header 与日志体之间的整行插槽
+  downloadFileName="api-logs.txt"
+/>
+```
+
+- `renderLine` 在视图提供的行外壳内渲染任意 React（彩色级别、时间戳），
+  `data-line` 仍由视图输出；`formatLine` 继续负责下载文本。
+- `toolbar` 不替换内置 follow/pause/download/clear；header 可见时四者仍工作。
+  `hideHeader` 隐藏 header + toolbar，调用方自己渲染工具栏并接管 pause/follow。
 
 **凭据、编辑器与指标图**（受控值组件/控件）：
 

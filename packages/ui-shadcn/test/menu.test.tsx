@@ -60,6 +60,7 @@ describe("Menu", () => {
             label: "Production",
             checked: false,
             onCheckedChange,
+            testId: "toggle-production",
           },
         ]}
       />,
@@ -68,6 +69,7 @@ describe("Menu", () => {
     fireEvent.click(screen.getByRole("button", { name: "Actions" }));
     const item = await screen.findByRole("menuitemcheckbox", { name: "Production" });
     expect(item.getAttribute("aria-checked")).toBe("false");
+    expect(item.getAttribute("data-testid")).toBe("toggle-production");
 
     fireEvent.click(item);
     expect(onCheckedChange).toHaveBeenCalledWith(true);
@@ -86,9 +88,9 @@ describe("Menu", () => {
         ]}
       />,
     );
-    expect(screen.getByRole("menuitemcheckbox", { name: "Production" }).getAttribute("aria-checked")).toBe(
-      "true",
-    );
+    expect(
+      screen.getByRole("menuitemcheckbox", { name: "Production" }).getAttribute("aria-checked"),
+    ).toBe("true");
   });
 
   it("groups radio items and reports the selected radio", async () => {
@@ -107,9 +109,9 @@ describe("Menu", () => {
     fireEvent.click(screen.getByRole("button", { name: "Actions" }));
     const all = await screen.findByRole("menuitemradio", { name: "All tags" });
     expect(all.getAttribute("aria-checked")).toBe("true");
-    expect(screen.getByRole("menuitemradio", { name: "frontend" }).getAttribute("aria-checked")).toBe(
-      "false",
-    );
+    expect(
+      screen.getByRole("menuitemradio", { name: "frontend" }).getAttribute("aria-checked"),
+    ).toBe("false");
 
     fireEvent.click(screen.getByRole("menuitemradio", { name: "frontend" }));
     expect(onPick).toHaveBeenCalledWith(true);

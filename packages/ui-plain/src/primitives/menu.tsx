@@ -158,6 +158,7 @@ function PlainMenuList({
               role="menuitemcheckbox"
               aria-checked={item.checked === true}
               disabled={item.disabled}
+              data-testid={item.testId}
               className={cx(itemClass(item), "ui-plain-menu__item--checkable")}
               onClick={() => {
                 item.onCheckedChange?.(item.checked !== true);
@@ -181,6 +182,7 @@ function PlainMenuList({
               role="menuitemradio"
               aria-checked={item.checked === true}
               disabled={item.disabled}
+              data-testid={item.testId}
               className={cx(itemClass(item), "ui-plain-menu__item--checkable")}
               onClick={() => {
                 item.onCheckedChange?.(true);
@@ -207,6 +209,7 @@ function PlainMenuList({
             type="button"
             role="menuitem"
             disabled={item.disabled}
+            data-testid={item.testId}
             className={itemClass(item)}
             onClick={() => {
               onCloseRoot();
@@ -234,6 +237,7 @@ function PlainSubmenu({ item, onCloseRoot }: { item: MenuItem; onCloseRoot: () =
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={item.disabled}
+        data-testid={item.testId}
         className={itemClass(item)}
         onClick={(event: ReactMouseEvent<HTMLButtonElement>) => {
           event.stopPropagation();

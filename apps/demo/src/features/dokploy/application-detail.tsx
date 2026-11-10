@@ -6,13 +6,14 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  LogViewer,
   MetricChart,
   type MetricSeries,
   Progress,
   RelativeTime,
   StatusDot,
+  type StreamViewSource,
   useStreamFrames,
-  useStreamState,
   useUiAdapter,
 } from "@lynxland/uikit-surfaces";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -22,7 +23,6 @@ import {
   Container,
   Copy,
   Database,
-  Download,
   ExternalLink,
   Eye,
   EyeOff,
@@ -33,7 +33,6 @@ import {
   Link2,
   Pause,
   Pencil,
-  Play,
   RefreshCw,
   Search,
   Server as ServerIcon,
@@ -74,6 +73,7 @@ import {
   DeploymentLogDrawer,
   deploymentStatusLabel,
   formatDuration,
+  formatLogLine,
   serviceStatusTone,
 } from "./shared";
 
@@ -897,6 +897,11 @@ function DeploymentsTab({
   );
 }
 
+function matchesLogQuery(frame: DeploymentLogFrame, needle: string): boolean {
+  if (needle === "") return true;
+  return `${frame.level} ${frame.msg}`.toLowerCase().includes(needle);
+}
+
 export function LogsTab({ service }: { service: Service }) {
   const ui = useUiAdapter();
   const [source] = useState(() => createDeploymentLogSource(service.id));
@@ -905,18 +910,61 @@ export function LogsTab({ service }: { service: Service }) {
     policy: { buffer: 500, pauseable: true, retry: { backoffMs: [300, 900] } },
   });
   const frames = useStreamFrames(stream);
-  const state = useStreamState(stream);
   const [query, setQuery] = useState("");
   const [native, setNative] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const paused = state.status === "paused";
   const appName = appNameFor(service);
-  const visible = frames.slice(-100).filter((frame) => {
-    if (query.trim() === "") return true;
-    return `${frame.level} ${frame.msg}`.toLowerCase().includes(query.trim().toLowerCase());
-  });
+  const needle = query.trim().toLowerCase();
+  const filteredFrames = frames.filter((frame) => matchesLogQuery(frame, needle));
 
-  const text = visible.map((frame) => `${frame.ts} ${frame.level} ${frame.msg}`).join("\n");
+  // The stream binding stays the owner of pause/resume/clear; only the frame
+  // window is filtered so LogViewer can keep its follow/pause behaviour.
+  const filteredStream = useMemo<StreamViewSource<DeploymentLogFrame>>(() => {
+    let sourceFrames: readonly DeploymentLogFrame[] | undefined;
+    let snapshot: readonly DeploymentLogFrame[] = [];
+    const select = () => {
+      const next = stream.getFrames();
+      if (next === sourceFrames) return snapshot;
+      sourceFrames = next;
+      snapshot = next.filter((frame) => matchesLogQuery(frame, needle));
+      return snapshot;
+    };
+    const wrapper: StreamViewSource<DeploymentLogFrame> = {
+      get frames() {
+        return select();
+      },
+      get status() {
+        return stream.status;
+      },
+      get error() {
+        return stream.error;
+      },
+      get resyncs() {
+        return stream.resyncs;
+      },
+      pause: () => stream.pause(),
+      resume: () => stream.resume(),
+      restart: () => stream.restart(),
+      resync: (anchor) => stream.resync(anchor),
+      clear: () => stream.clear(),
+      subscribeFrames: (listener) => stream.subscribeFrames(listener),
+      getFrames: select,
+    };
+    if (stream.subscribeStatus !== undefined) {
+      wrapper.subscribeStatus = (listener) => stream.subscribeStatus?.(listener);
+    }
+    if (stream.getState !== undefined) {
+      wrapper.getState = () =>
+        stream.getState?.() ?? {
+          status: stream.status,
+          error: stream.error,
+          resyncs: stream.resyncs,
+        };
+    }
+    return wrapper;
+  }, [stream, needle]);
+
+  const text = filteredFrames.slice(-100).map(formatLogLine).join("\n");
 
   const copy = () => {
     if (typeof navigator !== "undefined" && navigator.clipboard !== undefined) {
@@ -925,113 +973,90 @@ export function LogsTab({ service }: { service: Service }) {
     }
   };
 
-  const download = () => {
-    if (typeof URL.createObjectURL !== "function") return;
-    const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${service.name}-logs.txt`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <Panel title="Logs" description="Watch the logs of the application in real time">
-      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-        <div>
-          <FieldLabel>Select a container to view logs</FieldLabel>
-          <ui.Select
-            aria-label="Select a container"
-            value={service.id}
-            onValueChange={() => undefined}
-            options={[
-              {
-                value: service.id,
-                label: `${appName} (${service.id}) running Up 7 minutes`,
-              },
-            ]}
-          />
-        </div>
-        <div className="flex items-center gap-2 pb-1 text-sm">
-          <span>Native</span>
-          <ui.Switch checked={native} onCheckedChange={setNative} aria-label="Native" />
-        </div>
-      </div>
+      <LogViewer<DeploymentLogFrame>
+        stream={filteredStream}
+        limit={100}
+        height={416}
+        title="Application logs"
+        formatLine={formatLogLine}
+        renderLine={(frame, index) => <LogLine frame={frame} index={index} />}
+        downloadFileName={`${service.name}-logs.txt`}
+        toolbar={
+          <div className="flex w-full flex-col gap-3">
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <div>
+                <FieldLabel>Select a container to view logs</FieldLabel>
+                <ui.Select
+                  aria-label="Select a container"
+                  value={service.id}
+                  onValueChange={() => undefined}
+                  options={[
+                    {
+                      value: service.id,
+                      label: `${appName} (${service.id}) running Up 7 minutes`,
+                    },
+                  ]}
+                />
+              </div>
+              <div className="flex items-center gap-2 pb-1 text-sm">
+                <span>Native</span>
+                <ui.Switch checked={native} onCheckedChange={setNative} aria-label="Native" />
+              </div>
+            </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="inline-flex overflow-hidden rounded-md border border-[var(--border)] text-xs">
-          <span className="bg-[var(--background)] px-2 py-1.5 text-muted-foreground">Limit to</span>
-          <span className="border-l border-[var(--border)] px-2 py-1.5">100 lines</span>
-        </span>
-        <span className="inline-flex overflow-hidden rounded-md border border-[var(--border)] text-xs">
-          <span className="bg-[var(--background)] px-2 py-1.5 text-muted-foreground">
-            Time range
-          </span>
-          <span className="border-l border-[var(--border)] px-2 py-1.5">All time</span>
-        </span>
-        <span className="inline-flex overflow-hidden rounded-md border border-[var(--border)] text-xs">
-          <span className="bg-[var(--background)] px-2 py-1.5 text-muted-foreground">Log type</span>
-          <span className="border-l border-[var(--border)] px-2 py-1.5">All</span>
-        </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex overflow-hidden rounded-md border border-[var(--border)] text-xs">
+                <span className="bg-[var(--background)] px-2 py-1.5 text-muted-foreground">
+                  Limit to
+                </span>
+                <span className="border-l border-[var(--border)] px-2 py-1.5">100 lines</span>
+              </span>
+              <span className="inline-flex overflow-hidden rounded-md border border-[var(--border)] text-xs">
+                <span className="bg-[var(--background)] px-2 py-1.5 text-muted-foreground">
+                  Time range
+                </span>
+                <span className="border-l border-[var(--border)] px-2 py-1.5">All time</span>
+              </span>
+              <span className="inline-flex overflow-hidden rounded-md border border-[var(--border)] text-xs">
+                <span className="bg-[var(--background)] px-2 py-1.5 text-muted-foreground">
+                  Log type
+                </span>
+                <span className="border-l border-[var(--border)] px-2 py-1.5">All</span>
+              </span>
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <ui.Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() => (paused ? stream.resume() : stream.pause())}
-            data-testid="log-pause"
-          >
-            {paused ? <Play size={12} aria-hidden /> : <Pause size={12} aria-hidden />}
-            {paused ? "Resume" : "Pause"}
-          </ui.Button>
-          <ui.Button type="button" size="sm" variant="secondary" onClick={copy}>
-            <Copy size={12} aria-hidden /> Copy
-          </ui.Button>
-          <ui.Button type="button" size="sm" variant="secondary" onClick={download}>
-            <Download size={12} aria-hidden /> Download logs
-          </ui.Button>
-          <ui.Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => setMessage("AI log analysis is a placeholder.")}
-          >
-            AI
-          </ui.Button>
-        </div>
-      </div>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <ui.Button type="button" size="sm" variant="secondary" onClick={copy}>
+                  <Copy size={12} aria-hidden /> Copy
+                </ui.Button>
+                <ui.Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setMessage("AI log analysis is a placeholder.")}
+                >
+                  AI
+                </ui.Button>
+              </div>
+            </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <div className="relative w-full max-w-56">
-          <ui.Input
-            aria-label="Search logs"
-            className="w-full pr-9"
-            value={query}
-            placeholder="Search logs..."
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <Search
-            className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-        </div>
-      </div>
-
-      <div
-        className="mt-3 max-h-[26rem] min-h-[20rem] overflow-auto rounded-md border border-[var(--border)] bg-black/20 font-mono text-xs"
-        role="log"
-        aria-label="Application log lines"
-        data-testid="log-viewer"
-      >
-        {visible.length === 0 ? (
-          <p className="p-6 text-center text-muted-foreground">Waiting for frames…</p>
-        ) : (
-          visible.map((frame, index) => (
-            <LogLine key={`${frame.ts}-${index}`} frame={frame} index={index} />
-          ))
-        )}
-      </div>
+            <div className="relative w-full max-w-56">
+              <ui.Input
+                aria-label="Search logs"
+                className="w-full pr-9"
+                value={query}
+                placeholder="Search logs..."
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              <Search
+                className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+            </div>
+          </div>
+        }
+      />
 
       {message !== null ? (
         <p role="status" className="mt-2 text-xs text-muted-foreground">
@@ -1064,7 +1089,6 @@ function LogLine({ frame, index }: { frame: DeploymentLogFrame; index: number })
   return (
     <div
       className={`flex items-start gap-2 px-2 py-1 ${index % 2 === 0 ? "bg-transparent" : "bg-[var(--foreground)]/[0.04]"}`}
-      data-line={index}
     >
       <span className="shrink-0 rounded-sm bg-black/50 px-1.5 py-0.5 text-[10px] text-muted-foreground">
         {logTimestamp(frame.ts)}

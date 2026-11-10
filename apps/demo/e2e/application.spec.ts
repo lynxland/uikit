@@ -53,6 +53,13 @@ test.describe("Dokploy application detail", () => {
         timeout: 10_000,
       })
       .toBeGreaterThanOrEqual(24);
+    await expect(page.getByTestId("log-toolbar")).toBeVisible();
+    await expect(page.getByTestId("log-status")).toContainText("live");
+    await expect(page.getByLabel("Search logs")).toBeVisible();
+    await page.getByTestId("log-pause").click();
+    await expect(page.getByTestId("log-status")).toContainText("paused");
+    await page.getByTestId("log-pause").click();
+    await expect(page.getByTestId("log-status")).toContainText("live");
 
     await page.getByRole("tab", { name: "Monitoring" }).click();
     await expect(page.getByTestId("metric-chart")).toHaveCount(4);
