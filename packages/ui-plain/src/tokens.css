@@ -45,6 +45,11 @@
   --ring: #2f5bd7;
   --radius: 0.5rem;
 
+  --ui-sidebar: #f7f8fa;
+  --ui-sidebar-fg: #181a1f;
+  --ui-sidebar-border: #d9dce2;
+  --ui-sidebar-accent: #eceff4;
+
   --status-neutral: #626a77;
   --status-success: #1d7f4b;
   --status-warning: #a4610a;

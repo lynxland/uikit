@@ -99,7 +99,8 @@ export function DokployProjectsPage({ from }: { from: string }) {
     <DokployCard>
       <PageLayout
         width="flow"
-        className="[&_.ui-page-layout__title]:text-2xl"
+        titleSize="lg"
+        headerDivider
         icon={<Folder className="size-5 text-muted-foreground" aria-hidden />}
         title="Projects"
         description="Create and manage your projects"

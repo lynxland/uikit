@@ -4,6 +4,8 @@ import {
   LoadingState,
   PageLayout,
   RelativeTime,
+  StatusDot,
+  type StatusTone,
   useUiAdapter,
 } from "@lynxland/uikit-surfaces";
 import { Link } from "@tanstack/react-router";
@@ -16,23 +18,9 @@ import {
   serviceOf,
   servicesEntity,
 } from "@/lib/dokploy";
+import { DEPLOYMENT_STATUS_TONES } from "./shared";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-
-function statusDotClass(status: Deployment["status"]): string {
-  switch (status) {
-    case "success":
-      return "bg-[var(--status-success)]";
-    case "failed":
-      return "bg-[var(--status-danger)]";
-    case "running":
-      return "bg-[var(--status-warning)]";
-    case "queued":
-      return "bg-[var(--status-info)]";
-    default:
-      return "bg-muted-foreground/40";
-  }
-}
 
 function HomeStat({
   label,
@@ -66,7 +54,7 @@ function HomeStat({
 function StatusListCard({
   items,
 }: {
-  items: readonly { label: string; count: number | string; className: string }[];
+  items: readonly { label: string; count: number | string; tone: StatusTone }[];
 }) {
   return (
     <div className="flex min-h-[140px] flex-col gap-3 rounded-xl border border-[var(--border)] bg-background p-5">
@@ -74,7 +62,7 @@ function StatusListCard({
       <ul className="flex flex-col gap-1.5">
         {items.map((item) => (
           <li key={item.label} className="flex items-center gap-2.5 text-sm">
-            <span className={`size-2 shrink-0 rounded-full ${item.className}`} aria-hidden />
+            <StatusDot tone={item.tone} />
             <span className="w-8 font-semibold tabular-nums">{item.count}</span>
             <span className="text-muted-foreground">{item.label}</span>
           </li>
@@ -105,9 +93,9 @@ function RecentDeploymentRow({
   const service = serviceOf(deployment.serviceId);
   const content = (
     <>
-      <span
-        className={`size-2 shrink-0 rounded-full ${statusDotClass(deployment.status)}`}
-        aria-hidden
+      <StatusDot
+        tone={DEPLOYMENT_STATUS_TONES[deployment.status] ?? "neutral"}
+        label={statusLabel(deployment.status)}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-sm">{deployment.serviceName}</span>
@@ -203,7 +191,8 @@ export function DokployHomePage() {
     <DokployCard>
       <PageLayout
         width="flow"
-        className="gap-6 [&_.ui-page-layout__title]:text-3xl"
+        className="gap-6"
+        titleSize="xl"
         title="Welcome back"
         actions={
           <ui.Button asChild className="w-fit">
@@ -242,17 +231,17 @@ export function DokployHomePage() {
               {
                 label: "running",
                 count: stat(status.running),
-                className: "bg-[var(--status-success)]",
+                tone: "success",
               },
               {
                 label: "errored",
                 count: stat(status.error),
-                className: "bg-[var(--status-danger)]",
+                tone: "danger",
               },
               {
                 label: "idle",
                 count: stat(status.idle),
-                className: "bg-muted-foreground/40",
+                tone: "neutral",
               },
             ]}
           />

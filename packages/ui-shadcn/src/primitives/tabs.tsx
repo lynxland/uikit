@@ -9,6 +9,8 @@ const listVariants = cva("flex items-center", {
       underline: "h-9 justify-start gap-1 border-b border-[var(--border)] bg-transparent p-0",
       pills: "inline-flex gap-1 rounded-lg bg-[var(--muted)] p-1",
       filter: "flex-wrap gap-1.5",
+      segmented:
+        "w-full justify-start gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--muted)] p-1",
     },
   },
   defaultVariants: {
@@ -27,6 +29,8 @@ const tabVariants = cva(
           "h-7 gap-1.5 rounded-md px-3 text-[var(--muted-foreground)] hover:text-[var(--foreground)] data-[active]:bg-[var(--background)] data-[active]:text-[var(--foreground)] data-[active]:shadow-sm",
         filter:
           "h-8 gap-1.5 rounded-full border border-[var(--border)] bg-[var(--background)] px-3 text-xs text-[var(--muted-foreground)] hover:border-[var(--ring)] hover:text-[var(--foreground)] data-[active]:border-[var(--primary)] data-[active]:bg-[var(--primary)] data-[active]:text-[var(--primary-foreground)]",
+        segmented:
+          "h-7 flex-none gap-1.5 rounded-md border border-transparent px-3.5 text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] data-[active]:border-[var(--border)] data-[active]:bg-[var(--background)] data-[active]:text-[var(--foreground)] data-[active]:shadow-sm",
       },
     },
     defaultVariants: {

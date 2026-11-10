@@ -40,9 +40,7 @@ function isTheme(value: unknown): value is Theme {
 }
 
 /** Inline pre-paint script for SSR/static HTML (prevents a light flash). */
-export function themeScript(
-  options: { storageKey?: string; defaultTheme?: Theme } = {},
-): string {
+export function themeScript(options: { storageKey?: string; defaultTheme?: Theme } = {}): string {
   const storageKey = options.storageKey ?? "uikit-theme";
   const defaultTheme = options.defaultTheme ?? "dark";
   return `(() => {
@@ -142,7 +140,9 @@ export function ThemeToggle({ className, showLabel = true }: ThemeToggleProps) {
       onClick={toggle}
     >
       <span className="ui-theme-toggle__icon">{theme === "dark" ? <MoonIcon /> : <SunIcon />}</span>
-      {showLabel ? <span className="ui-theme-toggle__label">{theme === "dark" ? "Dark" : "Light"}</span> : null}
+      {showLabel ? (
+        <span className="ui-theme-toggle__label">{theme === "dark" ? "Dark" : "Light"}</span>
+      ) : null}
       <span className="ui-theme-toggle__hint">theme</span>
     </ui.Button>
   );

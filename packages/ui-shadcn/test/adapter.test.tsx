@@ -17,6 +17,7 @@ describe("shadcnAdapter", () => {
     expect(typedAdapter).toBe(shadcnAdapter);
     expect(shadcnAdapter.Button).toBeDefined();
     expect(shadcnAdapter.Select).toBeDefined();
+    expect(shadcnAdapter.Tooltip).toBeDefined();
     expect(shadcnAdapter.icons.ChevronDown).toBeDefined();
     expect(typeof shadcnAdapter.cx).toBe("function");
   });

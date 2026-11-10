@@ -25,7 +25,10 @@ export function Menu({
               type="button"
               role="menuitem"
               disabled={item.disabled}
-              className={cx("ui-plain-menu__item", item.danger === true && "ui-plain-menu__item--danger")}
+              className={cx(
+                "ui-plain-menu__item",
+                item.danger === true && "ui-plain-menu__item--danger",
+              )}
               onClick={() => {
                 setOpen(false);
                 item.onSelect?.();

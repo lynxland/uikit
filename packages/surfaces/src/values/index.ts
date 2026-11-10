@@ -42,3 +42,4 @@ export {
   type StatusTone,
   statusTone,
 } from "./status-badge";
+export { StatusDot, type StatusDotProps } from "./status-dot";

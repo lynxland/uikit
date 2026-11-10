@@ -91,4 +91,36 @@ describe("PageLayout", () => {
     expect(container.querySelector("h1")).toBeNull();
     expect(container.querySelector("header")).toBeNull();
   });
+
+  it("supports title sizes, content width, header divider and tab variants", () => {
+    const { container } = render(
+      withAdapter(
+        <PageLayout
+          title="Settings"
+          titleSize="lg"
+          width="content"
+          maxWidth="50rem"
+          headerDivider
+          tabsVariant="segmented"
+          tabs={[
+            { value: "general", label: "General" },
+            { value: "advanced", label: "Advanced" },
+          ]}
+          currentTab="general"
+        >
+          body
+        </PageLayout>,
+      ),
+    );
+    const page = screen.getByTestId("page-layout");
+    expect(page.className).toContain("ui-page-layout--content");
+    expect(page.getAttribute("data-title-size")).toBe("lg");
+    expect((page as HTMLElement).style.maxWidth).toBe("50rem");
+    expect(container.querySelector(".ui-page-layout__divider")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1 }).getAttribute("data-title-size")).toBe("lg");
+    expect(container.querySelector(".ui-page-layout__tabs")?.getAttribute("data-variant")).toBe(
+      "segmented",
+    );
+    expect(screen.getByRole("tablist").getAttribute("data-variant")).toBe("segmented");
+  });
 });

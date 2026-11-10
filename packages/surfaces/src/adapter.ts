@@ -94,8 +94,24 @@ export interface TabsProps {
   items: readonly TabsItem[];
   value: string;
   onValueChange: (value: string) => void;
-  variant?: "underline" | "pills" | "filter";
+  variant?: "underline" | "pills" | "filter" | "segmented";
   "aria-label"?: string;
+}
+
+/**
+ * Hover/focus label for an icon-only trigger. `trigger` is rendered *as* the
+ * trigger element (no nested button); the adapter owns portal/positioning and
+ * keyboard/focus behaviour. A tooltip augments, never replaces, the trigger's
+ * accessible name (`aria-label` or visible text).
+ */
+export interface TooltipProps {
+  trigger: React.ReactElement;
+  content: ReactNode;
+  side?: "top" | "right" | "bottom" | "left";
+  align?: "start" | "center" | "end";
+  /** Open delay in milliseconds. */
+  delay?: number;
+  disabled?: boolean;
 }
 
 export interface DialogProps {
@@ -197,6 +213,7 @@ export interface UiAdapter {
   Field: React.ComponentType<FieldProps>;
   Popover: React.ComponentType<PopoverProps>;
   Menu: React.ComponentType<MenuProps>;
+  Tooltip: React.ComponentType<TooltipProps>;
   Tabs: React.ComponentType<TabsProps>;
   Dialog: React.ComponentType<DialogProps>;
   Drawer: React.ComponentType<DrawerProps>;

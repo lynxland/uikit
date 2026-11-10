@@ -55,15 +55,17 @@ quickstart, scopes, settings, boom and their libs/features/e2e were deleted.
 - Sidebar header: Dokploy logo, organization switcher with Enterprise badge,
   notification bell. Footer: Update Available card, account menu (theme switch
   inside), version line.
-- Header: collapse toggle, project/environment/service breadcrumb dropdowns,
-  UTC server time. No visible command icon; ⌘K/Ctrl+K opens the palette.
+- Header: desktop collapse toggle / mobile drawer trigger, project/environment/
+  service breadcrumb dropdowns, UTC server time. No visible command icon;
+  ⌘K/Ctrl+K opens the palette.
 - Command palette is app-level (`src/components/command-palette.tsx`): Dialog +
   Input + filtered nav destinations, arrow keys, Enter, Escape.
-- Every main page uses the Dokploy card frame: outer `rounded-xl bg-sidebar
-  p-2.5` + inner `rounded-xl bg-background` (`DokployCard`). Settings pages opt
-  out of viewport fill and centre at 53rem.
-- `--sidebar` is derived in `apps/demo/theme.css` from `background`/`foreground`
-  and mapped to Tailwind `bg-sidebar`; no new palette lives in packages.
+- Every main page uses the Dokploy card frame: outer `rounded-xl
+  bg-[var(--ui-sidebar)] p-2.5` + inner `rounded-xl bg-background`
+  (`DokployCard`). Settings pages opt out of viewport fill and use
+  `PageLayout width="content"` (53rem).
+- `--ui-sidebar*` is owned by `@lynxland/uikit-ui-shadcn/tokens.css`; the demo
+  theme only maps brand typography/spacing, not shell colours or geometry.
 - Brand marks are inline SVG: Dokploy logo, GitHub/GitLab/Bitbucket/Gitea/Slack.
 
 ## Dokploy treatment

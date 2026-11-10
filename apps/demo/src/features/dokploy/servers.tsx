@@ -45,10 +45,11 @@ export function DokploySettingsServersPage() {
   const loading = servers.status === "loading" || servers.status === "idle";
 
   return (
-    <DokployCard fill={false} className="mx-auto w-full max-w-[53rem]">
+    <DokployCard fill={false}>
       <PageLayout
-        width="flow"
-        className="[&_.ui-page-layout__title]:text-2xl"
+        width="content"
+        titleSize="lg"
+        headerDivider
         icon={<ServerIcon className="size-5 text-muted-foreground" aria-hidden />}
         title="Servers"
         description="Add servers to deploy your applications remotely."
@@ -125,47 +126,67 @@ export function DokploySettingsServersPage() {
                   </ui.Button>
 
                   <div className="mt-2 flex items-center gap-1">
-                    <ui.Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="size-7 border border-[var(--border)]"
-                      aria-label={`Open terminal on ${server.name}`}
-                      onClick={() => setMessage("Open terminal is a demo placeholder.")}
-                    >
-                      <Terminal size={13} aria-hidden />
-                    </ui.Button>
-                    <ui.Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="size-7 border border-[var(--border)]"
-                      aria-label={`Edit ${server.name}`}
-                      onClick={() => setMessage("Edit server is a demo placeholder.")}
-                    >
-                      <Pencil size={13} aria-hidden />
-                    </ui.Button>
-                    <ui.Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="size-7 border border-[var(--border)]"
-                      aria-label={`Monitor ${server.name}`}
-                      onClick={() => setMessage("Server monitoring is a demo placeholder.")}
-                    >
-                      <Activity size={13} aria-hidden />
-                    </ui.Button>
-                    <ui.Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="ml-auto size-7 border border-[var(--border)] text-destructive"
-                      aria-label="Remove server"
-                      onClick={() => setDeleting(server)}
-                      data-testid={`server-delete-${server.id}`}
-                    >
-                      <Trash2 size={13} aria-hidden />
-                    </ui.Button>
+                    <ui.Tooltip
+                      content={`Open terminal on ${server.name}`}
+                      trigger={
+                        <ui.Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="size-7 border border-[var(--border)]"
+                          aria-label={`Open terminal on ${server.name}`}
+                          onClick={() => setMessage("Open terminal is a demo placeholder.")}
+                        >
+                          <Terminal size={13} aria-hidden />
+                        </ui.Button>
+                      }
+                    />
+                    <ui.Tooltip
+                      content={`Edit ${server.name}`}
+                      trigger={
+                        <ui.Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="size-7 border border-[var(--border)]"
+                          aria-label={`Edit ${server.name}`}
+                          onClick={() => setMessage("Edit server is a demo placeholder.")}
+                        >
+                          <Pencil size={13} aria-hidden />
+                        </ui.Button>
+                      }
+                    />
+                    <ui.Tooltip
+                      content={`Monitor ${server.name}`}
+                      trigger={
+                        <ui.Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="size-7 border border-[var(--border)]"
+                          aria-label={`Monitor ${server.name}`}
+                          onClick={() => setMessage("Server monitoring is a demo placeholder.")}
+                        >
+                          <Activity size={13} aria-hidden />
+                        </ui.Button>
+                      }
+                    />
+                    <ui.Tooltip
+                      content="Remove server"
+                      trigger={
+                        <ui.Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="ml-auto size-7 border border-[var(--border)] text-destructive"
+                          aria-label="Remove server"
+                          onClick={() => setDeleting(server)}
+                          data-testid={`server-delete-${server.id}`}
+                        >
+                          <Trash2 size={13} aria-hidden />
+                        </ui.Button>
+                      }
+                    />
                   </div>
                 </article>
               );

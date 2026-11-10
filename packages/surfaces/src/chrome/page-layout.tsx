@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useUiAdapter } from "../adapter";
 import { Tabs } from "../controls";
 import { cx } from "../values/classes";
@@ -14,6 +14,9 @@ export interface PageLayoutTab {
   label: ReactNode;
 }
 
+export type PageLayoutTitleSize = "sm" | "md" | "lg" | "xl";
+export type PageLayoutTabsVariant = "underline" | "pills" | "filter" | "segmented";
+
 export interface PageLayoutProps {
   title?: ReactNode;
   description?: ReactNode;
@@ -25,7 +28,16 @@ export interface PageLayoutProps {
   currentTab?: string;
   onTabChange?: (value: string) => void;
   lead?: ReactNode;
-  width?: "flow" | "narrow" | "wide";
+  /** `content` = 53rem for settings-like pages; `maxWidth` overrides any preset. */
+  width?: "flow" | "narrow" | "wide" | "content";
+  /** Explicit CSS length applied to the page container (wins over `width`). */
+  maxWidth?: string;
+  /** Heading scale: sm 18px / md 20px / lg 24px / xl 30px. */
+  titleSize?: PageLayoutTitleSize;
+  /** Full-width rule below the header (Dokploy-style page divider). */
+  headerDivider?: boolean;
+  /** Tab bar presentation; URL wiring stays with the page. */
+  tabsVariant?: PageLayoutTabsVariant;
   className?: string;
   children: ReactNode;
 }
@@ -44,6 +56,10 @@ export function PageLayout({
   onTabChange,
   lead,
   width = "wide",
+  maxWidth,
+  titleSize = "md",
+  headerDivider = false,
+  tabsVariant = "underline",
   className,
   children,
 }: PageLayoutProps) {
@@ -52,12 +68,16 @@ export function PageLayout({
   const showHeader =
     title !== undefined || description !== undefined || icon !== undefined || actions !== undefined;
   const activeTab = currentTab ?? tabs?.[0]?.value ?? "";
+  const style: CSSProperties | undefined = maxWidth !== undefined ? { maxWidth } : undefined;
 
   return (
     <div
       className={merge("ui-page-layout", `ui-page-layout--${width}`, className)}
+      style={style}
       data-testid="page-layout"
       data-width={width}
+      data-title-size={titleSize}
+      data-header-divider={headerDivider ? "true" : undefined}
     >
       {breadcrumb !== undefined || backLink !== undefined ? (
         <div className="ui-page-layout__nav">
@@ -71,13 +91,20 @@ export function PageLayout({
         <header className="ui-page-layout__header">
           {icon !== undefined ? <div className="ui-page-layout__icon">{icon}</div> : null}
           <div className="ui-page-layout__heading">
-            {title !== undefined ? <h1 className="ui-page-layout__title">{title}</h1> : null}
+            {title !== undefined ? (
+              <h1 className="ui-page-layout__title" data-title-size={titleSize}>
+                {title}
+              </h1>
+            ) : null}
             {description !== undefined ? (
               <p className="ui-page-layout__description">{description}</p>
             ) : null}
           </div>
           {actions !== undefined ? <div className="ui-page-layout__actions">{actions}</div> : null}
         </header>
+      ) : null}
+      {headerDivider && showHeader ? (
+        <div className="ui-page-layout__divider" aria-hidden="true" />
       ) : null}
       {lead !== undefined ? <div className="ui-page-layout__lead">{lead}</div> : null}
       {tabs !== undefined && tabs.length > 0 ? (
@@ -86,7 +113,7 @@ export function PageLayout({
           items={tabs.map((tab) => ({ value: tab.value, label: tab.label }))}
           value={activeTab}
           onChange={onTabChange ?? NOOP}
-          variant="underline"
+          variant={tabsVariant}
           aria-label="Sections"
         />
       ) : null}

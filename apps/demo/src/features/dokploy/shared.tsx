@@ -14,20 +14,16 @@ import {
 
 export const SERVICE_STATUS_TONES: Readonly<Record<string, StatusTone>> = {
   running: "success",
-  deploying: "info",
+  deploying: "warning",
   idle: "neutral",
   stopped: "neutral",
   error: "danger",
 };
 
-/** Dokploy service cards use a status dot instead of a pill. */
-export const SERVICE_STATUS_DOT: Readonly<Record<string, string>> = {
-  running: "bg-[var(--status-success)]",
-  deploying: "bg-[var(--status-warning)]",
-  idle: "bg-muted-foreground/40",
-  stopped: "bg-muted-foreground/40",
-  error: "bg-[var(--status-danger)]",
-};
+/** Semantic tone for the dot used by service cards and detail headers. */
+export function serviceStatusTone(status: string): StatusTone {
+  return SERVICE_STATUS_TONES[status] ?? "neutral";
+}
 
 export const DEPLOYMENT_STATUS_TONES: Readonly<Record<string, StatusTone>> = {
   success: "success",

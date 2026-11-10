@@ -34,6 +34,12 @@
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
 
+  /* Sidebar / navigation rail (Chrome L6) */
+  --ui-sidebar: color-mix(in oklab, var(--background) 92%, var(--foreground) 8%);
+  --ui-sidebar-fg: var(--foreground);
+  --ui-sidebar-border: var(--border);
+  --ui-sidebar-accent: color-mix(in oklab, var(--foreground) 9%, transparent);
+
   /* Radius scale (shadcn primitive) */
   --radius: 0.625rem;
   --radius-sm: calc(var(--radius) - 4px);
@@ -80,6 +86,11 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+
+  --ui-sidebar: color-mix(in oklab, var(--background) 92%, var(--foreground) 8%);
+  --ui-sidebar-fg: var(--foreground);
+  --ui-sidebar-border: var(--border);
+  --ui-sidebar-accent: color-mix(in oklab, var(--foreground) 10%, transparent);
 
   --status-neutral: oklch(0.708 0 0);
   --status-success: oklch(0.765 0.177 163.223);

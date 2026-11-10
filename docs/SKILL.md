@@ -20,7 +20,7 @@
 
 | 呈现层（L5–L7） | 角色 |
 |---|---|
-| **Value** | 纯展示：StatusBadge / RelativeTime / StatCard / states |
+| **Value** | 纯展示：StatusBadge / StatusDot / RelativeTime / StatCard / states |
 | **Control** | 受控 props：DataTable / FilterBar / Pager / Tabs / Form |
 | **View** | 绑定句柄 → 控件 props：CollectionView / RecordView / FormView |
 | **Chrome** | 页壳：PageLayout / AppShell / SectionCard（唯一 h1 所有者） |
@@ -357,8 +357,11 @@ import { shadcnAdapter } from "@lynxland/uikit-ui-shadcn";
 ```
 
 契约：`Button` / `Input` / `Textarea` / `Select` / `Checkbox` / `DateTimeInput` /
-`Switch` / `Field` / `Popover` / `Menu` / `Tabs` / `Dialog` / `Drawer` / `Badge` /
-`Card` / `Table` slots / `icons` / 可选 `cx`。`Button asChild` 可把 Router `<Link>` 渲染成按钮。具体 UI 库的 compound API 不泄漏到 surfaces。
+`Switch` / `Field` / `Popover` / `Menu` / `Tooltip` / `Tabs` / `Dialog` / `Drawer` /
+`Badge` / `Card` / `Table` slots / `icons` / 可选 `cx`。`Button asChild` 可把
+Router `<Link>` 渲染成按钮；`Tooltip` 的 `trigger` 同样按元素渲染，不嵌套按钮。
+`Tabs` 的 variant 为 `underline | pills | filter | segmented`。具体 UI 库的
+compound API 不泄漏到 surfaces。
 
 - 默认：`@lynxland/uikit-ui-shadcn`（Base UI 1.9 + shadcn）。
 - 参考最小实现：`@lynxland/uikit-ui-plain`（无 Tailwind/Base UI）。
@@ -458,7 +461,11 @@ import { shadcnAdapter } from "@lynxland/uikit-ui-shadcn";
       ]}
     />
   }
-  width="wide" // flow | narrow | wide
+  tabsVariant="segmented" // underline | pills | filter | segmented
+  titleSize="lg" // sm 18 / md 20 / lg 24 / xl 30
+  headerDivider
+  width="wide" // flow | narrow | wide | content(53rem)
+  maxWidth="53rem" // optional CSS length override
 >
   <CollectionView ... />
 </PageLayout>
@@ -472,6 +479,12 @@ import { shadcnAdapter } from "@lynxland/uikit-ui-shadcn";
   activePath={pathname}
   header={<GlobalActions />}
   collapsible
+  variant="plain" // plain | floating
+  sidebarWidth="16rem"
+  collapsedMode="icon" // hide | icon
+  storageKey="app.sidebar.collapsed"
+  mobileOpen={mobileOpen}
+  onMobileOpenChange={setMobileOpen}
 >
   <Outlet />
 </AppShell>
@@ -482,15 +495,22 @@ import { shadcnAdapter } from "@lynxland/uikit-ui-shadcn";
 
 - `PageLayout` 是唯一 h1 所有者；应用可换成自己的壳。
 - **宽度规则**：`wide` = 72rem（列表/详情/日志/事件等数据页，默认）；
-  `narrow` = 48rem（表单/设置等阅读型页面）；`flow` = 不设 max-width（真正的边缘到边缘页面）。
+  `narrow` = 48rem（表单/设置等阅读型页面）；`content` = 53rem（设置卡片内文）；
+  `flow` = 不设 max-width（真正的边缘到边缘页面）。
   preset 的 `FormPage`/`SettingsPage` 默认 `narrow`，其余默认 `wide`。
   demo 的 Dokploy clone 统一用 `flow` 作为页面卡基线（卡片自身控制边距），
-  设置页在卡片内再收窄到 53rem；不要把 `wide`/`narrow` 和 `flow` 混在同一个
-  页面卡里（见 `docs/audits/2026-11-10-dokploy-core-gaps.md` §6.2）。
+  设置页用 `width="content"`（不再套 `max-w-[53rem]`）；不要把
+  `wide`/`narrow` 和 `flow` 混在同一个页面卡里
+  （见 `docs/audits/2026-11-10-dokploy-core-gaps.md` §6.2）。
+- `titleSize` 控制 h1（18/20/24/30px），`headerDivider` 提供页头下通栏分隔线。
+  窄屏 ≤640px 时页头换行，actions 落到标题下方，h1 始终可见。
 - `AppShell` 只管导航/高度链；用 `renderLink` / `activePath` 接 Router，不 import Router。
   侧边栏有 `sidebarHeader` / `sidebarFooter` 两个完整插槽（团队切换器、用户菜单等），
   主内容区有 `header` 插槽；`collapsible` + `collapsed`/`defaultCollapsed`/`onCollapsedChange`
-  提供内置收起按钮与受控状态。
+  提供内置收起按钮与受控状态。`variant="floating"` + `sidebarWidth` 负责浮层几何；
+  `collapsedMode="icon"` 渲染带 Tooltip 的 3.5rem 图标轨；`mobileOpen` /
+  `onMobileOpenChange` 控制 <768px 的 overlay drawer。sidebar 颜色走
+  `--ui-sidebar*` token。
 - `Breadcrumb` / `SectionCard` / `ScopeSwitcher` / `Stepper` / `RouteErrorBoundary` 同层。
 
 ### 5.5 字段三拆

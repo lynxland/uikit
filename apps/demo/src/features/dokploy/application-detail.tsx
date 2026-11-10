@@ -7,6 +7,7 @@ import {
   MetricChart,
   type MetricSeries,
   RelativeTime,
+  StatusDot,
   useStreamFrames,
   useStreamState,
   useUiAdapter,
@@ -64,12 +65,13 @@ import {
 import { EditApplicationDrawer } from "./forms";
 import {
   appNameFor,
+  DEPLOYMENT_STATUS_TONES,
   DeleteCommandDialog,
   DeployButton,
   DeploymentLogDrawer,
   deploymentStatusLabel,
   formatDuration,
-  SERVICE_STATUS_DOT,
+  serviceStatusTone,
 } from "./shared";
 
 export type ApplicationTab =
@@ -853,16 +855,7 @@ function DeploymentsTab({
                   <span>
                     {index + 1}. {deploymentStatusLabel(deployment.status)}
                   </span>
-                  <span
-                    className={`size-2 rounded-full ${
-                      deployment.status === "success"
-                        ? "bg-[var(--status-success)]"
-                        : deployment.status === "failed"
-                          ? "bg-[var(--status-danger)]"
-                          : "bg-[var(--status-warning)]"
-                    }`}
-                    aria-hidden
-                  />
+                  <StatusDot tone={DEPLOYMENT_STATUS_TONES[deployment.status] ?? "neutral"} />
                 </div>
                 <div className="mt-1 truncate text-sm text-muted-foreground">
                   {deployment.commitMessage}
@@ -1500,13 +1493,10 @@ export function DokployApplicationDetailPage({
           <div className="flex min-w-0 items-start gap-3">
             <span className="relative inline-flex size-8 shrink-0 items-center justify-center">
               <Globe size={22} aria-hidden />
-              <span
-                className={`absolute -left-1.5 top-1/2 size-2.5 -translate-y-1/2 rounded-full ring-2 ring-[var(--background)] ${
-                  SERVICE_STATUS_DOT[service.status] ?? SERVICE_STATUS_DOT.idle
-                }`}
-                title={service.status}
-                role="img"
-                aria-label={`Status: ${service.status}`}
+              <StatusDot
+                tone={serviceStatusTone(service.status)}
+                label={`Status: ${service.status}`}
+                className="absolute -left-1.5 top-1/2 -translate-y-1/2 ring-2 ring-[var(--background)] [--ui-status-dot-size:0.625rem]"
               />
             </span>
             <div className="min-w-0">
@@ -1520,42 +1510,50 @@ export function DokployApplicationDetailPage({
               Dokploy Server
             </span>
             <div className="flex items-center gap-1">
-              <ui.Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="size-7"
-                aria-label="Edit application"
-                data-testid="edit-application"
-                onClick={() => setEditOpen(true)}
-              >
-                <Pencil size={14} aria-hidden />
-              </ui.Button>
-              <ui.Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="size-7 text-muted-foreground hover:text-destructive"
-                aria-label="Delete application"
-                data-testid="delete-application"
-                onClick={() => setDeleteOpen(true)}
-              >
-                <Trash2 size={14} aria-hidden />
-              </ui.Button>
+              <ui.Tooltip
+                content="Edit application"
+                trigger={
+                  <ui.Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="size-7"
+                    aria-label="Edit application"
+                    data-testid="edit-application"
+                    onClick={() => setEditOpen(true)}
+                  >
+                    <Pencil size={14} aria-hidden />
+                  </ui.Button>
+                }
+              />
+              <ui.Tooltip
+                content="Delete application"
+                trigger={
+                  <ui.Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 text-muted-foreground hover:text-destructive"
+                    aria-label="Delete application"
+                    data-testid="delete-application"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    <Trash2 size={14} aria-hidden />
+                  </ui.Button>
+                }
+              />
             </div>
           </div>
         </header>
 
         <div className="border-t border-[var(--border)] px-6 py-4">
-          <div className="dokploy-tabs">
-            <ui.Tabs
-              aria-label="Application sections"
-              variant="pills"
-              items={APPLICATION_TABS.map((item) => ({ value: item.value, label: item.label }))}
-              value={tab}
-              onValueChange={(value) => onTabChange(value as ApplicationTab)}
-            />
-          </div>
+          <ui.Tabs
+            aria-label="Application sections"
+            variant="segmented"
+            items={APPLICATION_TABS.map((item) => ({ value: item.value, label: item.label }))}
+            value={tab}
+            onValueChange={(value) => onTabChange(value as ApplicationTab)}
+          />
         </div>
 
         <div className="px-6 pb-8 pt-2">

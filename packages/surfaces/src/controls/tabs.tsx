@@ -5,7 +5,7 @@ export interface TabsControlProps {
   items: readonly TabsItem[];
   value: string;
   onChange: (value: string) => void;
-  variant?: "underline" | "pills" | "filter";
+  variant?: "underline" | "pills" | "filter" | "segmented";
   "aria-label"?: string;
   className?: string;
 }
@@ -26,7 +26,7 @@ export function Tabs({
   const ui = useUiAdapter();
   const merge = ui.cx ?? cx;
   return (
-    <div className={merge("ui-tabs", className)}>
+    <div className={merge("ui-tabs", className)} data-variant={variant ?? "underline"}>
       <ui.Tabs
         items={items}
         value={value}

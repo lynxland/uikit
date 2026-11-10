@@ -38,6 +38,16 @@
   --ui-accent: var(--primary, currentColor);
   --ui-danger: var(--destructive, currentColor);
 
+  /*
+   * Navigation rail (Chrome L6). The real `--ui-sidebar-*` tokens live in the
+   * UI adapter; these fallbacks keep surfaces usable when it omits them (see
+   * the layered defaults below).
+   */
+  --ui-sidebar-fallback: var(--card, var(--ui-bg));
+  --ui-sidebar-fg-fallback: var(--ui-fg);
+  --ui-sidebar-border-fallback: var(--ui-border);
+  --ui-sidebar-accent-fallback: color-mix(in oklab, var(--ui-accent) 10%, transparent);
+
   --ui-status-neutral: var(--status-neutral, currentColor);
   --ui-status-ok: var(--status-success, currentColor);
   --ui-status-warn: var(--status-warning, currentColor);
@@ -52,6 +62,19 @@
 
   --ui-focus: var(--ring, currentColor);
   --ui-shadow: color-mix(in oklab, currentColor 12%, transparent);
+}
+
+/*
+ * Layered so adapter tokens (unlayered) always win even when surfaces.css is
+ * imported after them.
+ */
+@layer ui-surfaces-defaults {
+  :root {
+    --ui-sidebar: var(--card, var(--ui-bg));
+    --ui-sidebar-fg: var(--ui-fg);
+    --ui-sidebar-border: var(--ui-border);
+    --ui-sidebar-accent: color-mix(in oklab, var(--ui-accent) 10%, transparent);
+  }
 }
 
 /* ---- layout helpers ---------------------------------------------------- */
@@ -603,6 +626,62 @@
 
 .ui-status-badge {
   display: inline-flex;
+}
+
+.ui-status-dot {
+  display: inline-block;
+  flex: none;
+  width: var(--ui-status-dot-size, 0.5rem);
+  height: var(--ui-status-dot-size, 0.5rem);
+  border-radius: var(--ui-radius-full);
+  background: var(--ui-status-neutral);
+}
+
+.ui-status-dot[data-tone="success"] {
+  background: var(--ui-status-ok);
+}
+
+.ui-status-dot[data-tone="warning"] {
+  background: var(--ui-status-warn);
+}
+
+.ui-status-dot[data-tone="danger"] {
+  background: var(--ui-status-err);
+}
+
+.ui-status-dot[data-tone="info"] {
+  background: var(--ui-status-info);
+}
+
+.ui-status-dot--pulse {
+  position: relative;
+}
+
+.ui-status-dot--pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: inherit;
+  animation: ui-status-dot-pulse 1.6s ease-out infinite;
+}
+
+@keyframes ui-status-dot-pulse {
+  0% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-status-dot--pulse::after {
+    animation: none;
+  }
 }
 
 .ui-relative-time {
@@ -1322,6 +1401,10 @@
   max-width: 72rem;
 }
 
+.ui-page-layout--content {
+  max-width: 53rem;
+}
+
 .ui-page-layout__nav {
   display: flex;
   flex-wrap: wrap;
@@ -1399,9 +1482,17 @@
 
 .ui-page-layout__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--ui-space-3);
   min-width: 0;
+}
+
+.ui-page-layout__divider {
+  height: 1px;
+  flex: none;
+  margin-inline: calc(-1 * var(--ui-space-6));
+  background: var(--ui-border);
 }
 
 .ui-page-layout__icon {
@@ -1423,11 +1514,23 @@
 .ui-page-layout__title {
   margin: 0;
   overflow: hidden;
-  font-size: var(--ui-text-xl);
+  font-size: 1.25rem;
   font-weight: 600;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ui-page-layout__title[data-title-size="sm"] {
+  font-size: 1.125rem;
+}
+
+.ui-page-layout__title[data-title-size="lg"] {
+  font-size: 1.5rem;
+}
+
+.ui-page-layout__title[data-title-size="xl"] {
+  font-size: 1.875rem;
 }
 
 .ui-page-layout__description {
@@ -1450,6 +1553,9 @@
 
 .ui-page-layout__tabs {
   min-width: 0;
+}
+
+.ui-page-layout__tabs[data-variant="underline"] {
   border-bottom: 1px solid var(--ui-border);
 }
 
@@ -1461,6 +1567,9 @@
 }
 
 .ui-app-shell {
+  --ui-app-shell-sidebar-width: 14rem;
+  --ui-app-shell-sidebar-collapsed-width: 3.5rem;
+  --ui-app-shell-sidebar-inset: 0.5rem;
   display: flex;
   width: 100%;
   height: 100dvh;
@@ -1474,11 +1583,20 @@
   display: flex;
   flex: none;
   flex-direction: column;
-  width: 14rem;
+  width: var(--ui-app-shell-sidebar-width);
   min-height: 0;
   overflow: hidden;
-  border-right: 1px solid var(--ui-border);
-  background: var(--ui-card);
+  border-right: 1px solid var(--ui-sidebar-border, var(--ui-sidebar-border-fallback));
+  background: var(--ui-sidebar, var(--ui-sidebar-fallback));
+  color: var(--ui-sidebar-fg, var(--ui-sidebar-fg-fallback));
+}
+
+/* Dokploy-style floating rail: 8px inset around a rounded sidebar panel. */
+.ui-app-shell--floating .ui-app-shell__sidebar {
+  width: calc(var(--ui-app-shell-sidebar-width) - 2 * var(--ui-app-shell-sidebar-inset));
+  margin: var(--ui-app-shell-sidebar-inset);
+  border: 1px solid var(--ui-sidebar-border, var(--ui-sidebar-border-fallback));
+  border-radius: var(--ui-radius-lg);
 }
 
 .ui-app-shell__sidebar-header {
@@ -1514,7 +1632,144 @@
   min-width: 0;
 }
 
-.ui-app-shell[data-collapsed="true"] .ui-app-shell__sidebar {
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="hide"] > .ui-app-shell__sidebar {
+  display: none;
+}
+
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="icon"] > .ui-app-shell__sidebar {
+  width: var(--ui-app-shell-sidebar-collapsed-width);
+}
+
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="icon"]
+  > .ui-app-shell__sidebar
+  .ui-app-shell__nav {
+  padding-inline: var(--ui-space-1);
+}
+
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="icon"]
+  > .ui-app-shell__sidebar
+  .ui-app-shell__link {
+  justify-content: center;
+  gap: 0;
+  min-height: 2.25rem;
+  padding-inline: 0;
+}
+
+/* Visually hidden, still the link's accessible name. */
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="icon"]
+  > .ui-app-shell__sidebar
+  .ui-app-shell__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="icon"]
+  > .ui-app-shell__sidebar
+  .ui-app-shell__chevron,
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="icon"]
+  > .ui-app-shell__sidebar
+  .ui-app-shell__section-label {
+  display: none;
+}
+
+/*
+ * Custom links keep their icon/badge outside the Router anchor. In the rail the
+ * anchor becomes a transparent overlay so the whole 3.5rem target stays
+ * clickable while the label text remains its accessible name.
+ */
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="icon"]
+  > .ui-app-shell__sidebar
+  .ui-app-shell__link--custom
+  .ui-app-shell__label {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="icon"]
+  > .ui-app-shell__sidebar
+  .ui-app-shell__link--custom
+  .ui-app-shell__label
+  > * {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+}
+
+/* ui-plain wraps the trigger in a tooltip anchor span; keep that full-size. */
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="icon"]
+  > .ui-app-shell__sidebar
+  .ui-app-shell__link--custom
+  .ui-app-shell__label
+  > *
+  > * {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+}
+
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="icon"]
+  > .ui-app-shell__sidebar
+  .ui-app-shell__section
+  + .ui-app-shell__section {
+  margin-top: var(--ui-space-2);
+  padding-top: var(--ui-space-2);
+  border-top: 1px solid var(--ui-sidebar-border, var(--ui-sidebar-border-fallback));
+}
+
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="icon"]
+  > .ui-app-shell__sidebar
+  .ui-app-shell__badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 1rem;
+  padding: 0 0.2rem;
+  font-size: 9px;
+  line-height: 1rem;
+}
+
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="icon"]
+  > .ui-app-shell__sidebar
+  .ui-app-shell__sublist {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/*
+ * The rail is navigation-only: arbitrary header/footer slots (team switcher,
+ * account menu, update card) cannot be meaningfully squeezed into 3.5rem.
+ * Expand the sidebar to reach them.
+ */
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="icon"]
+  > .ui-app-shell__sidebar
+  .ui-app-shell__sidebar-header,
+.ui-app-shell[data-collapsed="true"][data-collapsed-mode="icon"]
+  > .ui-app-shell__sidebar
+  .ui-app-shell__footer {
   display: none;
 }
 
@@ -1551,7 +1806,7 @@
   gap: var(--ui-space-2);
   padding: var(--ui-space-1) var(--ui-space-2);
   border-radius: var(--ui-radius-md);
-  color: color-mix(in oklab, var(--ui-fg) 72%, transparent);
+  color: color-mix(in oklab, var(--ui-sidebar-fg, var(--ui-sidebar-fg-fallback)) 72%, transparent);
   font-size: var(--ui-text-sm);
   text-decoration: none;
   transition:
@@ -1571,8 +1826,12 @@
 }
 
 .ui-app-shell__link:hover {
-  background: var(--ui-muted);
-  color: var(--ui-fg);
+  background: color-mix(
+    in oklab,
+    var(--ui-sidebar-accent, var(--ui-sidebar-accent-fallback)) 55%,
+    transparent
+  );
+  color: var(--ui-sidebar-fg, var(--ui-sidebar-fg-fallback));
 }
 
 .ui-app-shell__link:focus-visible {
@@ -1581,8 +1840,8 @@
 }
 
 .ui-app-shell__link[data-active="true"] {
-  background: color-mix(in oklab, var(--ui-accent) 10%, transparent);
-  color: var(--ui-fg);
+  background: var(--ui-sidebar-accent, var(--ui-sidebar-accent-fallback));
+  color: var(--ui-sidebar-fg, var(--ui-sidebar-fg-fallback));
   font-weight: 500;
 }
 
@@ -1594,7 +1853,7 @@
   inset-inline-start: 0;
   width: 3px;
   border-radius: 999px;
-  background: var(--ui-accent);
+  background: var(--ui-sidebar-fg, var(--ui-sidebar-fg-fallback));
   opacity: 0.8;
 }
 
@@ -1649,11 +1908,11 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  color: var(--ui-muted-fg);
+  color: color-mix(in oklab, var(--ui-sidebar-fg, var(--ui-sidebar-fg-fallback)) 65%, transparent);
 }
 
 .ui-app-shell__link[data-active="true"] .ui-app-shell__icon {
-  color: var(--ui-accent);
+  color: var(--ui-sidebar-fg, var(--ui-sidebar-fg-fallback));
 }
 
 .ui-app-shell__label {
@@ -1665,7 +1924,7 @@
 .ui-app-shell__footer {
   flex: none;
   padding: var(--ui-space-3) var(--ui-space-4);
-  border-top: 1px solid var(--ui-border);
+  border-top: 1px solid var(--ui-sidebar-border, var(--ui-sidebar-border-fallback));
 }
 
 .ui-app-shell__main {
@@ -1673,6 +1932,63 @@
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* ---- narrow-screen navigation drawer ---------------------------------- */
+
+.ui-app-shell__mobile {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+}
+
+.ui-app-shell__mobile-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 50%);
+}
+
+.ui-app-shell__mobile-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(18rem, calc(100vw - 3rem));
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--ui-sidebar-border, var(--ui-sidebar-border-fallback));
+  background: var(--ui-sidebar, var(--ui-sidebar-fallback));
+  color: var(--ui-sidebar-fg, var(--ui-sidebar-fg-fallback));
+  box-shadow: 0 24px 60px rgb(0 0 0 / 25%);
+  outline: none;
+}
+
+.ui-app-shell__mobile-close {
+  position: absolute;
+  top: var(--ui-space-1);
+  right: var(--ui-space-1);
+  z-index: 2;
+}
+
+.ui-app-shell .ui-app-shell__mobile-panel .ui-app-shell__sidebar-header {
+  padding-right: 2.75rem;
+}
+
+@media (min-width: 768px) {
+  .ui-app-shell__mobile {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .ui-app-shell > .ui-app-shell__sidebar {
+    display: none;
+  }
+
+  .ui-app-shell__header {
+    padding-inline: var(--ui-space-2);
+  }
 }
 
 .ui-section-card {
@@ -1871,8 +2187,24 @@
     padding: var(--ui-space-4);
   }
 
-  .ui-app-shell__sidebar {
-    width: 11rem;
+  .ui-page-layout__heading {
+    flex: 1 1 12rem;
+  }
+
+  .ui-page-layout__actions {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .ui-page-layout__title {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .ui-page-layout__divider {
+    margin-inline: calc(-1 * var(--ui-space-4));
   }
 
   .ui-record-view__hero {

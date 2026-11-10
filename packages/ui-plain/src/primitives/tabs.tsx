@@ -83,6 +83,7 @@ export function Tabs({
       aria-label={ariaLabel}
       className={cx("ui-plain-tabs", `ui-plain-tabs--${variant}`)}
       data-variant={variant}
+      data-full-width={variant === "segmented" ? "true" : undefined}
     >
       {items.map((item, index) => {
         const selected = item.value === value;

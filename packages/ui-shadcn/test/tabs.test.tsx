@@ -56,7 +56,7 @@ describe("Tabs", () => {
     );
   });
 
-  it("renders the three visual variants", () => {
+  it("renders the four visual variants", () => {
     const { rerender } = render(
       <Tabs aria-label="Sections" items={items} value="overview" onValueChange={() => {}} />,
     );
@@ -83,5 +83,19 @@ describe("Tabs", () => {
       />,
     );
     expect(screen.getByRole("tab", { name: "Overview" }).className).toContain("rounded-full");
+
+    rerender(
+      <Tabs
+        aria-label="Sections"
+        items={items}
+        value="overview"
+        onValueChange={() => {}}
+        variant="segmented"
+      />,
+    );
+    expect(screen.getByRole("tablist").className).toContain("w-full");
+    expect(screen.getByRole("tab", { name: "Overview" }).className).toContain(
+      "data-[active]:bg-[var(--background)]",
+    );
   });
 });

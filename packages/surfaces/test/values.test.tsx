@@ -12,6 +12,7 @@ import {
   RelativeTime,
   SecretValue,
   StatusBadge,
+  StatusDot,
   statusTone,
 } from "../src/values";
 import { testAdapter } from "./test-adapter";
@@ -38,6 +39,25 @@ describe("StatusBadge", () => {
   });
 });
 
+describe("StatusDot", () => {
+  it("renders semantic tones and an optional accessible label", () => {
+    const { rerender } = render(withAdapter(<StatusDot tone="success" />));
+    const decorative = document.querySelector(".ui-status-dot");
+    expect(decorative?.getAttribute("data-tone")).toBe("success");
+    expect(decorative?.getAttribute("aria-hidden")).toBe("true");
+
+    rerender(withAdapter(<StatusDot tone="danger" label="Service failed" pulse />));
+    const labelled = screen.getByRole("img", { name: "Service failed" });
+    expect(labelled.getAttribute("data-tone")).toBe("danger");
+    expect(labelled.className).toContain("ui-status-dot--pulse");
+  });
+
+  it("lets aria-label win over label", () => {
+    render(withAdapter(<StatusDot tone="warning" label="Ignored" aria-label="Deploying" />));
+    expect(screen.getByRole("img", { name: "Deploying" })).toBeTruthy();
+  });
+});
+
 describe("RelativeTime", () => {
   it("formats against the injected clock", () => {
     const now = new Date("2026-01-01T12:00:00Z");
@@ -53,7 +73,9 @@ describe("RelativeTime", () => {
     const now = new Date("2026-01-01T12:00:00Z");
     const value = new Date("2026-01-01T11:58:00Z");
     render(
-      withAdapter(<RelativeTime value={value} now={now} locale="en" format="long" numeric="always" />),
+      withAdapter(
+        <RelativeTime value={value} now={now} locale="en" format="long" numeric="always" />,
+      ),
     );
     expect(screen.getByText("2 minutes ago")).toBeTruthy();
   });

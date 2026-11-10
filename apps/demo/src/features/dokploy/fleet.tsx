@@ -67,7 +67,8 @@ export function DokployTraefikPage() {
     <DokployCard>
       <PageLayout
         width="flow"
-        className="[&_.ui-page-layout__title]:text-2xl"
+        titleSize="lg"
+        headerDivider
         title="Traefik File System"
         description="Manage all the files and directories in `/etc/dokploy/traefik`."
       >
@@ -209,7 +210,8 @@ export function DokployDockerPage() {
     <DokployCard>
       <PageLayout
         width="flow"
-        className="[&_.ui-page-layout__title]:text-2xl"
+        titleSize="lg"
+        headerDivider
         title="Docker Containers"
         description="See all the containers of your dokploy server"
         actions={
@@ -256,13 +258,18 @@ export function DokployDockerPage() {
                   <td className="px-4 py-3 text-xs">{row.status}</td>
                   <td className="px-4 py-3 font-mono text-xs">{row.image}</td>
                   <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      aria-label={`Actions for ${row.name}`}
-                      className="inline-flex size-7 items-center justify-center rounded-md hover:bg-[var(--border)]"
-                    >
-                      <MoreHorizontal size={14} aria-hidden />
-                    </button>
+                    <ui.Tooltip
+                      content={`Actions for ${row.name}`}
+                      trigger={
+                        <button
+                          type="button"
+                          aria-label={`Actions for ${row.name}`}
+                          className="inline-flex size-7 items-center justify-center rounded-md hover:bg-[var(--border)]"
+                        >
+                          <MoreHorizontal size={14} aria-hidden />
+                        </button>
+                      }
+                    />
                   </td>
                 </tr>
               ))}
@@ -284,7 +291,8 @@ export function DokployRequestsPage() {
     <DokployCard className="mx-auto w-full max-w-[70rem]">
       <PageLayout
         width="flow"
-        className="[&_.ui-page-layout__title]:text-2xl"
+        titleSize="lg"
+        headerDivider
         title="Requests"
         description="See all the incoming requests that pass trough Traefik"
       >
@@ -394,7 +402,8 @@ export function DokploySchedulesPage() {
     <DokployCard fill={false} innerClassName="min-h-[25rem]">
       <PageLayout
         width="flow"
-        className="[&_.ui-page-layout__title]:text-2xl"
+        titleSize="lg"
+        headerDivider
         title="Scheduled Tasks"
         description="Schedule tasks to run automatically at specified intervals."
         actions={
@@ -431,38 +440,53 @@ export function DokploySchedulesPage() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <ui.Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="size-7"
-                  aria-label={`Delete ${schedule.name}`}
-                  onClick={() =>
-                    setSchedules((current) => current.filter((item) => item.id !== schedule.id))
+                <ui.Tooltip
+                  content={`Delete ${schedule.name}`}
+                  trigger={
+                    <ui.Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      aria-label={`Delete ${schedule.name}`}
+                      onClick={() =>
+                        setSchedules((current) => current.filter((item) => item.id !== schedule.id))
+                      }
+                    >
+                      <Trash2 size={13} aria-hidden />
+                    </ui.Button>
                   }
-                >
-                  <Trash2 size={13} aria-hidden />
-                </ui.Button>
-                <ui.Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="size-7"
-                  aria-label={`Run ${schedule.name}`}
-                  onClick={() => setMessage(`Running ${schedule.name} is a demo placeholder.`)}
-                >
-                  <Play size={13} aria-hidden />
-                </ui.Button>
-                <ui.Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="size-7"
-                  aria-label={`Edit ${schedule.name}`}
-                  onClick={() => setMessage(`Editing ${schedule.name} is a demo placeholder.`)}
-                >
-                  <Pencil size={13} aria-hidden />
-                </ui.Button>
+                />
+                <ui.Tooltip
+                  content={`Run ${schedule.name}`}
+                  trigger={
+                    <ui.Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      aria-label={`Run ${schedule.name}`}
+                      onClick={() => setMessage(`Running ${schedule.name} is a demo placeholder.`)}
+                    >
+                      <Play size={13} aria-hidden />
+                    </ui.Button>
+                  }
+                />
+                <ui.Tooltip
+                  content={`Edit ${schedule.name}`}
+                  trigger={
+                    <ui.Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      aria-label={`Edit ${schedule.name}`}
+                      onClick={() => setMessage(`Editing ${schedule.name} is a demo placeholder.`)}
+                    >
+                      <Pencil size={13} aria-hidden />
+                    </ui.Button>
+                  }
+                />
               </div>
             </article>
           ))}

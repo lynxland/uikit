@@ -52,7 +52,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 ) {
   if (asChild) {
     if (!isValidElement(children)) {
-      throw new Error("@lynxland/uikit-ui-shadcn Button: asChild expects a single React element child.");
+      throw new Error(
+        "@lynxland/uikit-ui-shadcn Button: asChild expects a single React element child.",
+      );
     }
     const child = children as ReactElement<{ className?: string }>;
     return cloneElement(child, {

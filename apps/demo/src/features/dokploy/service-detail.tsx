@@ -1,5 +1,11 @@
 import { useRecord } from "@lynxland/uikit-react";
-import { CopyButton, ErrorState, LoadingState, useUiAdapter } from "@lynxland/uikit-surfaces";
+import {
+  CopyButton,
+  ErrorState,
+  LoadingState,
+  StatusDot,
+  useUiAdapter,
+} from "@lynxland/uikit-surfaces";
 import { useNavigate } from "@tanstack/react-router";
 import { Eye, EyeOff, Globe, Pencil, RefreshCw, Square, Terminal, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -7,7 +13,7 @@ import { BrandMark } from "@/components/brand-mark";
 import { DokployCard } from "@/components/page-card";
 import { deleteService, environmentOf, type Service, servicesEntity } from "@/lib/dokploy";
 import { EnvironmentTab, LogsTab, MonitoringTab } from "./application-detail";
-import { appNameFor, DeleteCommandDialog, DeployButton, SERVICE_STATUS_DOT } from "./shared";
+import { appNameFor, DeleteCommandDialog, DeployButton, serviceStatusTone } from "./shared";
 
 export type ServiceTab = "general" | "environment" | "logs" | "monitoring" | "backups" | "advanced";
 
@@ -355,13 +361,10 @@ export function DokployServiceDetailPage({
           <div className="flex min-w-0 items-start gap-3">
             <span className="relative inline-flex size-8 shrink-0 items-center justify-center">
               {kindIcon(row.kind)}
-              <span
-                className={`absolute -left-1.5 top-1/2 size-2.5 -translate-y-1/2 rounded-full ring-2 ring-[var(--background)] ${
-                  SERVICE_STATUS_DOT[row.status] ?? SERVICE_STATUS_DOT.idle
-                }`}
-                title={row.status}
-                role="img"
-                aria-label={`Status: ${row.status}`}
+              <StatusDot
+                tone={serviceStatusTone(row.status)}
+                label={`Status: ${row.status}`}
+                className="absolute -left-1.5 top-1/2 -translate-y-1/2 ring-2 ring-[var(--background)] [--ui-status-dot-size:0.625rem]"
               />
             </span>
             <div className="min-w-0">
@@ -375,40 +378,48 @@ export function DokployServiceDetailPage({
               Dokploy Server
             </span>
             <div className="flex items-center gap-1">
-              <ui.Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="size-7"
-                aria-label="Edit service"
-                onClick={() => undefined}
-              >
-                <Pencil size={14} aria-hidden />
-              </ui.Button>
-              <ui.Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="size-7 text-muted-foreground hover:text-destructive"
-                aria-label="Delete service"
-                onClick={() => setDeleteOpen(true)}
-              >
-                <Trash2 size={14} aria-hidden />
-              </ui.Button>
+              <ui.Tooltip
+                content="Edit service"
+                trigger={
+                  <ui.Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="size-7"
+                    aria-label="Edit service"
+                    onClick={() => undefined}
+                  >
+                    <Pencil size={14} aria-hidden />
+                  </ui.Button>
+                }
+              />
+              <ui.Tooltip
+                content="Delete service"
+                trigger={
+                  <ui.Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 text-muted-foreground hover:text-destructive"
+                    aria-label="Delete service"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    <Trash2 size={14} aria-hidden />
+                  </ui.Button>
+                }
+              />
             </div>
           </div>
         </header>
 
         <div className="border-t border-[var(--border)] px-6 py-4">
-          <div className="dokploy-tabs">
-            <ui.Tabs
-              aria-label="Service sections"
-              variant="pills"
-              items={tabs.map((item) => ({ value: item.value, label: item.label }))}
-              value={activeTab}
-              onValueChange={(value) => onTabChange(value as ServiceTab)}
-            />
-          </div>
+          <ui.Tabs
+            aria-label="Service sections"
+            variant="segmented"
+            items={tabs.map((item) => ({ value: item.value, label: item.label }))}
+            value={activeTab}
+            onValueChange={(value) => onTabChange(value as ServiceTab)}
+          />
         </div>
 
         <div className="px-6 pb-8 pt-2">

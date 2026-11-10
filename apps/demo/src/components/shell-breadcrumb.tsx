@@ -188,22 +188,27 @@ export function ShellBreadcrumb() {
               ) : (
                 <CrumbText current>{appId === "new" ? "New application" : appId}</CrumbText>
               )}
-              <ui.Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="ml-0.5 size-6 text-muted-foreground"
-                aria-label="Close service"
-                onClick={() => {
-                  void navigate({
-                    to: "/dashboard/project/$projectId/environment/$environmentId",
-                    params: { projectId, environmentId: envId },
-                  });
-                }}
-                data-testid="breadcrumb-close-service"
-              >
-                <X size={13} aria-hidden="true" />
-              </ui.Button>
+              <ui.Tooltip
+                content="Close service"
+                trigger={
+                  <ui.Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="ml-0.5 size-6 text-muted-foreground"
+                    aria-label="Close service"
+                    onClick={() => {
+                      void navigate({
+                        to: "/dashboard/project/$projectId/environment/$environmentId",
+                        params: { projectId, environmentId: envId },
+                      });
+                    }}
+                    data-testid="breadcrumb-close-service"
+                  >
+                    <X size={13} aria-hidden="true" />
+                  </ui.Button>
+                }
+              />
             </li>
           ) : null}
         </ol>

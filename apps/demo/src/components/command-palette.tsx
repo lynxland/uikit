@@ -33,18 +33,22 @@ export function CommandPaletteTrigger({ className }: { className?: string }) {
   const ui = useUiAdapter();
   const { setOpen } = useCommandPalette();
   return (
-    <ui.Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className={className}
-      aria-label="Open command palette"
-      title="Search (⌘K)"
-      data-testid="command-trigger"
-      onClick={() => setOpen(true)}
-    >
-      <Search size={15} aria-hidden="true" />
-    </ui.Button>
+    <ui.Tooltip
+      content="Search (⌘K)"
+      trigger={
+        <ui.Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={className}
+          aria-label="Open command palette"
+          data-testid="command-trigger"
+          onClick={() => setOpen(true)}
+        >
+          <Search size={15} aria-hidden="true" />
+        </ui.Button>
+      }
+    />
   );
 }
 

@@ -19,6 +19,7 @@ import {
   Table,
   Tabs,
   Textarea,
+  Tooltip,
 } from "./primitives";
 
 /**
@@ -40,6 +41,7 @@ export const plainAdapter: UiAdapter = {
   Field,
   Menu,
   Popover,
+  Tooltip,
   Tabs,
   Dialog,
   Drawer,

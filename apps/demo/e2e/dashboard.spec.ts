@@ -41,6 +41,7 @@ test.describe("Dokploy shell and home", () => {
     page,
   }) => {
     await page.goto("/dashboard/home");
+    await expect(page.getByRole("heading", { level: 1, name: "Welcome back" })).toBeVisible();
     await page.keyboard.press("Control+k");
     const input = page.getByTestId("command-input");
     await expect(input).toBeVisible();
@@ -66,6 +67,57 @@ test.describe("Dokploy shell and home", () => {
     await expect(page.getByLabel("Domain")).toHaveValue("hostinger.dokploy.com");
     await expect(page.getByRole("heading", { level: 2, name: "Web Server" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Web Server");
+  });
+
+  test("mobile shell uses a drawer and keeps the page heading visible", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/dashboard/home");
+
+    const heading = page.getByRole("heading", { level: 1, name: "Welcome back" });
+    await expect(heading).toBeVisible();
+    const box = await heading.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThan(0);
+
+    // The desktop rail is hidden; navigation lives in the drawer.
+    await expect(page.getByTestId("mobile-menu-toggle")).toBeVisible();
+    await expect(page.getByTestId("app-shell-mobile-nav")).toHaveCount(0);
+
+    await page.getByTestId("mobile-menu-toggle").click();
+    const drawer = page.getByTestId("app-shell-mobile-nav");
+    await expect(drawer).toBeVisible();
+    await expect(drawer.getByRole("navigation", { name: "Main" })).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("app-shell-mobile-nav")).toHaveCount(0);
+
+    await page.getByTestId("mobile-menu-toggle").click();
+    await drawer.getByRole("link", { name: "Projects" }).click();
+    await expect(page).toHaveURL(/\/dashboard\/projects$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
+    await expect(page.getByTestId("app-shell-mobile-nav")).toHaveCount(0);
+  });
+
+  test("desktop collapsed mode is an icon rail", async ({ page }) => {
+    await page.goto("/dashboard/home");
+    const shell = page.getByTestId("app-shell");
+    await expect(shell).toHaveAttribute("data-collapsed-mode", "icon");
+    await page.getByTestId("sidebar-toggle").click();
+    await expect(shell).toHaveAttribute("data-collapsed", "true");
+    const nav = page.getByRole("navigation", { name: "Main" });
+    await expect(nav.getByRole("link", { name: "Projects", exact: true })).toBeVisible();
+    await expect(page.getByTestId("sidebar-toggle")).toHaveAttribute(
+      "aria-label",
+      "Expand sidebar",
+    );
+    await page.getByTestId("sidebar-toggle").click();
+    await expect(shell).not.toHaveAttribute("data-collapsed", "true");
+
+    // Collapse again and verify the icon-only target is still clickable.
+    await page.getByTestId("sidebar-toggle").click();
+    await expect(shell).toHaveAttribute("data-collapsed", "true");
+    await nav.getByRole("link", { name: "Projects", exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard\/projects$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
   });
 
   test("fleet pages match the official layouts", async ({ page }) => {

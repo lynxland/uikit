@@ -13,7 +13,7 @@ import {
   Outlet,
   useRouterState,
 } from "@tanstack/react-router";
-import { PanelLeft } from "lucide-react";
+import { Menu, PanelLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CommandPaletteProvider } from "@/components/command-palette";
 import { DokploySidebarFooter, DokploySidebarHeader } from "@/components/dokploy-sidebar";
@@ -36,7 +36,7 @@ function ServerTime() {
   const time = now.toISOString().slice(11, 19);
   return (
     <div
-      className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground"
+      className="hidden shrink-0 items-center gap-2 text-xs text-muted-foreground md:flex"
       data-testid="server-time"
     >
       <span>
@@ -55,11 +55,17 @@ function RootLayout() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const activeItem = findActiveNavItem(nav, pathname);
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <CommandPaletteProvider>
       <AppShell
         className="dokploy-shell"
+        variant="floating"
+        sidebarWidth="16rem"
+        collapsedMode="icon"
+        mobileOpen={mobileOpen}
+        onMobileOpenChange={setMobileOpen}
         sidebarHeader={<DokploySidebarHeader />}
         sidebarFooter={<DokploySidebarFooter />}
         nav={nav}
@@ -83,18 +89,34 @@ function RootLayout() {
         onCollapsedChange={setCollapsed}
         header={
           <div className="flex min-w-0 items-center gap-3">
-            <ui.Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-8 shrink-0"
-              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              aria-expanded={!collapsed}
-              data-testid="sidebar-toggle"
-              onClick={() => setCollapsed((current) => !current)}
-            >
-              <PanelLeft size={16} aria-hidden="true" />
-            </ui.Button>
+            <div className="flex shrink-0 md:hidden">
+              <ui.Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                aria-label="Open navigation"
+                aria-expanded={mobileOpen}
+                data-testid="mobile-menu-toggle"
+                onClick={() => setMobileOpen(true)}
+              >
+                <Menu size={16} aria-hidden="true" />
+              </ui.Button>
+            </div>
+            <div className="hidden shrink-0 md:flex">
+              <ui.Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                aria-expanded={!collapsed}
+                data-testid="sidebar-toggle"
+                onClick={() => setCollapsed((current) => !current)}
+              >
+                <PanelLeft size={16} aria-hidden="true" />
+              </ui.Button>
+            </div>
             <span className="h-4 w-px shrink-0 bg-[var(--border)]" aria-hidden="true" />
             <div className="min-w-0 flex-1">
               <ShellBreadcrumb />

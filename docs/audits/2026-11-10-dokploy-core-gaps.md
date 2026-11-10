@@ -387,3 +387,26 @@ corresponding CSS/duplicated implementation, and keeps `pnpm check` +
 - `pnpm exec biome check apps/demo/src apps/demo/e2e` green.
 - Desktop captures: `/home/qiulin/artifacts/dokploy-live/*.png`; mobile capture:
   `/home/qiulin/artifacts/dokploy-live/home-mobile.png`.
+
+## 13. P0 batch landed (2026-11-10)
+
+- [x] **6.1 AppShell** — `variant="plain|floating"`, `sidebarWidth`,
+  `collapsedMode="hide|icon"` (3.5rem rail + adapter Tooltip), `storageKey`,
+  `mobileOpen`/`onMobileOpenChange` with backdrop/Escape/focus-trap drawer;
+  `--ui-sidebar*` tokens in `ui-shadcn` + `ui-plain` with surfaces fallbacks;
+  demo shell geometry overrides deleted.
+- [x] **6.2 PageLayout** — `titleSize` (18/20/24/30), `headerDivider`,
+  `tabsVariant`, `width="content"` (53rem) + `maxWidth`, responsive header
+  stacking; adapter `Tabs` gains a full-width `segmented` variant in both
+  adapters; demo arbitrary title variants / `.dokploy-tabs` / `max-w-[53rem]`
+  removed.
+- [x] **6.5 Tooltip** — `Tooltip` contract (`trigger`/`content`/`side`/
+  `align`/`delay`/`disabled`) implemented with Base UI (portal, positioning,
+  focus, Escape) and a dependency-free `ui-plain` fallback; used by the icon
+  rail and demo icon-only edit/delete/server/breadcrumb actions.
+- [x] **6.6 StatusDot** — `StatusDot` value with `StatusTone`, optional
+  screen-reader label, `pulse` and className; demo service/header/home dots
+  use it with no app-level colour classes.
+- [x] Verification — `pnpm check`, `pnpm --filter demo build`,
+  `pnpm --filter demo e2e` (18/18 incl. mobile drawer + icon rail),
+  Biome on the touched source trees.

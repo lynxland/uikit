@@ -8,21 +8,10 @@
 @source "../../packages/ui-shadcn/src";
 @source "../../packages/surfaces/src";
 
-/*
- * Dokploy's shell uses a `bg-sidebar` card rail around an inner background
- * surface. There is no sidebar token in the shared palette, so derive it from
- * the semantic foreground/background pair instead of introducing a new color
- * table. Light: near-white grey. Dark: one step above the background.
- */
-:root {
-  --sidebar: color-mix(in oklab, var(--background) 92%, var(--foreground) 8%);
-}
-
 /* shadcn 语义变量 → Tailwind color token（demo 只做映射，不私产色表）。 */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-sidebar: var(--sidebar);
 
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
@@ -57,32 +46,14 @@
   --color-chart-5: var(--chart-5);
 }
 
-/* Dokploy's sidebar is wider than uikit's compact default (16rem container). */
-@media (min-width: 768px) {
-  .ui-app-shell__sidebar {
-    width: 16rem;
-  }
-}
-
 /*
  * Dokploy shell fidelity overrides (demo-local).
  *
- * The shared AppShell stays the source of structure; the official Dokploy
- * chrome differs in a few presentational details: the sidebar shares the page
- * background, section labels are title case, the active item is a filled pill
- * without a rail, and the main header is a translucent top strip.
+ * The floating geometry, width and sidebar colours now come from AppShell
+ * props plus the `--ui-sidebar-*` tokens. Only brand-specific typography and
+ * spacing stay here: title-case section labels, compact link metrics and a
+ * borderless main header.
  */
-/* Floating 16rem rail: 8px margin + 240px panel, total 256px as in Dokploy. */
-@media (min-width: 768px) {
-  .dokploy-shell .ui-app-shell__sidebar {
-    width: calc(16rem - 16px);
-    margin: 8px;
-    border: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
-    border-radius: 14px;
-    background: var(--sidebar);
-  }
-}
-
 .dokploy-shell .ui-app-shell__sidebar-header {
   padding: 0.5rem;
   color: inherit;
@@ -100,7 +71,7 @@
 
 .dokploy-shell .ui-app-shell__section-label {
   padding: 0.5rem 0.5rem 0.25rem;
-  color: var(--muted-foreground);
+  color: color-mix(in oklab, var(--ui-sidebar-fg) 62%, transparent);
   font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: normal;
@@ -112,28 +83,24 @@
   min-height: 2rem;
   padding: 0.375rem 0.5rem;
   border-radius: 0.5rem;
-  color: var(--muted-foreground);
+  color: color-mix(in oklab, var(--ui-sidebar-fg) 68%, transparent);
   font-size: 0.8125rem;
   font-weight: 400;
 }
 
 .dokploy-shell .ui-app-shell__link:hover {
-  background: color-mix(in oklab, var(--foreground) 6%, transparent);
-  color: var(--foreground);
+  background: color-mix(in oklab, var(--ui-sidebar-accent) 55%, transparent);
+  color: var(--ui-sidebar-fg);
 }
 
 .dokploy-shell .ui-app-shell__link[data-active="true"] {
-  background: color-mix(in oklab, var(--foreground) 9%, transparent);
-  color: var(--foreground);
+  background: var(--ui-sidebar-accent);
+  color: var(--ui-sidebar-fg);
   font-weight: 500;
 }
 
 .dokploy-shell .ui-app-shell__link[data-active="true"]::before {
   display: none;
-}
-
-.dokploy-shell .ui-app-shell__link[data-active="true"] .ui-app-shell__icon {
-  color: var(--foreground);
 }
 
 .dokploy-shell .ui-app-shell__icon {
@@ -165,40 +132,6 @@
   box-shadow:
     0 1px 2px rgb(0 0 0 / 0.18),
     0 12px 32px rgb(0 0 0 / 0.08);
-}
-
-/* Segmented application tab bar: full-width muted rail, filled active tab. */
-.dokploy-tabs [role="tablist"] {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  width: 100%;
-  gap: 0.125rem;
-  padding: 0.25rem;
-  border-radius: 0.5rem;
-  background: color-mix(in oklab, var(--foreground) 4%, transparent);
-}
-
-.dokploy-tabs [role="tab"] {
-  flex: none;
-  height: 1.75rem;
-  padding-inline: 0.875rem;
-  border: 1px solid transparent;
-  border-radius: 0.375rem;
-  color: var(--muted-foreground);
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.dokploy-tabs [role="tab"]:hover {
-  color: var(--foreground);
-}
-
-.dokploy-tabs [role="tab"][data-active] {
-  border-color: color-mix(in oklab, var(--foreground) 12%, transparent);
-  background: color-mix(in oklab, var(--foreground) 10%, transparent);
-  color: var(--foreground);
-  box-shadow: none;
 }
 
 /* Code editor used by the Environment tab. */

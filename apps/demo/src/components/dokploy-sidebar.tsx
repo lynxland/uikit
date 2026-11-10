@@ -1,4 +1,4 @@
-import { useTheme, useUiAdapter } from "@lynxland/uikit-surfaces";
+import { StatusDot, useTheme, useUiAdapter } from "@lynxland/uikit-surfaces";
 import { useNavigate } from "@tanstack/react-router";
 import { Bell, ChevronsUpDown, Download } from "lucide-react";
 import { useState } from "react";
@@ -101,9 +101,8 @@ export function DokploySidebarFooter() {
       >
         <Download size={14} aria-hidden="true" />
         <span>Update Available</span>
-        <span className="absolute right-3 inline-flex size-2" aria-hidden="true">
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--status-success)] opacity-60" />
-          <span className="relative inline-flex size-2 rounded-full bg-[var(--status-success)]" />
+        <span className="absolute right-3 inline-flex" aria-hidden="true">
+          <StatusDot tone="success" pulse />
         </span>
       </ui.Button>
 

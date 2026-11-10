@@ -29,3 +29,4 @@ export { Select } from "./select";
 export { Switch } from "./switch";
 export { Table } from "./table";
 export { listVariants, Tabs, tabVariants } from "./tabs";
+export { Tooltip } from "./tooltip";

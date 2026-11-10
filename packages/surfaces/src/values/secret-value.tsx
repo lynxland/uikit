@@ -38,9 +38,7 @@ export function SecretValue({
       data-secret-value="true"
       {...(testId !== undefined ? { "data-testid": testId } : {})}
     >
-      <code className="ui-secret-value__code">
-        {revealed ? value : "••••••••••••"}
-      </code>
+      <code className="ui-secret-value__code">{revealed ? value : "••••••••••••"}</code>
       {masked ? (
         <ui.Button
           type="button"

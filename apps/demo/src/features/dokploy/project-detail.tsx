@@ -6,6 +6,7 @@ import {
   LoadingState,
   PageLayout,
   RelativeTime,
+  StatusDot,
   useUiAdapter,
 } from "@lynxland/uikit-surfaces";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -22,7 +23,7 @@ import {
   servicesEntity,
 } from "@/lib/dokploy";
 import { CreateApplicationDialog } from "./forms";
-import { SERVICE_STATUS_DOT } from "./shared";
+import { serviceStatusTone } from "./shared";
 
 type ServiceSort =
   | "lastDeploy-desc"
@@ -145,13 +146,10 @@ function ServiceCard({
         open();
       }}
     >
-      <span
-        className={`absolute -right-1 -top-1 size-2.5 rounded-full ring-2 ring-[var(--background)] ${
-          SERVICE_STATUS_DOT[service.status] ?? SERVICE_STATUS_DOT.idle
-        }`}
-        title={service.status}
-        role="img"
-        aria-label={`Status: ${service.status}`}
+      <StatusDot
+        tone={serviceStatusTone(service.status)}
+        label={`Status: ${service.status}`}
+        className="absolute -right-1 -top-1 ring-2 ring-[var(--background)] [--ui-status-dot-size:0.625rem]"
       />
       <div className="flex items-start gap-3">
         <div className="pt-0.5 opacity-0 transition-opacity group-hover:opacity-100" data-checkbox>
@@ -288,7 +286,8 @@ export function DokployProjectEnvironmentPage({
     <DokployCard>
       <PageLayout
         width="flow"
-        className="[&_.ui-page-layout__title]:text-2xl"
+        titleSize="lg"
+        headerDivider
         icon={<FolderInput className="size-5 text-muted-foreground" aria-hidden />}
         title={
           <span className="inline-flex min-w-0 flex-wrap items-center gap-2">

@@ -265,7 +265,10 @@ export function DataTable<Row extends RowData>({
               } = extra;
               const activate = (event: { target: EventTarget | null }) => {
                 const target = event.target as HTMLElement | null;
-                if (target !== null && target.closest("button, a, input, label, select, textarea") !== null) {
+                if (
+                  target !== null &&
+                  target.closest("button, a, input, label, select, textarea") !== null
+                ) {
                   return;
                 }
                 onRowClick?.(original);

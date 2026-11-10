@@ -32,10 +32,11 @@ export function SettingsPlaceholderPage({
   description: string;
 }) {
   return (
-    <DokployCard fill={false} className="mx-auto w-full max-w-[53rem]">
+    <DokployCard fill={false}>
       <PageLayout
-        width="flow"
-        className="[&_.ui-page-layout__title]:text-2xl"
+        width="content"
+        titleSize="lg"
+        headerDivider
         title={title}
         description={description}
       >
@@ -86,10 +87,11 @@ export function DokploySshKeysPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   return (
-    <DokployCard fill={false} className="mx-auto w-full max-w-[53rem]">
+    <DokployCard fill={false}>
       <PageLayout
-        width="flow"
-        className="[&_.ui-page-layout__title]:text-2xl"
+        width="content"
+        titleSize="lg"
+        headerDivider
         icon={<KeyRound className="size-5 text-muted-foreground" aria-hidden />}
         title="SSH Keys"
         description="Create and manage SSH Keys, you can use them to access your servers, git private repositories, and more."
@@ -105,26 +107,38 @@ export function DokploySshKeysPage() {
                 {index + 1}. {key.name}
               </span>
               <span className="flex shrink-0 items-center gap-1">
-                <ui.Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="size-7"
-                  aria-label={`Edit ${key.name}`}
-                  onClick={() => setMessage("Editing SSH keys is a placeholder in this clone.")}
-                >
-                  <Pencil size={13} aria-hidden />
-                </ui.Button>
-                <ui.Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="size-7 text-destructive"
-                  aria-label={`Delete ${key.name}`}
-                  onClick={() => setMessage("Deleting SSH keys is a placeholder in this clone.")}
-                >
-                  <Trash2 size={13} aria-hidden />
-                </ui.Button>
+                <ui.Tooltip
+                  content={`Edit ${key.name}`}
+                  trigger={
+                    <ui.Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      aria-label={`Edit ${key.name}`}
+                      onClick={() => setMessage("Editing SSH keys is a placeholder in this clone.")}
+                    >
+                      <Pencil size={13} aria-hidden />
+                    </ui.Button>
+                  }
+                />
+                <ui.Tooltip
+                  content={`Delete ${key.name}`}
+                  trigger={
+                    <ui.Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-7 text-destructive"
+                      aria-label={`Delete ${key.name}`}
+                      onClick={() =>
+                        setMessage("Deleting SSH keys is a placeholder in this clone.")
+                      }
+                    >
+                      <Trash2 size={13} aria-hidden />
+                    </ui.Button>
+                  }
+                />
               </span>
             </div>
           ))}
@@ -253,10 +267,11 @@ export function DokployGitProvidersPage() {
   );
 
   return (
-    <DokployCard fill={false} className="mx-auto w-full max-w-[53rem]">
+    <DokployCard fill={false}>
       <PageLayout
-        width="flow"
-        className="[&_.ui-page-layout__title]:text-2xl"
+        width="content"
+        titleSize="lg"
+        headerDivider
         icon={<GitBranch className="size-5 text-muted-foreground" aria-hidden />}
         title="Git Providers"
         description="Connect your Git provider for authentication."
@@ -310,26 +325,40 @@ export function DokployGitProvidersPage() {
                   }}
                 />
               </div>
-              <ui.Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="size-7"
-                aria-label={`Open ${connection.name}`}
-                onClick={() => setMessage("Opening provider connections is a demo placeholder.")}
-              >
-                <ExternalLink size={13} aria-hidden />
-              </ui.Button>
-              <ui.Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="size-7 text-muted-foreground hover:text-destructive"
-                aria-label={`Delete ${connection.name}`}
-                onClick={() => setMessage("Deleting provider connections is a demo placeholder.")}
-              >
-                <Trash2 size={13} aria-hidden />
-              </ui.Button>
+              <ui.Tooltip
+                content={`Open ${connection.name}`}
+                trigger={
+                  <ui.Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="size-7"
+                    aria-label={`Open ${connection.name}`}
+                    onClick={() =>
+                      setMessage("Opening provider connections is a demo placeholder.")
+                    }
+                  >
+                    <ExternalLink size={13} aria-hidden />
+                  </ui.Button>
+                }
+              />
+              <ui.Tooltip
+                content={`Delete ${connection.name}`}
+                trigger={
+                  <ui.Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 text-muted-foreground hover:text-destructive"
+                    aria-label={`Delete ${connection.name}`}
+                    onClick={() =>
+                      setMessage("Deleting provider connections is a demo placeholder.")
+                    }
+                  >
+                    <Trash2 size={13} aria-hidden />
+                  </ui.Button>
+                }
+              />
             </div>
           ))}
         </div>
@@ -356,10 +385,11 @@ export function DokployWebServerPage() {
   const action = (label: string) => setMessage(`${label} is a demo placeholder.`);
 
   return (
-    <DokployCard fill={false} className="mx-auto w-full max-w-[53rem]">
+    <DokployCard fill={false}>
       <PageLayout
-        width="flow"
-        className="[&_.ui-page-layout__title]:text-2xl"
+        width="content"
+        titleSize="lg"
+        headerDivider
         icon={<Globe className="size-5 text-muted-foreground" aria-hidden />}
         title="Server Domain"
         description="Add a domain to your server application."
@@ -496,10 +526,11 @@ export function DokployUsersPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   return (
-    <DokployCard fill={false} className="mx-auto w-full max-w-[53rem]">
+    <DokployCard fill={false}>
       <PageLayout
-        width="flow"
-        className="[&_.ui-page-layout__title]:text-2xl"
+        width="content"
+        titleSize="lg"
+        headerDivider
         icon={<Users className="size-5 text-muted-foreground" aria-hidden />}
         title="Users"
         description="Add your users to your Dokploy account."
@@ -530,16 +561,21 @@ export function DokployUsersPage() {
                   <td className="px-5 py-4">Disabled</td>
                   <td className="px-5 py-4 text-muted-foreground">{user.created}</td>
                   <td className="px-5 py-4">
-                    <ui.Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      aria-label={`Actions for ${user.email}`}
-                      onClick={() => setMessage("User actions are a demo placeholder.")}
-                    >
-                      <span aria-hidden>•••</span>
-                    </ui.Button>
+                    <ui.Tooltip
+                      content={`Actions for ${user.email}`}
+                      trigger={
+                        <ui.Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-7"
+                          aria-label={`Actions for ${user.email}`}
+                          onClick={() => setMessage("User actions are a demo placeholder.")}
+                        >
+                          <span aria-hidden>•••</span>
+                        </ui.Button>
+                      }
+                    />
                   </td>
                 </tr>
               ))}
@@ -586,10 +622,11 @@ export function DokployNotificationsPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   return (
-    <DokployCard fill={false} className="mx-auto w-full max-w-[53rem]">
+    <DokployCard fill={false}>
       <PageLayout
-        width="flow"
-        className="[&_.ui-page-layout__title]:text-2xl"
+        width="content"
+        titleSize="lg"
+        headerDivider
         icon={<Bell className="size-5 text-muted-foreground" aria-hidden />}
         title="Notifications"
         description="Add your providers to receive notifications, like Discord, Slack, Telegram, Teams, Email, Resend, Lark."
@@ -604,26 +641,36 @@ export function DokployNotificationsPage() {
                 <BrandMark provider={channel.provider} className="size-3.5" />
               </span>
               <span className="min-w-0 flex-1 truncate text-sm font-medium">{channel.name}</span>
-              <ui.Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="size-7"
-                aria-label={`Edit ${channel.name}`}
-                onClick={() => setMessage("Editing notifications is a demo placeholder.")}
-              >
-                <Pencil size={13} aria-hidden />
-              </ui.Button>
-              <ui.Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="size-7 text-destructive"
-                aria-label={`Delete ${channel.name}`}
-                onClick={() => setMessage("Deleting notifications is a demo placeholder.")}
-              >
-                <Trash2 size={13} aria-hidden />
-              </ui.Button>
+              <ui.Tooltip
+                content={`Edit ${channel.name}`}
+                trigger={
+                  <ui.Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="size-7"
+                    aria-label={`Edit ${channel.name}`}
+                    onClick={() => setMessage("Editing notifications is a demo placeholder.")}
+                  >
+                    <Pencil size={13} aria-hidden />
+                  </ui.Button>
+                }
+              />
+              <ui.Tooltip
+                content={`Delete ${channel.name}`}
+                trigger={
+                  <ui.Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 text-destructive"
+                    aria-label={`Delete ${channel.name}`}
+                    onClick={() => setMessage("Deleting notifications is a demo placeholder.")}
+                  >
+                    <Trash2 size={13} aria-hidden />
+                  </ui.Button>
+                }
+              />
             </div>
           ))}
         </div>
@@ -656,10 +703,11 @@ export function DokployProfilePage() {
   const [saved, setSaved] = useState(false);
 
   return (
-    <DokployCard fill={false} className="mx-auto w-full max-w-[53rem]">
+    <DokployCard fill={false}>
       <PageLayout
-        width="flow"
-        className="[&_.ui-page-layout__title]:text-2xl"
+        width="content"
+        titleSize="lg"
+        headerDivider
         title="Profile"
         description="Account details, organization and appearance."
         actions={

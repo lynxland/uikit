@@ -1,6 +1,6 @@
 import { Menu as BaseMenu } from "@base-ui/react/menu";
-import { Fragment } from "react";
 import type { MenuProps } from "@lynxland/uikit-surfaces/adapter";
+import { Fragment } from "react";
 import { cx } from "./cx";
 
 /**

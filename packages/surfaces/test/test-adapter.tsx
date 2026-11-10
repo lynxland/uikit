@@ -29,6 +29,7 @@ import type {
   SwitchProps,
   TabsProps,
   TextareaProps,
+  TooltipProps,
   UiAdapter,
 } from "../src/adapter";
 
@@ -217,10 +218,8 @@ function Menu({ trigger, items, "aria-label": ariaLabel }: MenuProps) {
   const [open, setOpen] = useState(false);
   return (
     <div className="test-menu" data-open={open ? "true" : "false"}>
-      <span
-        onClick={() => setOpen((current) => !current)}
-        role="presentation"
-      >
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: test adapter mirrors the real trigger */}
+      <span onClick={() => setOpen((current) => !current)} role="presentation">
         {trigger}
       </span>
       {open ? (
@@ -244,6 +243,22 @@ function Menu({ trigger, items, "aria-label": ariaLabel }: MenuProps) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function Tooltip({ trigger, content, side, disabled }: TooltipProps) {
+  const [open, setOpen] = useState(false);
+  const element = cloneElement(trigger as ReactElement<Record<string, unknown>>, {
+    onMouseEnter: () => setOpen(true),
+    onMouseLeave: () => setOpen(false),
+    onFocus: () => setOpen(true),
+    onBlur: () => setOpen(false),
+  });
+  return (
+    <span className="test-tooltip" data-side={side}>
+      {element}
+      {open && !disabled ? <span role="tooltip">{content}</span> : null}
+    </span>
   );
 }
 
@@ -343,6 +358,7 @@ export const testAdapter: UiAdapter = {
   Field,
   Menu,
   Popover,
+  Tooltip,
   Tabs,
   Dialog,
   Drawer,

@@ -19,6 +19,7 @@ import {
   Table,
   Tabs,
   Textarea,
+  Tooltip,
 } from "./primitives";
 
 /**
@@ -39,6 +40,7 @@ export const shadcnAdapter: UiAdapter = {
   Field,
   Menu,
   Popover,
+  Tooltip,
   Tabs,
   Dialog,
   Drawer,

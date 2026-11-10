@@ -1,9 +1,11 @@
 export {
   AppShell,
-  findActiveNavItem,
+  type AppShellCollapsedMode,
   type AppShellNavItem,
   type AppShellNavSection,
   type AppShellProps,
+  type AppShellVariant,
+  findActiveNavItem,
 } from "./app-shell";
 export {
   Breadcrumb,
@@ -11,16 +13,12 @@ export {
   type BreadcrumbProps,
 } from "./breadcrumb";
 export {
-  type Theme,
-  ThemeProvider,
-  type ThemeProviderProps,
-  themeScript,
-  ThemeToggle,
-  type ThemeToggleProps,
-  type ThemeContextValue,
-  useTheme,
-} from "./theme";
-export { PageLayout, type PageLayoutProps, type PageLayoutTab } from "./page-layout";
+  PageLayout,
+  type PageLayoutProps,
+  type PageLayoutTab,
+  type PageLayoutTabsVariant,
+  type PageLayoutTitleSize,
+} from "./page-layout";
 export {
   describeUnknownError,
   RouteErrorBoundary,
@@ -29,3 +27,13 @@ export {
 export { ScopeSwitcher, type ScopeSwitcherItem, type ScopeSwitcherProps } from "./scope-switcher";
 export { SectionCard, type SectionCardProps } from "./section-card";
 export { Stepper, type StepperProps, type StepperStep } from "./stepper";
+export {
+  type Theme,
+  type ThemeContextValue,
+  ThemeProvider,
+  type ThemeProviderProps,
+  ThemeToggle,
+  type ThemeToggleProps,
+  themeScript,
+  useTheme,
+} from "./theme";

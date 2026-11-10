@@ -962,11 +962,11 @@ export interface FilterField {
   items={tabs}
   value={current}
   onChange={onChange}
-  variant="underline" | "pills" | "filter"
+  variant="underline" | "pills" | "filter" | "segmented"
 />
 ```
 
-- 一个受控 Tabs 控件覆盖模块 tab、详情 tab、过滤分片 tab。
+- 一个受控 Tabs 控件覆盖模块 tab、详情 tab、过滤分片 tab、全宽分段 tab。
 - 写入律（push/replace）由调用点决定；Tabs 不 import Router。
 - 键盘/aria 在一个地方实现。
 
@@ -1002,8 +1002,9 @@ export interface FilterField {
 
 #### Values
 
-- `StatusBadge`、`RelativeTime`、`CopyButton`、`SecretReveal`、`DiffView`、
-  `JsonField`、`StatCard`、`MetricChart`、`FieldValue`、`LoadingState`/`EmptyState`/`ErrorState`。
+- `StatusBadge`、`StatusDot`（tone + 可选无障碍标签 + pulse）、`RelativeTime`、
+  `CopyButton`、`SecretReveal`、`DiffView`、`JsonField`、`StatCard`、`MetricChart`、
+  `FieldValue`、`LoadingState`/`EmptyState`/`ErrorState`。
 - 值视图只依赖 L2 类型或纯 props；不 import 数据层、Router、绑定。
 
 ### 6.2 视图（L5 Views）
@@ -1088,8 +1089,12 @@ export interface FilterField {
   tabs={moduleTabs}
   currentTab={tab}
   onTabChange={setTab}
+  tabsVariant="underline" | "pills" | "filter" | "segmented"
+  titleSize="sm" | "md" | "lg" | "xl"
+  headerDivider
   lead={<FiringBanner />}
-  width="flow" | "narrow" | "wide"
+  width="flow" | "narrow" | "wide" | "content"
+  maxWidth="53rem"
 >
   <CollectionView ... />
 </PageLayout>
@@ -1099,10 +1104,14 @@ export interface FilterField {
 
 - `PageLayout` 是唯一渲染 `h1` 的层（或应用自有壳）。视图不渲染 h1。
 - `PageLayout` 不取数；`title` 由页面/页面模板传入。
-- **宽度三档**：`wide` = 72rem（列表/详情/日志/事件等数据页，默认）；
-  `narrow` = 48rem（表单/设置等阅读型页面）；`flow` = 不设 max-width。
+- **宽度四档**：`wide` = 72rem（列表/详情/日志/事件等数据页，默认）；
+  `narrow` = 48rem（表单/设置等阅读型页面）；`content` = 53rem（设置卡片内文）；
+  `flow` = 不设 max-width。`maxWidth` 可覆盖任意预设。
   preset 的 `FormPage`/`SettingsPage` 默认 `narrow`，其余默认 `wide`；
   同一应用不要混用 `flow` 造成宽度漂移。
+- `titleSize` 映射 18/20/24/30px（默认 `md` = 20px）；`headerDivider` 在页头下
+  渲染通栏分隔线；`tabsVariant` 决定 tab 外观，默认 `underline`。
+  窄屏（≤640px）页头允许换行，actions 移到标题下方，h1 不再被挤成零宽。
 - `PageLayout` 的 `tabs` 只是受控渲染；URL 接线归页面或 `useSearchState`。
 - `PageLayout` 可选；**kit 不强制消费方使用**。fleetly 的 `PageFrame`、
   torchwood 的 `PageCard` 可以保留，只要它们遵守“唯一 h1/唯一页头”的规则。
@@ -1111,7 +1120,15 @@ export interface FilterField {
   - `header` 是主内容区顶部插槽（全局搜索/动作）；
   - nav item 支持 `icon`/`badge`/`children`（嵌套可折叠分组）；
   - `activePath` + `findActiveNavItem()` 做最长前缀 active 匹配；
-  - `collapsible` + `collapsed`/`defaultCollapsed`/`onCollapsedChange` 提供内置收起。
+  - `collapsible` + `collapsed`/`defaultCollapsed`/`onCollapsedChange` 提供内置收起；
+  - `variant="plain" | "floating"`（floating = 8px inset 圆角 sidebar 面板）、
+    `sidebarWidth`（CSS 长度，经 `--ui-app-shell-sidebar-width`）、
+    `collapsedMode="hide" | "icon"`（icon = 3.5rem 图标轨 + Tooltip）、
+    `storageKey`（localStorage 持久化未受控 collapsed）；
+  - `mobileOpen` / `onMobileOpenChange` 控制窄屏抽屉；<768px 时 sidebar 变为
+    overlay drawer（backdrop + Escape + focus trap），不再压缩成 11rem。
+  - 颜色/边框走 `--ui-sidebar` / `--ui-sidebar-fg` / `--ui-sidebar-border` /
+    `--ui-sidebar-accent`；adapter 必须提供这组 token（surfaces 提供 fallback）。
 - `Breadcrumb`、`SectionCard`、`ScopeSwitcher`、`Stepper`、`RouteErrorBoundary` 归 Chrome/App 面。
 
 ```tsx
@@ -1514,6 +1531,7 @@ ui-shadcn / ui-plain (peer: React; type-only import surfaces.UiAdapter)
      Field: Component<FieldProps>;
      Popover: Component<PopoverProps>;
      Menu: Component<MenuProps>;
+     Tooltip: Component<TooltipProps>;
      Tabs: Component<TabsProps>;
      Dialog: Component<DialogProps>;
      Drawer: Component<DrawerProps>;
@@ -1536,6 +1554,7 @@ ui-shadcn / ui-plain (peer: React; type-only import surfaces.UiAdapter)
    | Field | `label/description/error/required/htmlFor` | label/说明/错误包装 |
    | Popover | `open/onOpenChange/trigger/children` | trigger 作为元素渲染，不嵌套 button |
    | Menu | `trigger/items/align/side` | 操作菜单；item 支持 icon/danger/separator |
+   | Tooltip | `trigger/content/side/align/delay/disabled` | trigger 作为元素渲染；不替代 `aria-label` |
    | Dialog / Drawer | `open/onOpenChange/title/description/footer/children` | 内部处理 portal/focus/esc |
    | Tabs | `items/value/onValueChange/variant` | 受控、键盘/a11y 内置 |
    | Badge / Card / Table | `tone/variant/children/className` | 简单展示 |
@@ -1549,6 +1568,8 @@ ui-shadcn / ui-plain (peer: React; type-only import surfaces.UiAdapter)
 3. **Token contract**：
    - 标准语义变量：`--background` / `--foreground` / `--card` / `--muted` /
      `--muted-foreground` / `--border` / `--primary` / `--destructive`；
+   - Chrome rail：`--ui-sidebar` / `--ui-sidebar-fg` / `--ui-sidebar-border` /
+     `--ui-sidebar-accent`（light/dark 都必须定义；surfaces 提供 fallback）；
    - 状态/图表扩展：`--status-neutral` / `--status-success` / `--status-warning` /
      `--status-danger` / `--status-info` / `--chart-1..N`；
    - 删除 kit 私有方言（`text-muted` / `bg-panel` / `border-line` / `text-fg` / `text-err`）。
@@ -1576,8 +1597,8 @@ ui-shadcn / ui-plain (peer: React; type-only import surfaces.UiAdapter)
    `themeScript()` 首屏脚本）。主题切换是应用策略，不是 core 原语。
 8. **v2 devtool/token profile 已删除**；copy-owned 改由 `uikit eject` 负责。
    `doctor` 只校验 UI adapter contract 是否齐全、token 变量是否定义。
-9. **`StatusBadge`/`StatCard` 的 `tone`** 映射到 `ok/warn/err/neutral` 语义 token，
-   不再用 `tone` 字符串直接拼 class。
+9. **`StatusBadge`/`StatusDot`/`StatCard` 的 `tone`** 映射到 `ok/warn/err/neutral`
+   语义 token，不再用 `tone` 字符串直接拼 class。
 10. **Surface styles contract（补充）**：
     - `@lynxland/uikit-surfaces` 导出 **`surfaces.css`**：语义结构类 + CSS 变量，
       不依赖 Tailwind；这是 surfaces 的默认布局/间距/状态样式。

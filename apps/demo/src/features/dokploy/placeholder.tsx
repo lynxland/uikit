@@ -17,7 +17,7 @@ export function DokployPlaceholderPage({
 }) {
   return (
     <DokployCard>
-      <PageLayout width="flow" title={title} description={description}>
+      <PageLayout width="flow" titleSize="lg" title={title} description={description}>
         <EmptyState
           icon={icon}
           title="Not implemented in this clone"

@@ -18,6 +18,7 @@ describe("plainAdapter", () => {
     expect(plainAdapter.Button).toBeDefined();
     expect(plainAdapter.Input).toBeDefined();
     expect(plainAdapter.Select).toBeDefined();
+    expect(plainAdapter.Tooltip).toBeDefined();
     expect(plainAdapter.Table.Root).toBeDefined();
     expect(plainAdapter.icons.Loader).toBeDefined();
     expect(typeof plainAdapter.cx).toBe("function");

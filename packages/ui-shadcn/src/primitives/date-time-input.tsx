@@ -6,6 +6,8 @@ import { fieldControl } from "./input";
 import { Popover } from "./popover";
 
 const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"] as const;
+const HOURS = Array.from({ length: 24 }, (_, value) => value);
+const MINUTES = Array.from({ length: 60 }, (_, value) => value);
 
 function parseValue(value: string | undefined): Date | null {
   if (value === undefined || value === "") return null;
@@ -79,7 +81,8 @@ export function DateTimeInput({
 
   const dayDisabled = (day: Date): boolean => {
     if (minDate !== null && day.getTime() < new Date(minDate).setHours(0, 0, 0, 0)) return true;
-    if (maxDate !== null && day.getTime() > new Date(maxDate).setHours(23, 59, 59, 999)) return true;
+    if (maxDate !== null && day.getTime() > new Date(maxDate).setHours(23, 59, 59, 999))
+      return true;
     return false;
   };
 
@@ -200,7 +203,7 @@ export function DateTimeInput({
             value={selectTime.getHours()}
             onChange={(event) => setTimePart(Number(event.target.value), selectTime.getMinutes())}
           >
-            {Array.from({ length: 24 }, (_, hour) => (
+            {HOURS.map((hour) => (
               <option key={hour} value={hour}>
                 {pad(hour)}
               </option>
@@ -213,7 +216,7 @@ export function DateTimeInput({
             value={selectTime.getMinutes()}
             onChange={(event) => setTimePart(selectTime.getHours(), Number(event.target.value))}
           >
-            {Array.from({ length: 60 }, (_, minute) => (
+            {MINUTES.map((minute) => (
               <option key={minute} value={minute}>
                 {pad(minute)}
               </option>

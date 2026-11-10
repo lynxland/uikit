@@ -1,11 +1,14 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { UiAdapterProvider } from "../src/adapter";
-import { AppShell, findActiveNavItem, type AppShellNavItem } from "../src/chrome";
+import { AppShell, type AppShellNavItem, findActiveNavItem } from "../src/chrome";
 import { testAdapter } from "./test-adapter";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
 
 const nav = [
   {
@@ -83,12 +86,8 @@ describe("AppShell", () => {
         </AppShell>,
       ),
     );
-    expect(
-      screen.getByRole("link", { name: "Widgets" }).getAttribute("aria-current"),
-    ).toBe("page");
-    expect(
-      screen.getByRole("link", { name: "Settings" }).getAttribute("aria-current"),
-    ).toBeNull();
+    expect(screen.getByRole("link", { name: "Widgets" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("aria-current")).toBeNull();
   });
 
   it("renders default anchors and marks the active item", () => {
@@ -163,6 +162,113 @@ describe("AppShell", () => {
     expect(screen.getByText("ICON")).toBeTruthy();
     expect(screen.getByText("4")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Projects" }).getAttribute("href")).toBe("/projects");
+  });
+
+  it("applies shell variant and sidebar width through the CSS custom property", () => {
+    render(
+      withAdapter(
+        <AppShell nav={nav} variant="floating" sidebarWidth="16rem">
+          content
+        </AppShell>,
+      ),
+    );
+    const shell = screen.getByTestId("app-shell");
+    expect(shell.getAttribute("data-variant")).toBe("floating");
+    expect(shell.className).toContain("ui-app-shell--floating");
+    expect(shell.style.getPropertyValue("--ui-app-shell-sidebar-width")).toBe("16rem");
+  });
+
+  it("renders an icon rail with accessible labels and tooltips", () => {
+    render(
+      withAdapter(
+        <AppShell nav={nav} collapsed collapsedMode="icon">
+          content
+        </AppShell>,
+      ),
+    );
+    const shell = screen.getByTestId("app-shell");
+    expect(shell.getAttribute("data-collapsed-mode")).toBe("icon");
+
+    const widgets = screen.getByRole("link", { name: "Widgets" });
+    fireEvent.mouseEnter(widgets);
+    expect(screen.getByRole("tooltip").textContent).toBe("Widgets");
+  });
+
+  it("keeps custom links focusable with tooltips in the icon rail", () => {
+    const iconNav = [
+      {
+        label: "Workspace",
+        items: [{ label: "Projects", to: "/projects", icon: <span>ICON</span> }],
+      },
+    ];
+    render(
+      withAdapter(
+        <AppShell
+          nav={iconNav}
+          collapsed
+          collapsedMode="icon"
+          renderLink={(item) => <a href={item.to}>{item.label}</a>}
+        >
+          content
+        </AppShell>,
+      ),
+    );
+    const link = screen.getByRole("link", { name: "Projects" });
+    fireEvent.focus(link);
+    expect(screen.getByRole("tooltip").textContent).toBe("Projects");
+  });
+
+  it("persists the uncontrolled collapsed state under storageKey", () => {
+    window.localStorage.setItem("shell.collapsed", "true");
+    render(
+      withAdapter(
+        <AppShell nav={nav} collapsible storageKey="shell.collapsed">
+          content
+        </AppShell>,
+      ),
+    );
+    const shell = screen.getByTestId("app-shell");
+    expect(shell.getAttribute("data-collapsed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
+    expect(shell.hasAttribute("data-collapsed")).toBe(false);
+    expect(window.localStorage.getItem("shell.collapsed")).toBe("false");
+  });
+
+  it("opens the mobile drawer and closes it with Escape or a route change", () => {
+    const onMobileOpenChange = vi.fn();
+    const result = render(
+      withAdapter(
+        <AppShell
+          nav={nav}
+          activePath="/widgets"
+          mobileOpen
+          onMobileOpenChange={onMobileOpenChange}
+        >
+          content
+        </AppShell>,
+      ),
+    );
+    const drawer = screen.getByTestId("app-shell-mobile-nav");
+    expect(drawer.getAttribute("role")).toBe("dialog");
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(onMobileOpenChange).toHaveBeenCalledWith(false);
+    fireEvent.click(screen.getByTestId("app-shell-mobile-backdrop"));
+    expect(onMobileOpenChange).toHaveBeenCalledTimes(2);
+
+    onMobileOpenChange.mockClear();
+    result.rerender(
+      withAdapter(
+        <AppShell
+          nav={nav}
+          activePath="/settings"
+          mobileOpen
+          onMobileOpenChange={onMobileOpenChange}
+        >
+          content
+        </AppShell>,
+      ),
+    );
+    expect(onMobileOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("lets the app supply Router links and active state", () => {
