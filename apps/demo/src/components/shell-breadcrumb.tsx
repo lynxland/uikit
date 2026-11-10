@@ -1,8 +1,8 @@
 import { useCollection } from "@lynxland/uikit-react";
-import { useUiAdapter } from "@lynxland/uikit-surfaces";
+import { CommandMenu, useUiAdapter } from "@lynxland/uikit-surfaces";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { ChevronDown, Folder, Globe, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import {
   environmentId,
   environmentOf,
@@ -23,17 +23,23 @@ function labelForPath(pathname: string): string {
 
 interface CrumbMenuProps {
   label: ReactNode;
-  items: readonly { label: string; onSelect: () => void }[];
+  items: readonly { id: string; label: string; checked?: boolean; onSelect: () => void }[];
   ariaLabel: string;
+  searchPlaceholder: string;
   icon?: ReactNode;
   testId?: string;
 }
 
-function CrumbMenu({ label, items, ariaLabel, icon, testId }: CrumbMenuProps) {
+function CrumbMenu({ label, items, ariaLabel, searchPlaceholder, icon, testId }: CrumbMenuProps) {
   const ui = useUiAdapter();
+  const [open, setOpen] = useState(false);
   return (
-    <ui.Menu
+    <CommandMenu
+      open={open}
+      onOpenChange={setOpen}
       aria-label={ariaLabel}
+      placeholder={searchPlaceholder}
+      emptyText="Nothing matches your search."
       align="start"
       side="bottom"
       trigger={
@@ -137,10 +143,13 @@ export function ShellBreadcrumb() {
             <CrumbMenu
               ariaLabel="Switch project"
               label={projectName}
+              searchPlaceholder="Search projects…"
               icon={<Folder size={14} className="shrink-0" aria-hidden="true" />}
               testId="breadcrumb-project"
               items={projects.rows.map((item) => ({
+                id: item.id,
                 label: item.name,
+                checked: item.id === projectId,
                 onSelect: () => {
                   void navigate({
                     to: "/dashboard/project/$projectId/environment/$environmentId",
@@ -157,9 +166,12 @@ export function ShellBreadcrumb() {
             <CrumbMenu
               ariaLabel="Switch environment"
               label={environmentName}
+              searchPlaceholder="Search environments…"
               testId="breadcrumb-environment"
               items={environmentsFor(projectId).map((item) => ({
+                id: item.id,
                 label: item.name.charAt(0).toUpperCase() + item.name.slice(1),
+                checked: item.id === envId,
                 onSelect: () => {
                   void navigate({
                     to: "/dashboard/project/$projectId/environment/$environmentId",
@@ -175,10 +187,13 @@ export function ShellBreadcrumb() {
                 <CrumbMenu
                   ariaLabel="Switch service"
                   label={app.name}
+                  searchPlaceholder="Search services…"
                   icon={<ServiceIcon kind={app.kind} />}
                   testId="breadcrumb-service"
                   items={envServices.map((item) => ({
+                    id: item.id,
                     label: item.name,
+                    checked: item.id === app.id,
                     onSelect: () => {
                       const target = serviceTarget(item);
                       void navigate({ to: target.to as never, params: target.params as never });

@@ -1,11 +1,13 @@
 import { useCollection, useRecord, useStream } from "@lynxland/uikit-react";
 import {
+  Alert,
   CopyButton,
   EmptyState,
   ErrorState,
   LoadingState,
   MetricChart,
   type MetricSeries,
+  Progress,
   RelativeTime,
   StatusDot,
   useStreamFrames,
@@ -100,6 +102,10 @@ export const APPLICATION_TABS: readonly { value: ApplicationTab; label: string }
   { value: "monitoring", label: "Monitoring" },
   { value: "advanced", label: "Advanced" },
 ];
+
+export const APPLICATION_TAB_VALUES: readonly ApplicationTab[] = APPLICATION_TABS.map(
+  (item) => item.value,
+);
 
 function Panel({
   title,
@@ -1123,12 +1129,7 @@ function MetricPanel({
       <h3 className="text-sm font-semibold">{title}</h3>
       <div className="mt-1 text-xs text-muted-foreground">{used}</div>
       {percent !== undefined ? (
-        <div className="mt-3 h-1 overflow-hidden rounded-full bg-[var(--muted)]">
-          <div
-            className="h-full rounded-full bg-[var(--foreground)]/40"
-            style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
-          />
-        </div>
+        <Progress className="mt-3" value={percent} aria-label={`${title} usage`} />
       ) : null}
       <div className="mt-3">
         <MetricChart
@@ -1364,10 +1365,13 @@ function AdvancedTab({ service }: { service: Service }) {
               </ui.Badge>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">
-            <Database size={12} className="inline" /> Advanced edits are local-only in this demo;
-            they are controlled forms, not bindings.
-          </p>
+          <Alert
+            tone="info"
+            title="Advanced edits are local-only"
+            icon={<Database size={14} aria-hidden />}
+          >
+            These controlled forms do not issue commands or touch a cluster in this demo.
+          </Alert>
         </div>
       </Panel>
 

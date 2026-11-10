@@ -1,5 +1,6 @@
 import { useCollection, useRecord } from "@lynxland/uikit-react";
 import {
+  CommandMenu,
   CopyButton,
   EmptyState,
   ErrorState,
@@ -203,6 +204,7 @@ export function DokployProjectEnvironmentPage({
   const servers = useCollection(serversEntity.collection!, { window: { kind: "all" } });
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
   const [environmentOpen, setEnvironmentOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<ServiceSort>("lastDeploy-desc");
@@ -293,8 +295,12 @@ export function DokployProjectEnvironmentPage({
           <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
             <span className="truncate">{row.name}</span>
             <span className="text-muted-foreground">/</span>
-            <ui.Menu
+            <CommandMenu
+              open={switcherOpen}
+              onOpenChange={setSwitcherOpen}
               aria-label="Switch environment"
+              placeholder="Search environments…"
+              emptyText="No environments found."
               align="start"
               trigger={
                 <ui.Button
@@ -309,7 +315,10 @@ export function DokployProjectEnvironmentPage({
                 </ui.Button>
               }
               items={environments.map((item) => ({
+                id: item.id,
                 label: titleCase(item.name),
+                keywords: [item.branch, item.id],
+                checked: item.id === environment.id,
                 onSelect: () => {
                   void navigate({
                     to: "/dashboard/project/$projectId/environment/$environmentId",

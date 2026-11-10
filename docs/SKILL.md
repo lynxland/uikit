@@ -20,7 +20,7 @@
 
 | 呈现层（L5–L7） | 角色 |
 |---|---|
-| **Value** | 纯展示：StatusBadge / StatusDot / RelativeTime / StatCard / states |
+| **Value** | 纯展示：StatusBadge / StatusDot / Alert / Progress / Toast / Kbd / RelativeTime / StatCard / states |
 | **Control** | 受控 props：DataTable / FilterBar / Pager / Tabs / Form |
 | **View** | 绑定句柄 → 控件 props：CollectionView / RecordView / FormView |
 | **Chrome** | 页壳：PageLayout / AppShell / SectionCard（唯一 h1 所有者） |
@@ -340,8 +340,10 @@ page.reset();
 - `PagerModel`：offset 本地算 prev/next；cursor prev 走 `router.history.back()`，
   深链 cursor 历史为空时 prev 不可用。
 - offset 分页的 schema 必须声明 `defaultPage: { kind:"offset", offset:0 }`。
-- `useEnumSearch({ from, key, values, defaultValue })` / `useTabParam({ from })`
-  处理 tab/status/env 等单键 URL 参数，默认值不写入 URL。
+- `useEnumSearch({ from, key, values, defaultValue })` / `useTabParam({ from, values, defaultValue })`
+  处理 tab/status/env 等单键 URL 参数，默认值不写入 URL。传 `values` 时
+  `useTabParam` 会把未知 URL 值归一化为 `defaultValue`，返回类型收窄为
+  `EnumSearchHandle<T>`，路由包装层不再手写 `.some(...) ? value : "general"`。
 
 ## 5. Surfaces：UI 无关的呈现层
 
@@ -360,8 +362,9 @@ import { shadcnAdapter } from "@lynxland/uikit-ui-shadcn";
 `Switch` / `Field` / `Popover` / `Menu` / `Tooltip` / `Tabs` / `Dialog` / `Drawer` /
 `Badge` / `Card` / `Table` slots / `icons` / 可选 `cx`。`Button asChild` 可把
 Router `<Link>` 渲染成按钮；`Tooltip` 的 `trigger` 同样按元素渲染，不嵌套按钮。
-`Tabs` 的 variant 为 `underline | pills | filter | segmented`。具体 UI 库的
-compound API 不泄漏到 surfaces。
+`Tabs` 的 variant 为 `underline | pills | filter | segmented`。`Popover` 的
+`className` 只作用于内容面板（宽度/padding 逃生口），不作用于 trigger。
+具体 UI 库的 compound API 不泄漏到 surfaces。
 
 - 默认：`@lynxland/uikit-ui-shadcn`（Base UI 1.9 + shadcn）。
 - 参考最小实现：`@lynxland/uikit-ui-plain`（无 Tailwind/Base UI）。
@@ -409,6 +412,14 @@ compound API 不泄漏到 surfaces。
 - `DataTable` 可以渲染静态数组；`onRowClick` 同时支持 Enter/Space 键盘激活；
   `getRowProps` 可加 `data-testid`/ARIA/行级属性。`FilterBar` 没有完整本地 Draft 镜像。
 - 一个受控 `Tabs` 覆盖模块/详情/过滤三种形态。
+- `CommandPalette`（Dialog）与 `CommandMenu`（Popover）共用 headless
+  `useCommandList`：query 过滤、active index、ArrowUp/Down、Home/End、Enter、
+  Escape、scroll-into-view 只实现一次。item 支持
+  `id/label/group/icon/keywords/checked/disabled/shortcut/onSelect`；两者都只
+  接收受控 `open/onOpenChange`，且不 import Router。
+- `Kbd` 只负责快捷键显示（`keys` 或 `shortcut="mod+k"`，Mac=⌘、其它=Ctrl）；
+  `useHotkey` 只负责 window 监听（`mod/ctrl/meta/alt/shift`、`enabled`，
+  默认忽略 input/textarea/select/contenteditable）。
 - `RelativeTime` 默认 `Intl` short（`2 min. ago`）；`format="long"` 输出
   `2 minutes ago`，`numeric="always"` 可避免 “yesterday” 之类的自动措辞。
 
@@ -546,6 +557,69 @@ const fields = crudFields<Widget, CreateWidget, UpdateWidget>({
 - `Input` 类型独立于 Row；Row → Input 必须显式 `toUpdateInput`。
 - `ReferenceValue` / `ReferenceInput` 在 `fields/` 里用 `useLookup`；控件层不取数。
 
+### 5.6 反馈与命令面
+
+```tsx
+import {
+  Alert,
+  CommandMenu,
+  CommandPalette,
+  Kbd,
+  Progress,
+  ToastProvider,
+  toast,
+  useHotkey,
+  useToast,
+} from "@lynxland/uikit-surfaces";
+
+<ToastProvider>
+  <App />
+</ToastProvider>
+
+toast.success("Server domain saved.");
+toast.error("Deploy failed", { description: "The build exited with code 1." });
+const t = useToast(); // same imperative API for components
+
+<Alert tone="warning" title="Invalid config" live>
+  Invalid Traefik configuration can break routing.
+</Alert>
+
+<Progress value={62} tone="warning" label="CPU usage" aria-label="CPU usage" />
+
+<CommandPalette
+  open={open}
+  onOpenChange={setOpen}
+  items={[
+    { id: "settings", label: "Settings", group: "Home", keywords: ["preferences"], onSelect: openSettings },
+  ]}
+/>
+
+<CommandMenu
+  open={envOpen}
+  onOpenChange={setEnvOpen}
+  trigger={<Button>production</Button>}
+  items={environments.map((env) => ({
+    id: env.id,
+    label: env.name,
+    checked: env.id === currentId,
+    onSelect: () => selectEnvironment(env.id),
+  }))}
+/>
+
+<Kbd shortcut="mod+k" />
+useHotkey({ key: "k", mod: true, handler: () => setOpen((value) => !value) });
+```
+
+- `toast.success/error/info(message, { description, icon, action, duration, id })`
+  是模块级队列；`ToastProvider` 渲染 `aria-live="polite"` viewport，支持关闭、
+  自动消失、hover/focus 暂停与栈上限。`PresetProvider` 默认安装它。
+- `Alert` 的 `tone` 为 `info | success | warning | danger`；静态横幅默认不带
+  `role`，只有新插入的紧急消息传 `live` 才用 `role="alert"`。
+- `Progress` 支持 `value/max/tone/indeterminate/label/aria-label`；`label`
+  是可见标签，`aria-label` 是无可见标签时的名称。
+- **命名**：`CommandPalette`/`CommandMenu` 是 UI 面板；preset 的
+  `CommandDialog` 是数据命令（mutation）宿主，两者不是同一概念。
+
 ## 6. Preset 页面
 
 ```tsx
@@ -566,7 +640,11 @@ import {
 | `EventsPage` | backlog useCollection × useStream × EventFeed | 手装 |
 
 叠加宿主（preset 导出）：`CommandDialog` / `CommandDrawer`（打开时跑 command form，ok 自动关闭）
-与 `ConfirmCommandDialog`（bare command 的确认/危险操作）。
+与 `ConfirmCommandDialog`（bare command 的确认/危险操作）。`PresetProvider` 还会安装
+surfaces 的 `ToastProvider`，因此 preset 消费方默认有 `toast.*` viewport。
+
+**命名区分**：preset `CommandDialog` 是“执行数据命令”，surfaces
+`CommandPalette`/`CommandMenu` 是“搜索/跳转/选择”；不要互相替代。
 
 示例：一个带 URL/过滤/分页/CRUD 的列表页：
 

@@ -27,17 +27,23 @@ test.describe("Dokploy settings", () => {
     await expect(page.getByRole("heading", { level: 1, name: "SSH Keys" })).toBeVisible();
     await expect(page.getByTestId("dokploy-page-card")).toBeVisible();
     await page.getByRole("button", { name: "Add SSH Key" }).click();
-    await expect(page.getByTestId("ssh-message")).toContainText("placeholder");
+    await expect(page.getByTestId("toast-viewport")).toContainText(
+      "Key creation is a demo placeholder.",
+    );
 
     await page.goto("/dashboard/settings/git-providers");
     await expect(page.getByRole("heading", { level: 1, name: "Git Providers" })).toBeVisible();
     await page.getByRole("button", { name: "GitHub" }).click();
-    await expect(page.getByTestId("git-message")).toContainText("placeholder");
+    await expect(page.getByTestId("toast-viewport")).toContainText(
+      "GitHub setup is a demo placeholder.",
+    );
 
     await page.goto("/dashboard/settings/profile");
     await expect(page.getByRole("heading", { level: 1, name: "Profile" })).toBeVisible();
     await page.getByRole("button", { name: "Save profile" }).click();
-    await expect(page.getByTestId("profile-saved")).toContainText("saved locally");
+    await expect(page.getByTestId("toast-viewport")).toContainText(
+      "Profile saved locally — no command was issued.",
+    );
     await expect(page.getByTestId("theme-toggle").first()).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Profile");
   });
@@ -46,7 +52,7 @@ test.describe("Dokploy settings", () => {
     await page.goto("/dashboard/settings/web-server");
     await expect(page.getByLabel("Let's Encrypt Email")).toHaveValue("siumauricio@hotmail.com");
     await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Server domain saved.")).toBeVisible();
+    await expect(page.getByTestId("toast-viewport")).toContainText("Server domain saved.");
 
     await page.goto("/dashboard/settings/users");
     await expect(page.getByRole("heading", { level: 1, name: "Users" })).toBeVisible();

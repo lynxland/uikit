@@ -13,7 +13,11 @@ test.describe("Dokploy project environment", () => {
     await expect(page.getByTestId("service-card-app-atlas-api")).toContainText("Created");
 
     await page.getByTestId("environment-switcher").click();
-    await page.getByRole("menuitem", { name: "Staging" }).click();
+    await expect(page.getByRole("option", { name: "Production" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await page.getByRole("option", { name: "Staging" }).click();
     await expect(page).toHaveURL(/\/environment\/proj-atlas-staging$/);
     await expect(page.getByTestId("service-card-app-atlas-api-staging")).toBeVisible();
     await expect(page.getByTestId("service-card-app-atlas-api")).toHaveCount(0);

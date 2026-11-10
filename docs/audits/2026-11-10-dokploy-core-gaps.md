@@ -410,3 +410,47 @@ corresponding CSS/duplicated implementation, and keeps `pnpm check` +
 - [x] Verification — `pnpm check`, `pnpm --filter demo build`,
   `pnpm --filter demo e2e` (18/18 incl. mobile drawer + icon rail),
   Biome on the touched source trees.
+
+## 14. P0 batch 2 landed (2026-11-10)
+
+- [x] **6.4 Toast** — surfaces `ToastProvider`, `useToast`, imperative
+  `toast.success/error/info/dismiss/clear` (module queue + `useSyncExternalStore`);
+  `aria-live="polite"` viewport, close button, duration, hover/focus pause,
+  action, stack limit; no adapter primitive added. `PresetProvider` installs
+  the viewport by default. Demo inline `role="status"` messages in Settings/
+  Web Server/Users/Notifications/Profile, fleet schedules and server/service/git
+  placeholders now use typed `notify.*` helpers; viewport is
+  `data-testid="toast-viewport"`.
+- [x] **P1 Alert** — surfaces `Alert` with
+  `tone="info|success|warning|danger"`, optional title/description/icon/action,
+  `live` (role alert only when requested), status-token CSS. Demo
+  `WarningAlert` removed; Traefik/Requests use warning alerts and Application
+  Advanced uses an info alert (the current Advanced tab has no Cluster Settings
+  section, so the official blue banner is represented there).
+- [x] **P1 Progress** — surfaces `Progress` with
+  `value/max/tone/indeterminate/label/aria-label/className`; Application
+  metric bars and the shared `UsageBar` now use it.
+- [x] **6.3 Command** — shared headless `useCommandList` (query filter, active
+  index, ArrowUp/Down, Home/End, Enter, Escape, scroll-into-view);
+  `CommandPalette` (Dialog) and `CommandMenu` (Popover + checked state);
+  `Kbd` (`keys` or `shortcut="mod+k"`); `useHotkey` (mod/ctrl/meta, editable
+  guard, enabled). Demo palette uses the surfaces primitive + `useHotkey`/`Kbd`;
+  both environment switchers use `CommandMenu` with search/checked/Esc while
+  keeping `environment-switcher` and `breadcrumb-environment` ids. Adapter
+  `Popover` gained a content-panel `className` in both adapters.
+- [x] **6.10 useTabParam values** — generic `useTabParam<T>({ values,
+  defaultValue })` validates URL input and returns `EnumSearchHandle<T>`;
+  application/postgres/redis/compose wrappers pass tab values and no longer
+  hand-validate or cast.
+- [x] **Docs** — `docs/SKILL.md` §4.6/§5.1/§5.2/§5.4/§5.6 and
+  `docs/design.md` values/controls/adapter/preset notes updated; the
+  `CommandPalette` vs preset `CommandDialog` naming distinction is documented.
+- [x] **Verification** — `pnpm check` green (core 44, react 34, testing 7,
+  surfaces 117, ui-shadcn 31, ui-plain 27, preset 35, cli 5, spike 10);
+  `pnpm --filter demo build` green; `pnpm --filter demo e2e` 18/18 green;
+  Biome over the touched trees has no errors.
+- Remaining risks: the toast viewport is an in-tree fixed region (not portalled,
+  so a transformed ancestor could contain it); the default stack limit is 5 and
+  the module queue is process-global (fine for one app root, not multi-tenant
+  SSR); `CommandMenu.contentClassName` replaces the default popover
+  width/padding class rather than layering on top of it.

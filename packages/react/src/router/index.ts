@@ -297,7 +297,9 @@ export interface EnumSearchHandle<T extends string> {
  * key through TanStack Router without hand-writing `validateSearch` +
  * functional navigate casts at every route.
  */
-export function useEnumSearch<T extends string>(options: EnumSearchOptions<T>): EnumSearchHandle<T> {
+export function useEnumSearch<T extends string>(
+  options: EnumSearchOptions<T>,
+): EnumSearchHandle<T> {
   const raw = useSearch({ from: options.from as never, strict: false }) as unknown as Record<
     string,
     unknown
@@ -329,39 +331,62 @@ export function useEnumSearch<T extends string>(options: EnumSearchOptions<T>): 
   return { value, setValue };
 }
 
-export interface TabParamOptions {
+export interface TabParamOptions<T extends string = string> {
   from: string;
   key?: string;
-  defaultValue?: string;
+  /** Allowed values; when omitted the URL value is accepted as-is. */
+  values?: readonly T[];
+  /** Omitted from the URL when selected. Defaults to `values[0]`. */
+  defaultValue?: T;
   history?: "replace" | "push";
 }
 
-/** Convenience wrapper for the common `?tab=` case. */
-export function useTabParam(options: TabParamOptions): EnumSearchHandle<string> {
+/**
+ * Convenience wrapper for the common `?tab=` case.
+ *
+ * Pass `values` to validate/normalize URL input without hand-written
+ * `.some(...) ? value : "general"` casts in every route:
+ *
+ * ```ts
+ * const tab = useTabParam({
+ *   from: Route.id,
+ *   values: ["general", "logs"] as const,
+ *   defaultValue: "general",
+ * });
+ * tab.value; // "general" | "logs"
+ * ```
+ */
+export function useTabParam<T extends string = string>(
+  options: TabParamOptions<T>,
+): EnumSearchHandle<T> {
   const key = options.key ?? "tab";
-  const defaultValue = options.defaultValue ?? "";
+  const fallback = options.defaultValue ?? options.values?.[0] ?? ("" as T);
   const raw = useSearch({ from: options.from as never, strict: false }) as unknown as Record<
     string,
     unknown
   >;
   const navigate = useNavigate();
   const candidate = raw[key];
-  const value = typeof candidate === "string" ? candidate : defaultValue;
+  const value =
+    typeof candidate === "string" &&
+    (options.values === undefined || (options.values as readonly string[]).includes(candidate))
+      ? (candidate as T)
+      : (fallback as T);
 
   const setValue = useCallback(
-    (next: string) => {
+    (next: T) => {
       void (navigate as unknown as FunctionalNavigate)({
         to: ".",
         search: (prev) => {
           const copy = { ...prev };
-          if (next === defaultValue) delete copy[key];
+          if (next === fallback) delete copy[key];
           else copy[key] = next;
           return copy;
         },
         replace: (options.history ?? "replace") === "replace",
       });
     },
-    [navigate, key, options.history, defaultValue],
+    [navigate, key, options.history, fallback],
   );
 
   return { value, setValue };

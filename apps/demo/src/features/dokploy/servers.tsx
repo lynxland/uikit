@@ -22,6 +22,7 @@ import {
 import { useState } from "react";
 import { DokployCard } from "@/components/page-card";
 import { deleteServer, type Server, serversEntity } from "@/lib/dokploy";
+import { notify } from "@/lib/feedback";
 import { CreateServerDialog } from "./forms";
 import { DeleteCommandDialog } from "./shared";
 
@@ -40,7 +41,6 @@ export function DokploySettingsServersPage() {
   const servers = useCollection(serversEntity.collection!, { window: { kind: "all" } });
   const [createOpen, setCreateOpen] = useState(false);
   const [deleting, setDeleting] = useState<Server | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
 
   const loading = servers.status === "loading" || servers.status === "idle";
 
@@ -120,7 +120,7 @@ export function DokploySettingsServersPage() {
                     variant="outline"
                     size="sm"
                     className="mt-3 w-full justify-center gap-1.5"
-                    onClick={() => setMessage(`${server.name} setup is a demo placeholder.`)}
+                    onClick={() => notify.placeholder(`${server.name} setup`)}
                   >
                     Setup Server <Settings2 size={13} aria-hidden />
                   </ui.Button>
@@ -135,7 +135,7 @@ export function DokploySettingsServersPage() {
                           variant="ghost"
                           className="size-7 border border-[var(--border)]"
                           aria-label={`Open terminal on ${server.name}`}
-                          onClick={() => setMessage("Open terminal is a demo placeholder.")}
+                          onClick={() => notify.placeholder("Open terminal")}
                         >
                           <Terminal size={13} aria-hidden />
                         </ui.Button>
@@ -150,7 +150,7 @@ export function DokploySettingsServersPage() {
                           variant="ghost"
                           className="size-7 border border-[var(--border)]"
                           aria-label={`Edit ${server.name}`}
-                          onClick={() => setMessage("Edit server is a demo placeholder.")}
+                          onClick={() => notify.placeholder("Edit server")}
                         >
                           <Pencil size={13} aria-hidden />
                         </ui.Button>
@@ -165,7 +165,7 @@ export function DokploySettingsServersPage() {
                           variant="ghost"
                           className="size-7 border border-[var(--border)]"
                           aria-label={`Monitor ${server.name}`}
-                          onClick={() => setMessage("Server monitoring is a demo placeholder.")}
+                          onClick={() => notify.placeholder("Server monitoring")}
                         >
                           <Activity size={13} aria-hidden />
                         </ui.Button>
@@ -204,12 +204,6 @@ export function DokploySettingsServersPage() {
             <Plus size={13} aria-hidden /> Create Server
           </ui.Button>
         </div>
-
-        {message !== null ? (
-          <p role="status" className="text-xs text-muted-foreground">
-            {message}
-          </p>
-        ) : null}
       </PageLayout>
 
       {createOpen ? <CreateServerDialog open onOpenChange={setCreateOpen} /> : null}

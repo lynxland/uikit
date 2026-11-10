@@ -1,4 +1,4 @@
-import { PageLayout, useUiAdapter } from "@lynxland/uikit-surfaces";
+import { Alert, PageLayout, useUiAdapter } from "@lynxland/uikit-surfaces";
 import {
   ArrowUpDown,
   Check,
@@ -16,15 +16,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { DokployCard } from "@/components/page-card";
-
-function WarningAlert({ children }: { children: string }) {
-  return (
-    <div className="flex items-center gap-2 rounded-lg border border-orange-900/60 bg-orange-950/40 px-3 py-2.5 text-sm text-orange-400">
-      <CircleAlert size={15} className="shrink-0" aria-hidden />
-      <span>{children}</span>
-    </div>
-  );
-}
+import { notify } from "@/lib/feedback";
 
 const TRAEFIK_FILE = `providers:
   swarm:
@@ -72,10 +64,10 @@ export function DokployTraefikPage() {
         title="Traefik File System"
         description="Manage all the files and directories in `/etc/dokploy/traefik`."
       >
-        <WarningAlert>
+        <Alert tone="warning" icon={<CircleAlert size={15} aria-hidden />}>
           Adding invalid configuration to existing files, can break your Traefik instance,
           preventing access to your applications.
-        </WarningAlert>
+        </Alert>
 
         <div className="grid gap-4 lg:grid-cols-[17rem_minmax(0,1fr)]">
           <div className="rounded-xl border border-[var(--border)] p-2">
@@ -296,10 +288,10 @@ export function DokployRequestsPage() {
         title="Requests"
         description="See all the incoming requests that pass trough Traefik"
       >
-        <WarningAlert>
+        <Alert tone="warning" icon={<CircleAlert size={15} aria-hidden />}>
           When you activate, you need to reload traefik to apply the changes, you can reload traefik
           in Settings
-        </WarningAlert>
+        </Alert>
 
         <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-[var(--border)] p-4">
           <ui.Field label="Log Cleanup Schedule" htmlFor="requests-schedule">
@@ -395,7 +387,6 @@ const SCHEDULES = [
 
 export function DokploySchedulesPage() {
   const ui = useUiAdapter();
-  const [message, setMessage] = useState<string | null>(null);
   const [schedules, setSchedules] = useState<readonly (typeof SCHEDULES)[number][]>(SCHEDULES);
 
   return (
@@ -407,11 +398,7 @@ export function DokploySchedulesPage() {
         title="Scheduled Tasks"
         description="Schedule tasks to run automatically at specified intervals."
         actions={
-          <ui.Button
-            type="button"
-            size="sm"
-            onClick={() => setMessage("Add Schedule is a demo placeholder.")}
-          >
+          <ui.Button type="button" size="sm" onClick={() => notify.placeholder("Add Schedule")}>
             <Plus size={13} aria-hidden /> Add Schedule
           </ui.Button>
         }
@@ -466,7 +453,7 @@ export function DokploySchedulesPage() {
                       variant="ghost"
                       className="size-7"
                       aria-label={`Run ${schedule.name}`}
-                      onClick={() => setMessage(`Running ${schedule.name} is a demo placeholder.`)}
+                      onClick={() => notify.placeholder(`Running ${schedule.name}`)}
                     >
                       <Play size={13} aria-hidden />
                     </ui.Button>
@@ -481,7 +468,7 @@ export function DokploySchedulesPage() {
                       variant="ghost"
                       className="size-7"
                       aria-label={`Edit ${schedule.name}`}
-                      onClick={() => setMessage(`Editing ${schedule.name} is a demo placeholder.`)}
+                      onClick={() => notify.placeholder(`Editing ${schedule.name}`)}
                     >
                       <Pencil size={13} aria-hidden />
                     </ui.Button>
@@ -491,12 +478,6 @@ export function DokploySchedulesPage() {
             </article>
           ))}
         </div>
-
-        {message !== null ? (
-          <p role="status" className="text-xs text-muted-foreground">
-            {message}
-          </p>
-        ) : null}
       </PageLayout>
     </DokployCard>
   );

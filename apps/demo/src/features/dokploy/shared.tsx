@@ -1,6 +1,6 @@
 import type { Command } from "@lynxland/uikit-core";
 import { type CommandEntity, useCommand, useStream } from "@lynxland/uikit-react";
-import { LogViewer, type StatusTone, useUiAdapter } from "@lynxland/uikit-surfaces";
+import { LogViewer, Progress, type StatusTone, useUiAdapter } from "@lynxland/uikit-surfaces";
 import { Rocket } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import {
@@ -302,24 +302,14 @@ export function UsageBar({
   value: number;
   detail?: string;
 }) {
-  const tone =
-    value >= 85
-      ? "bg-[var(--status-danger)]"
-      : value >= 65
-        ? "bg-[var(--status-warning)]"
-        : "bg-[var(--status-success)]";
+  const tone = value >= 85 ? "danger" : value >= 65 ? "warning" : "success";
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
         <span>{label}</span>
         <span className="font-mono text-foreground">{detail ?? `${value}%`}</span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-[var(--muted)]">
-        <div
-          className={`h-full rounded-full ${tone}`}
-          style={{ width: `${Math.min(100, value)}%` }}
-        />
-      </div>
+      <Progress value={value} tone={tone} aria-label={label} />
     </div>
   );
 }

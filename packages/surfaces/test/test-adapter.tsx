@@ -197,7 +197,7 @@ function Field({ label, description, error, required, htmlFor, children }: Field
   );
 }
 
-function Popover({ open, onOpenChange, trigger, children }: PopoverProps) {
+function Popover({ open, onOpenChange, trigger, children, className }: PopoverProps) {
   const element = isValidElement(trigger)
     ? cloneElement(trigger as ReactElement<{ onClick?: (event: MouseEvent) => void }>, {
         onClick: (event: MouseEvent) => {
@@ -209,7 +209,7 @@ function Popover({ open, onOpenChange, trigger, children }: PopoverProps) {
   return (
     <div className="test-popover" data-open={open ? "true" : "false"}>
       {element}
-      {open ? <div className="test-popover-content">{children}</div> : null}
+      {open ? <div className={join("test-popover-content", className)}>{children}</div> : null}
     </div>
   );
 }

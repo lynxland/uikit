@@ -14,6 +14,7 @@ export function Popover({
   children,
   align = "center",
   side = "bottom",
+  className,
 }: PopoverProps) {
   return (
     <BasePopover.Root open={open} onOpenChange={(next) => onOpenChange(next)}>
@@ -24,6 +25,7 @@ export function Popover({
             className={cx(
               "z-50 w-72 rounded-md border border-[var(--border)] bg-[var(--popover)] p-4 text-[var(--popover-foreground)] shadow-md outline-none",
               "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
+              className,
             )}
           >
             {children}

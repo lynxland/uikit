@@ -1,32 +1,24 @@
 import { useTabParam } from "@lynxland/uikit-react/router";
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  DokployServiceDetailPage,
-  type ServiceTab,
-  serviceTabs,
-  serviceTabValidator,
-} from "@/features/dokploy/service-detail";
+import { DokployServiceDetailPage, serviceTabValues } from "@/features/dokploy/service-detail";
+
+const TAB_VALUES = serviceTabValues("redis");
 
 export const Route = createFileRoute(
   "/dashboard/project/$projectId/environment/$environmentId/services/redis/$serviceId",
 )({
-  validateSearch: serviceTabValidator("redis"),
   component: RedisDetailRoute,
 });
 
 function RedisDetailRoute() {
   const { projectId, environmentId, serviceId } = Route.useParams();
-  const tab = useTabParam({ from: Route.id, defaultValue: "general" });
+  const tab = useTabParam({ from: Route.id, values: TAB_VALUES, defaultValue: "general" });
   return (
     <DokployServiceDetailPage
       projectId={projectId}
       environmentId={environmentId}
       serviceId={serviceId}
-      tab={
-        (serviceTabs("redis").some((item) => item.value === tab.value)
-          ? tab.value
-          : "general") as ServiceTab
-      }
+      tab={tab.value}
       onTabChange={(next) => tab.setValue(next)}
     />
   );

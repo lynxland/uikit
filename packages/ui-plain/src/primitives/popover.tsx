@@ -35,6 +35,7 @@ export function Popover({
   children,
   align = "center",
   side = "bottom",
+  className,
 }: PopoverProps) {
   const rootRef = useRef<HTMLSpanElement | null>(null);
   const panelId = useId();
@@ -85,7 +86,7 @@ export function Popover({
           id={panelId}
           role="dialog"
           aria-modal="false"
-          className={cx("ui-plain-popover-panel", `ui-plain-popover-panel--${side}`)}
+          className={cx("ui-plain-popover-panel", `ui-plain-popover-panel--${side}`, className)}
           data-align={align}
           data-side={side}
           data-slot="popover-panel"

@@ -91,6 +91,7 @@ function PopoverHarness() {
       open={open}
       onOpenChange={setOpen}
       trigger={<Button variant="outline">Filters</Button>}
+      className="popover-wide"
     >
       <p>Popover body</p>
     </Popover>
@@ -107,6 +108,7 @@ describe("Popover", () => {
 
     fireEvent.click(triggers[0] as HTMLElement);
     expect(await screen.findByText("Popover body")).toBeTruthy();
+    expect(screen.getByText("Popover body").closest(".popover-wide")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Filters" }).getAttribute("aria-expanded")).toBe(
       "true",
     );

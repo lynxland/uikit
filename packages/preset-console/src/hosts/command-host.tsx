@@ -1,19 +1,6 @@
-import type {
-  Command,
-  Effect,
-  Scope,
-  StandardSchemaV1,
-} from "@lynxland/uikit-core";
-import {
-  type CommandEntity,
-  useCommand,
-  useCommandForm,
-} from "@lynxland/uikit-react";
-import {
-  type FieldInput,
-  FormView,
-  useUiAdapter,
-} from "@lynxland/uikit-surfaces";
+import type { Command, Effect, Scope, StandardSchemaV1 } from "@lynxland/uikit-core";
+import { type CommandEntity, useCommand, useCommandForm } from "@lynxland/uikit-react";
+import { type FieldInput, FormView, useUiAdapter } from "@lynxland/uikit-surfaces";
 import type { ReactNode } from "react";
 
 export interface CommandFormHostOptions<I extends object> {
@@ -28,8 +15,7 @@ export interface CommandFormHostOptions<I extends object> {
   effects?: readonly Effect[];
 }
 
-export interface CommandDialogProps<I extends object, O>
-  extends CommandFormHostOptions<I> {
+export interface CommandDialogProps<I extends object, O> extends CommandFormHostOptions<I> {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   command: Command<I, O>;
@@ -92,8 +78,7 @@ export function CommandDialog<I extends object, O>({
   );
 }
 
-export interface CommandDrawerProps<I extends object, O>
-  extends CommandFormHostOptions<I> {
+export interface CommandDrawerProps<I extends object, O> extends CommandFormHostOptions<I> {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   command: Command<I, O>;

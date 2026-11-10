@@ -138,6 +138,8 @@ export interface PopoverProps {
   children: ReactNode;
   align?: "start" | "center" | "end";
   side?: "top" | "bottom" | "left" | "right";
+  /** Class for the popover surface (width/padding escape hatch); never the trigger. */
+  className?: string;
 }
 
 export interface MenuItem {

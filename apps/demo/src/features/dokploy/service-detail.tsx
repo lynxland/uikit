@@ -12,6 +12,7 @@ import { type ReactNode, useState } from "react";
 import { BrandMark } from "@/components/brand-mark";
 import { DokployCard } from "@/components/page-card";
 import { deleteService, environmentOf, type Service, servicesEntity } from "@/lib/dokploy";
+import { notify } from "@/lib/feedback";
 import { EnvironmentTab, LogsTab, MonitoringTab } from "./application-detail";
 import { appNameFor, DeleteCommandDialog, DeployButton, serviceStatusTone } from "./shared";
 
@@ -36,12 +37,8 @@ export function serviceTabs(
   return [...shared, { value: "advanced", label: "Advanced" }];
 }
 
-export function serviceTabValidator(kind: Service["kind"]) {
-  return (search: Record<string, unknown>): { tab?: ServiceTab } => {
-    const tab = search.tab;
-    if (typeof tab !== "string") return {};
-    return serviceTabs(kind).some((item) => item.value === tab) ? { tab: tab as ServiceTab } : {};
-  };
+export function serviceTabValues(kind: Service["kind"]): readonly ServiceTab[] {
+  return serviceTabs(kind).map((item) => item.value);
 }
 
 function Panel({
@@ -215,7 +212,6 @@ function ComposeCard({ service }: { service: Service }) {
 
 function GeneralTab({ service }: { service: Service }) {
   const ui = useUiAdapter();
-  const [message, setMessage] = useState<string | null>(null);
 
   return (
     <div className="flex flex-col gap-4">
@@ -226,7 +222,7 @@ function GeneralTab({ service }: { service: Service }) {
             type="button"
             size="sm"
             variant="secondary"
-            onClick={() => setMessage("Reload is a demo placeholder.")}
+            onClick={() => notify.placeholder("Reload")}
           >
             <RefreshCw size={12} aria-hidden /> Reload
           </ui.Button>
@@ -235,7 +231,7 @@ function GeneralTab({ service }: { service: Service }) {
             size="sm"
             variant="outline"
             className="border-[var(--status-danger)]/30 text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10 hover:text-[var(--status-danger)]"
-            onClick={() => setMessage("Stop is a demo placeholder.")}
+            onClick={() => notify.placeholder("Stop")}
           >
             <Square size={12} aria-hidden /> Stop
           </ui.Button>
@@ -243,16 +239,11 @@ function GeneralTab({ service }: { service: Service }) {
             type="button"
             size="sm"
             variant="outline"
-            onClick={() => setMessage("Open terminal is a demo placeholder.")}
+            onClick={() => notify.placeholder("Open terminal")}
           >
             <Terminal size={12} aria-hidden /> Open Terminal
           </ui.Button>
         </div>
-        {message !== null ? (
-          <p role="status" className="mt-3 text-xs text-muted-foreground">
-            {message}
-          </p>
-        ) : null}
       </Panel>
 
       {service.kind === "compose" ? (

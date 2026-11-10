@@ -41,9 +41,7 @@ export interface CrudUpdateConfig<Row, UpdateInput extends object> {
   toInput?: (row: Row) => Partial<UpdateInput>;
 }
 
-export type CrudPageHostRequest<Row> =
-  | { mode: "create" }
-  | { mode: "edit"; row: Row };
+export type CrudPageHostRequest<Row> = { mode: "create" } | { mode: "edit"; row: Row };
 
 export interface CrudDeleteConfig<Row, DeleteInput> {
   command: Command<DeleteInput, unknown>;
@@ -315,7 +313,7 @@ export function CrudPage<
                       if (update.host === "page") {
                         if (onPageHost === undefined) {
                           throw new Error(
-                            "@lynxland/uikit-preset-console CrudPage: update.host=\"page\" requires onPageHost.",
+                            '@lynxland/uikit-preset-console CrudPage: update.host="page" requires onPageHost.',
                           );
                         }
                         onPageHost({ mode: "edit", row });
@@ -353,7 +351,7 @@ export function CrudPage<
               if (create.host === "page") {
                 if (onPageHost === undefined) {
                   throw new Error(
-                    "@lynxland/uikit-preset-console CrudPage: create.host=\"page\" requires onPageHost.",
+                    '@lynxland/uikit-preset-console CrudPage: create.host="page" requires onPageHost.',
                   );
                 }
                 onPageHost({ mode: "create" });

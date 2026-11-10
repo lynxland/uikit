@@ -22,6 +22,7 @@ import {
 import { useState } from "react";
 import { BrandMark } from "@/components/brand-mark";
 import { DokployCard } from "@/components/page-card";
+import { notify } from "@/lib/feedback";
 
 /** Honest placeholder for Settings routes that the strict clone does not implement. */
 export function SettingsPlaceholderPage({
@@ -84,7 +85,6 @@ const SSH_KEYS: readonly SshKey[] = [
 
 export function DokploySshKeysPage() {
   const ui = useUiAdapter();
-  const [message, setMessage] = useState<string | null>(null);
 
   return (
     <DokployCard fill={false}>
@@ -116,7 +116,7 @@ export function DokploySshKeysPage() {
                       variant="ghost"
                       className="size-7"
                       aria-label={`Edit ${key.name}`}
-                      onClick={() => setMessage("Editing SSH keys is a placeholder in this clone.")}
+                      onClick={() => notify.placeholder("Editing SSH keys")}
                     >
                       <Pencil size={13} aria-hidden />
                     </ui.Button>
@@ -131,9 +131,7 @@ export function DokploySshKeysPage() {
                       variant="ghost"
                       className="size-7 text-destructive"
                       aria-label={`Delete ${key.name}`}
-                      onClick={() =>
-                        setMessage("Deleting SSH keys is a placeholder in this clone.")
-                      }
+                      onClick={() => notify.placeholder("Deleting SSH keys")}
                     >
                       <Trash2 size={13} aria-hidden />
                     </ui.Button>
@@ -145,20 +143,10 @@ export function DokploySshKeysPage() {
         </div>
 
         <div className="flex justify-end">
-          <ui.Button
-            type="button"
-            size="sm"
-            onClick={() => setMessage("Key creation is a placeholder in this clone.")}
-          >
+          <ui.Button type="button" size="sm" onClick={() => notify.placeholder("Key creation")}>
             <Plus size={13} aria-hidden /> Add SSH Key
           </ui.Button>
         </div>
-
-        {message !== null ? (
-          <p role="status" className="text-xs text-muted-foreground" data-testid="ssh-message">
-            {message}
-          </p>
-        ) : null}
       </PageLayout>
     </DokployCard>
   );
@@ -261,7 +249,6 @@ function dateLabel(value: string): string {
 
 export function DokployGitProvidersPage() {
   const ui = useUiAdapter();
-  const [message, setMessage] = useState<string | null>(null);
   const [enabled, setEnabled] = useState<ReadonlySet<string>>(
     new Set(GIT_CONNECTIONS.filter((item) => item.enabled).map((item) => item.id)),
   );
@@ -284,7 +271,7 @@ export function DokployGitProvidersPage() {
                 key={provider.id}
                 type="button"
                 className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-medium transition-colors ${provider.className}`}
-                onClick={() => setMessage(`${provider.label} setup is a demo placeholder.`)}
+                onClick={() => notify.placeholder(`${provider.label} setup`)}
               >
                 <BrandMark provider={provider.id} className="size-3.5" /> {provider.label}
               </button>
@@ -334,9 +321,7 @@ export function DokployGitProvidersPage() {
                     variant="ghost"
                     className="size-7"
                     aria-label={`Open ${connection.name}`}
-                    onClick={() =>
-                      setMessage("Opening provider connections is a demo placeholder.")
-                    }
+                    onClick={() => notify.placeholder("Opening provider connections")}
                   >
                     <ExternalLink size={13} aria-hidden />
                   </ui.Button>
@@ -351,9 +336,7 @@ export function DokployGitProvidersPage() {
                     variant="ghost"
                     className="size-7 text-muted-foreground hover:text-destructive"
                     aria-label={`Delete ${connection.name}`}
-                    onClick={() =>
-                      setMessage("Deleting provider connections is a demo placeholder.")
-                    }
+                    onClick={() => notify.placeholder("Deleting provider connections")}
                   >
                     <Trash2 size={13} aria-hidden />
                   </ui.Button>
@@ -362,12 +345,6 @@ export function DokployGitProvidersPage() {
             </div>
           ))}
         </div>
-
-        {message !== null ? (
-          <p role="status" className="text-xs text-muted-foreground" data-testid="git-message">
-            {message}
-          </p>
-        ) : null}
       </PageLayout>
     </DokployCard>
   );
@@ -380,9 +357,8 @@ export function DokployWebServerPage() {
   const [https, setHttps] = useState(true);
   const [certificate, setCertificate] = useState("letsencrypt");
   const [dailyCleanup, setDailyCleanup] = useState(true);
-  const [message, setMessage] = useState<string | null>(null);
 
-  const action = (label: string) => setMessage(`${label} is a demo placeholder.`);
+  const action = (label: string) => notify.placeholder(label);
 
   return (
     <DokployCard fill={false}>
@@ -437,7 +413,7 @@ export function DokployWebServerPage() {
           </div>
 
           <div className="mt-5 flex justify-end">
-            <ui.Button type="button" size="sm" onClick={() => setMessage("Server domain saved.")}>
+            <ui.Button type="button" size="sm" onClick={() => notify.saved("Server domain saved.")}>
               Save
             </ui.Button>
           </div>
@@ -482,12 +458,6 @@ export function DokployWebServerPage() {
             </div>
           </div>
         </section>
-
-        {message !== null ? (
-          <p role="status" className="text-xs text-muted-foreground">
-            {message}
-          </p>
-        ) : null}
       </PageLayout>
     </DokployCard>
   );
@@ -523,7 +493,6 @@ const ORGANIZATION_USERS = [
 
 export function DokployUsersPage() {
   const ui = useUiAdapter();
-  const [message, setMessage] = useState<string | null>(null);
 
   return (
     <DokployCard fill={false}>
@@ -570,7 +539,7 @@ export function DokployUsersPage() {
                           size="icon"
                           className="size-7"
                           aria-label={`Actions for ${user.email}`}
-                          onClick={() => setMessage("User actions are a demo placeholder.")}
+                          onClick={() => notify.placeholder("User actions")}
                         >
                           <span aria-hidden>•••</span>
                         </ui.Button>
@@ -595,21 +564,11 @@ export function DokployUsersPage() {
           <div className="flex flex-col items-center justify-center gap-3 px-5 py-12 text-center">
             <Users size={28} className="text-muted-foreground" aria-hidden />
             <p className="text-sm text-muted-foreground">Invite users to your organization</p>
-            <ui.Button
-              type="button"
-              size="sm"
-              onClick={() => setMessage("Invitations are a demo placeholder.")}
-            >
+            <ui.Button type="button" size="sm" onClick={() => notify.placeholder("Invitations")}>
               <Plus size={13} aria-hidden /> Add Invitation
             </ui.Button>
           </div>
         </section>
-
-        {message !== null ? (
-          <p role="status" className="text-xs text-muted-foreground">
-            {message}
-          </p>
-        ) : null}
       </PageLayout>
     </DokployCard>
   );
@@ -619,7 +578,6 @@ const NOTIFICATION_CHANNELS = [{ id: "ntf-slack", name: "dsfgdsfg", provider: "s
 
 export function DokployNotificationsPage() {
   const ui = useUiAdapter();
-  const [message, setMessage] = useState<string | null>(null);
 
   return (
     <DokployCard fill={false}>
@@ -650,7 +608,7 @@ export function DokployNotificationsPage() {
                     variant="ghost"
                     className="size-7"
                     aria-label={`Edit ${channel.name}`}
-                    onClick={() => setMessage("Editing notifications is a demo placeholder.")}
+                    onClick={() => notify.placeholder("Editing notifications")}
                   >
                     <Pencil size={13} aria-hidden />
                   </ui.Button>
@@ -665,7 +623,7 @@ export function DokployNotificationsPage() {
                     variant="ghost"
                     className="size-7 text-destructive"
                     aria-label={`Delete ${channel.name}`}
-                    onClick={() => setMessage("Deleting notifications is a demo placeholder.")}
+                    onClick={() => notify.placeholder("Deleting notifications")}
                   >
                     <Trash2 size={13} aria-hidden />
                   </ui.Button>
@@ -679,17 +637,11 @@ export function DokployNotificationsPage() {
           <ui.Button
             type="button"
             size="sm"
-            onClick={() => setMessage("Adding notifications is a demo placeholder.")}
+            onClick={() => notify.placeholder("Adding notifications")}
           >
             <Plus size={13} aria-hidden /> Add Notification
           </ui.Button>
         </div>
-
-        {message !== null ? (
-          <p role="status" className="text-xs text-muted-foreground">
-            {message}
-          </p>
-        ) : null}
       </PageLayout>
     </DokployCard>
   );
@@ -700,7 +652,6 @@ export function DokployProfilePage() {
   const [name, setName] = useState("Ada Lovelace");
   const [email, setEmail] = useState("ada@example.com");
   const [organization, setOrganization] = useState("platform");
-  const [saved, setSaved] = useState(false);
 
   return (
     <DokployCard fill={false}>
@@ -711,7 +662,7 @@ export function DokployProfilePage() {
         title="Profile"
         description="Account details, organization and appearance."
         actions={
-          <ui.Button type="button" size="sm" onClick={() => setSaved(true)}>
+          <ui.Button type="button" size="sm" onClick={() => notify.savedLocally("Profile")}>
             Save profile
           </ui.Button>
         }
@@ -734,10 +685,7 @@ export function DokployProfilePage() {
                 <ui.Input
                   id="profile-name"
                   value={name}
-                  onChange={(event) => {
-                    setName(event.target.value);
-                    setSaved(false);
-                  }}
+                  onChange={(event) => setName(event.target.value)}
                 />
               </ui.Field>
               <ui.Field label="Email" htmlFor="profile-email">
@@ -745,10 +693,7 @@ export function DokployProfilePage() {
                   id="profile-email"
                   type="email"
                   value={email}
-                  onChange={(event) => {
-                    setEmail(event.target.value);
-                    setSaved(false);
-                  }}
+                  onChange={(event) => setEmail(event.target.value)}
                 />
               </ui.Field>
             </div>
@@ -780,12 +725,6 @@ export function DokployProfilePage() {
             </div>
           </SectionCard>
         </div>
-
-        {saved ? (
-          <p role="status" className="text-xs text-muted-foreground" data-testid="profile-saved">
-            Profile saved locally — no command was issued.
-          </p>
-        ) : null}
       </PageLayout>
     </DokployCard>
   );

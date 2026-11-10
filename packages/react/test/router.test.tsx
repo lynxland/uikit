@@ -150,6 +150,26 @@ describe("useEnumSearch / useTabParam", () => {
     act(() => harness.get().setValue("overview"));
     await waitFor(() => expect(paramsOf(harness.router).tab).toBeUndefined());
   });
+
+  it("validates tab values and normalizes an unknown URL value to the default", async () => {
+    const search = collectionSearch({});
+    const harness = renderRouteHook(
+      () =>
+        useTabParam({
+          from: "/",
+          values: ["general", "logs"] as const,
+          defaultValue: "general",
+        }),
+      { search, initial: "/?tab=nope", client: createClient() },
+    );
+
+    await waitFor(() => expect(harness.get().value).toBe("general"));
+    act(() => harness.get().setValue("logs"));
+    await waitFor(() => expect(paramsOf(harness.router).tab).toBe("logs"));
+    expect(harness.get().value).toBe("logs");
+    act(() => harness.get().setValue("general"));
+    await waitFor(() => expect(paramsOf(harness.router).tab).toBeUndefined());
+  });
 });
 
 describe("useCollectionPage", () => {

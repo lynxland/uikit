@@ -773,6 +773,9 @@ export interface CollectionPageHandle<T> extends CollectionHandle<T> {
   - 缺省 tab 不写 URL。
 - 所有 setter 走函数式 search；不在渲染期 navigate。
 - `useSearchState` 是通用的：页面自定义参数（tab 等）也可以用它，不必绑 Collection。
+- 单键枚举参数用 `useEnumSearch({ from, key, values, defaultValue })` 或
+  `useTabParam({ from, values, defaultValue })`：`values` 校验 URL 输入并把
+  未知值归一化为 `defaultValue`，返回 `EnumSearchHandle<T>`；默认值不写入 URL。
 
 ### 5.3 命令绑定
 
@@ -970,6 +973,20 @@ export interface FilterField {
 - 写入律（push/replace）由调用点决定；Tabs 不 import Router。
 - 键盘/aria 在一个地方实现。
 
+#### CommandPalette / CommandMenu
+
+```tsx
+<CommandPalette open={open} onOpenChange={setOpen} items={items} />
+<CommandMenu open={open} onOpenChange={setOpen} trigger={<Button>Env</Button>} items={items} />
+```
+
+- 两者共用 headless `useCommandList`：query 过滤、active index、
+  ArrowUp/Down、Home/End、Enter、Escape、scroll-into-view。
+- item 支持 `id/label/group/icon/keywords/checked/disabled/shortcut/onSelect`；
+  `CommandMenu` 使用 adapter Popover，`CommandPalette` 使用 adapter Dialog。
+- 不新增 adapter `Command` 基元；`Command` 名字属于数据写原语。
+- 选择动作由调用方 `onSelect` 完成，控件不 import Router。
+
 #### AsyncState
 
 ```tsx
@@ -1002,9 +1019,15 @@ export interface FilterField {
 
 #### Values
 
-- `StatusBadge`、`StatusDot`（tone + 可选无障碍标签 + pulse）、`RelativeTime`、
+- `StatusBadge`、`StatusDot`（tone + 可选无障碍标签 + pulse）、`Alert`
+  （info/success/warning/danger + 可选 title/description/icon/action + `live`）、
+  `Progress`（value/max/tone/indeterminate/label）、`RelativeTime`、`Kbd`、
   `CopyButton`、`SecretReveal`、`DiffView`、`JsonField`、`StatCard`、`MetricChart`、
   `FieldValue`、`LoadingState`/`EmptyState`/`ErrorState`。
+- `ToastProvider` / `useToast` / 命令式 `toast.*` 是 surfaces 级反馈队列：
+  viewport 用 `aria-live`，支持关闭、duration、hover/focus 暂停与栈上限；
+  不需要 adapter toast 基元。`PresetProvider` 默认安装 viewport。
+- `useHotkey` 只管 window 键盘监听（mod/ctrl/meta、editable 保护），不碰 Router。
 - 值视图只依赖 L2 类型或纯 props；不 import 数据层、Router、绑定。
 
 ### 6.2 视图（L5 Views）
@@ -1171,6 +1194,9 @@ export interface FilterField {
 | `SettingsPage` | `PageLayout` + `SectionCard × n` + `usePreference` | 手装 |
 | `WizardPage` | `PageLayout` + `Stepper` + `FormView`/Stream 等待步 | 手装 |
 | `EventsPage` | backlog `useCollection` 定锚 × `useStream` 续订 × `EventFeed` | 手装 |
+
+`PresetProvider` 同时安装 surfaces 的 `ToastProvider`（`toast.*` viewport），
+这是反馈壳而不是数据 provider；QueryClient/Router/Scope 仍由应用拥有。
 
 **`CrudPage` 的类型面（补充）**：不要再用 v2 `CommandDescriptor<any>` + `FieldDef<T>`。
 
@@ -1552,7 +1578,7 @@ ui-shadcn / ui-plain (peer: React; type-only import surfaces.UiAdapter)
    | DateTimeInput | `value/onChange/disabled/min/max` | 值用 `YYYY-MM-DDTHH:mm`；adapter 自绘 picker，不依赖原生弹窗 |
    | Switch | `checked/onCheckedChange/disabled` | 受控 |
    | Field | `label/description/error/required/htmlFor` | label/说明/错误包装 |
-   | Popover | `open/onOpenChange/trigger/children` | trigger 作为元素渲染，不嵌套 button |
+   | Popover | `open/onOpenChange/trigger/children/className` | trigger 作为元素渲染，不嵌套 button；className 只作用于内容面板 |
    | Menu | `trigger/items/align/side` | 操作菜单；item 支持 icon/danger/separator |
    | Tooltip | `trigger/content/side/align/delay/disabled` | trigger 作为元素渲染；不替代 `aria-label` |
    | Dialog / Drawer | `open/onOpenChange/title/description/footer/children` | 内部处理 portal/focus/esc |
