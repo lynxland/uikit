@@ -483,8 +483,10 @@ import { shadcnAdapter } from "@lynxland/uikit-ui-shadcn";
 - `PageLayout` 是唯一 h1 所有者；应用可换成自己的壳。
 - **宽度规则**：`wide` = 72rem（列表/详情/日志/事件等数据页，默认）；
   `narrow` = 48rem（表单/设置等阅读型页面）；`flow` = 不设 max-width（真正的边缘到边缘页面）。
-  preset 的 `FormPage`/`SettingsPage` 默认 `narrow`，其余默认 `wide`；
-  demo 不再用 `flow` 混排，避免同一应用内宽度漂移。
+  preset 的 `FormPage`/`SettingsPage` 默认 `narrow`，其余默认 `wide`。
+  demo 的 Dokploy clone 统一用 `flow` 作为页面卡基线（卡片自身控制边距），
+  设置页在卡片内再收窄到 53rem；不要把 `wide`/`narrow` 和 `flow` 混在同一个
+  页面卡里（见 `docs/audits/2026-11-10-dokploy-core-gaps.md` §6.2）。
 - `AppShell` 只管导航/高度链；用 `renderLink` / `activePath` 接 Router，不 import Router。
   侧边栏有 `sidebarHeader` / `sidebarFooter` 两个完整插槽（团队切换器、用户菜单等），
   主内容区有 `header` 插槽；`collapsible` + `collapsed`/`defaultCollapsed`/`onCollapsedChange`

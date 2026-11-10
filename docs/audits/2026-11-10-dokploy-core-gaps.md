@@ -1,275 +1,389 @@
-# Dokploy clone — friction & core gap backlog
+# Dokploy clone — friction, coverage, core backlog
 
-> Date: 2026-11-10
-> Evidence: `apps/demo` strict Dokploy clone + official screenshots
-> (`/home/qiulin/artifacts/dokploy-ui/*.webp`, live captures in
-> `/home/qiulin/artifacts/dokploy-live/`)
-> Scope: gaps that survived the clone, with priority for `@lynxland/uikit`
-> core/surfaces work. Demo-only workarounds are called out explicitly.
+> Date: 2026-11-10 (deep pass after the first backlog)
+> Evidence: 38 official screenshots (`/home/qiulin/artifacts/dokploy-ui/*.webp`),
+> live captures (`/home/qiulin/artifacts/dokploy-live/`), the demo source, and
+> the official Dokploy source at `~/workspace/paas/dokploy/apps/dokploy`.
+> Scope: what survives as friction after the strict clone; which gaps belong
+> to `surfaces`, the UI adapter, `react`, `preset-console`, or the app.
 
-## 1. Friction already resolved in the packages
+## 1. Corrections to the first backlog
+
+| Previous claim | Correction |
+|---|---|
+| `MetricChart` has no legend | It already renders a legend with last values and min/max x labels. Missing: y-axis ticks, hover readout, area mode, thresholds, units, `showLegend`, explicit series colors. |
+| `MetricChart` colors are stable | Bug: `buildGeometry` sets `colorIndex: index`, so reordering series changes colors despite the `key` comment. Use `series.color` or a stable key hash. |
+| `Tabs` only has underline | The adapter already has `underline`, `pills` and `filter`. Missing: a full-width segmented variant and `className`/`fullWidth`; `PageLayout` also hardcodes underline. |
+| `DataTable` has no column visibility | The data table already supports controlled `columnVisibility` / `onColumnVisibilityChange`. Missing: a `ColumnPicker` UI. |
+| Root server clock re-renders the shell every second | False: `ServerTime` is a leaf component with its own timer. Remove this from the backlog. |
+| Mobile sidebar "shrinks" | It is worse: at 390px the 11rem sidebar is still present, the brand overlaps, the header time clips, and `PageLayout` actions squeeze the h1 out of view (`home-mobile.png`). This is a broken shell, not a cosmetic breakpoint. |
+| No `Command` primitive in the adapter → add one | The palette and searchable menus can be built in `surfaces` from Dialog/Input/Popover + a headless list-navigation hook. Do not necessarily add a third adapter compound; the data-layer `Command` name is already taken. |
+| First backlog listed only the obvious primitives | Also missing: `Alert`, `Progress`, `Avatar`, `Separator`, `DateRange/Calendar`, `InputGroup`, and consistent styling escape hatches on `Popover`/`Select`/`Menu`. |
+
+Two coverage corrections are more serious than the API list:
+
+- Several official screens are **not cloned**: top-level Monitoring, Swarm,
+  Templates, Settings AI/Audit Logs/Certificates/Registry/S3/SSO/License/
+  Whitelabeling, build-log modal, create-backup/custom-role dialogs.
+- Several screens are **partial**: application Preview/Schedules/Volume
+  Backups/Patches tabs; database Backups/Advanced; compose Containers/
+  Backups/Schedules/Volume Backups; Project Environment dialog; mobile.
+
+## 2. Layer model used below
+
+| Layer | Owns | Examples |
+|---|---|---|
+| `surfaces` values/controls/chrome | Layout, state contracts, keyboard logic that is not portal/styling-specific | `PageLayout`, `AppShell`, `DataTable`, `MetricChart`, `LogViewer`, `StatusDot` |
+| UI adapter (`ui-shadcn` / `ui-plain`) | Portal, focus, positioning, visual primitives | `Tooltip`, `Toast` viewport, `Menu`, `Tabs`, `Select`, `Popover` |
+| `react` / `react/router` | Data/URL bindings | `useTabParam`, `useCollection`, `useSearchState` |
+| `preset-console` | Opinionated page composition | `SettingsPage`, `CollectionPage`, `CommandDialog` |
+| `apps/demo` | Dokploy-specific data, routes, brand, page frame | `DokployCard`, service routes, fixtures |
+
+A new adapter primitive is justified only when it needs portal/positioning/
+focus management or is shared by multiple surfaces. Pure display pieces
+(`StatusDot`, `Progress`, `Alert`) should stay in `surfaces`, not the adapter.
+
+## 3. Friction already resolved
 
 | Friction | Resolution |
 |---|---|
-| AppShell could not render nav icons/badges around custom Router links | `AppShell.renderLink` keeps icon/badge; `sidebarHeader`/`sidebarFooter`/`header` slots |
-| Nested nav groups could not open on active child | `AppShellNavItem.children` + recursive `findActiveNavItem()` |
+| AppShell could not render nav icons/badges around custom Router links | `AppShell.renderLink` keeps icon/badge; header/footer slots |
+| Nested nav groups could not open on active child | `children` + recursive `findActiveNavItem()` |
 | No router-aware Button | `Button asChild` in all adapters |
-| No dropdown menu primitive | `Menu` adapter primitive |
-| No row-level masked secret | `SecretValue` value primitive |
-| DataTable rows were mouse-only / lacked test ids | keyboard Enter/Space + `getRowProps` |
+| No dropdown menu | adapter `Menu` |
+| No row-level masked secret | `SecretValue` |
+| DataTable rows mouse-only / no row test ids | Enter/Space + `getRowProps` |
 | Tabs/filters needed hand-written URL validators | `useEnumSearch` / `useTabParam` |
-| Every form host repeated command-dialog plumbing | preset `CommandDialog` / `CommandDrawer` / `ConfirmCommandDialog` |
+| Repeated command-dialog plumbing | preset `CommandDialog` / `CommandDrawer` / `ConfirmCommandDialog` |
 | Theme switch/class/localStorage repeated | `ThemeProvider` / `ThemeToggle` / `themeScript` |
 | Breadcrumb was app-specific | Router-agnostic `Breadcrumb` |
-| Relative time only produced Intl short form (`1 hr. ago`) | `RelativeTime format="long"` → `1 hour ago` |
+| Relative time only short (`1 hr. ago`) | `RelativeTime format="long"` |
 | Date/time input missing | `DateTimeInput` |
 
-## 2. Friction that should stay app-level
+## 4. Deliberately app-level
 
-These are deliberate application concerns, not core gaps:
-
-| Concern | Why it stays in the app |
+| Concern | Why |
 |---|---|
-| `DokployCard` page frame | Dokploy-specific chrome; `PageLayout` is already the h1 owner |
-| Server clock in the header | Application header slot content |
-| Dokploy/provider brand marks | Brand assets and licensing; app can inline Simple Icons |
-| Project/environment/service breadcrumb dropdowns | Needs app data + Router navigation |
-| Four service-detail routes (application/postgres/redis/compose) | Route shape is TanStack Router/app-specific |
-| Permission matrix | Identity model belongs to the consumer; `useCan` exists |
-| Top-level Monitoring placeholder | Page composition decision, not a primitive |
-| Demo timestamps/servers/names | Fixture data |
-
-## 3. Core backlog (prioritized)
-
-### P0 — blocks parity or repeats on every page
-
-#### 3.1 `CommandPalette` + `Kbd` + `useHotkey`
-
-**Observed:** `src/components/command-palette.tsx` is ~200 lines of Dialog +
-Input + filtering + arrow-key navigation. There is no `Command` compound in
-the adapter and no reusable global shortcut hook. `⌘K` is hand-wired.
-
-**Proposal:**
-- `surfaces` `CommandPalette` control: `items` (label/group/icon/keywords/
-  onSelect/disabled), `open`, `onOpenChange`, `placeholder`, `empty`.
-- `Kbd` value for shortcut hints.
-- `useHotkey`/`usePlatformModifier` hook (window listener, input-safe).
-- Keep the preset `CommandDialog` for mutation forms; the palette must be a
-  distinct name to avoid the existing collision.
-
-**Acceptance:** demo deletes its palette implementation and opens the same
-palette with ⌘K/Ctrl+K, arrows, Enter, Escape.
-
-#### 3.2 `Toast` / `useToast`
-
-**Observed:** every placeholder action uses an inline `role="status"` string or
-a persistent message under a card. Dokploy uses transient toasts for
-save/deploy/delete feedback. The adapter has no Toast primitive.
-
-**Proposal:** adapter `ToastProvider`/`toast()` contract (`success` / `error` /
-`info`, action, duration), surfaces provider at app root, ui-shadcn + ui-plain
-implementations.
-
-**Acceptance:** Settings save, deploy, delete and placeholder actions emit
-toasts; no inline messages remain on those surfaces.
-
-#### 3.3 `Tooltip`
-
-**Observed:** icon-only buttons (edit/delete/server actions/breadcrumb close)
-and collapsed sidebar items rely on `title` or `aria-label`. There is no
-Tooltip primitive in the adapter.
-
-**Proposal:** adapter `Tooltip` (trigger/content/side/align/delay); use it for
-icon buttons and `AppShell` collapsed items.
-
-**Acceptance:** icon actions show the same labels as their `aria-label` without
-layout shift.
-
-#### 3.4 `StatusDot` value
-
-**Observed:** status dot color maps are duplicated in Home, Projects, service
-cards, application/database headers and breadcrumbs (`SERVICE_STATUS_DOT`,
-`statusDotClass`, `statusBreakdown`).
-
-**Proposal:** `StatusDot` value with `tone` (`success|warning|danger|info|
-neutral`), optional label and `aria-label`, using the same status tokens as
-`StatusBadge`.
-
-**Acceptance:** all dot sites use `StatusDot`; no app-level color maps.
-
-#### 3.5 `AppShell` shell variants + icon rail + mobile drawer + sidebar token
-
-**Observed:**
-- Floating Dokploy rail (16rem, 8px margin, rounded panel) is implemented by
-  demo CSS overriding `.ui-app-shell__sidebar`.
-- Collapsed mode hides the sidebar entirely; official Dokploy collapses to an
-  icon rail with tooltips.
-- Below 640px the base CSS shrinks the sidebar to 11rem instead of a mobile
-  Sheet/drawer.
-- `--sidebar` is derived in `apps/demo/theme.css`; the shared token contract
-  has no sidebar surface token.
-
-**Proposal:**
-- `AppShell variant="plain" | "floating" | "inset"` and width token
-  (`14rem` default, `16rem`/custom).
-- `collapsedMode="hide" | "icon"` with icon-rail CSS and tooltip labels.
-- Mobile drawer contract (Sheet) for the sidebar.
-- `--ui-sidebar` token in `ui-shadcn/tokens.css` + adapter contract.
-- Optional `SidebarSection`/`SidebarFooter` sticky behavior documented.
-
-**Acceptance:** demo deletes its shell CSS overrides (except brand styling) and
-gets floating/icon-rail/mobile behavior from `AppShell` props.
-
-#### 3.6 `CodeEditor` value
-
-**Observed:** Environment, Traefik config and Compose file use a hand-built
-`textarea` + line-number gutter. Masked mode replaces the value with dots, so
-editing while hidden is impossible; no syntax highlighting, validation or
-selection helpers.
-
-**Proposal:** `CodeEditor` value with `value`, `onChange`, `language`,
-`lineNumbers`, `readOnly`, `masked`, `onMaskedChange`, `minHeight`, `gutter`;
-adapter can lazily wrap CodeMirror/Monaco, with a textarea fallback.
-
-**Acceptance:** Environment/Traefik/Compose use one component; reveal toggles
-without changing the underlying value; line numbers stay aligned.
-
-#### 3.7 `InputGroup` + `SecretInput`
-
-**Observed:** credential rows repeat `Input + reveal Button + CopyButton`;
-form fields repeat trailing icon buttons. There is no input group or editable
-secret control.
-
-**Proposal:**
-- `InputGroup` control (`Input` + leading/trailing addons).
-- `SecretInput` (masked value, reveal, copy, optional generate).
-- Or extend `SecretValue` with an `editable` mode.
-
-**Acceptance:** Postgres/Redis credentials and env-var secret fields use the
-shared control.
-
-#### 3.8 `MetricChart` readout/axes/legend/thresholds
-
-**Observed:** application monitoring needs axes, used/limit readouts, series
-legends and units. `MetricChart` is a sparkline; the demo hand-builds legends,
-progress bars and used labels.
-
-**Proposal:** props for `showAxis`, `showLegend`, `tooltip`, `unit`,
-`domain`, `threshold`, `valueFormatter`, `height`, plus a `series.name/color`.
-Keep the sparkline default for compact cards.
-
-**Acceptance:** Monitoring tab uses `MetricChart` legends/readout instead of
-bespoke markup; CPU/Memory/Block I/O/Network match the official cards.
-
-#### 3.9 `Tabs variant="segmented"`
-
-**Observed:** Dokploy application tabs are a full-width segmented rail. The
-demo uses `.dokploy-tabs` CSS to restyle the pills variant.
-
-**Proposal:** add a first-class `segmented` variant (full-width, muted rail,
-filled active tab, tokenized) to the adapter contract and both adapters.
-
-**Acceptance:** demo removes `.dokploy-tabs` and uses `variant="segmented"`.
-
-#### 3.10 `useTabParam` value validation
-
-**Observed:** every tab route repeats:
-`tab = serviceTabs(...).some(...) ? tab : "general"`, then casts.
-`useTabParam` accepts any string.
-
-**Proposal:** `useTabParam({ from, values, defaultValue })` (same for
-`useEnumSearch`); return the validated value and a typed setter.
-
-**Acceptance:** application/service detail route wrappers contain no manual
-validation/casts.
-
-### P1 — important, but can follow the P0 batch
-
-#### 3.11 `FileTree` control
-
-Traefik uses an app-side static tree. Proposal: controlled `FileTree` with
-`items` (id/label/icon/children), `expanded`, `selected`, `onSelect`,
-`onExpandedChange`, keyboard navigation. Acceptance: Traefik screen uses it.
-
-#### 3.12 `ColumnPicker` for DataTable
-
-`DataTable` already supports controlled column visibility, but there is no UI.
-Docker/Requests "Columns" buttons are local placeholders. Proposal:
-`ColumnPicker` control (`columns`, `visibility`, `onVisibilityChange`) that
-pairs with `DataTable`. Acceptance: both fleet tables use it.
-
-#### 3.13 `PageLayout` title size + content width
-
-Different pages need 30/24/20px h1 sizes; the demo repeats arbitrary variants
-`[&_.ui-page-layout__title]:text-2xl`. Settings need 53rem, between the
-existing `narrow` (48rem) and `wide` (72rem).
-
-**Proposal:** `titleSize="sm" | "md" | "lg"` and `maxWidth` token or
-`width="content"`. Acceptance: remove title arbitrary classes and settings
-`max-w-[53rem]` wrappers.
-
-#### 3.14 `Menu` checkbox/radio/submenu items
-
-The Tags filter and provider menus use plain `onSelect` toggles. Official menus
-use checkbox/radio semantics and nested groups. Proposal: menu item kinds
-`item | checkbox | radio | separator | label | submenu`, with `checked` and
-`onCheckedChange`. Acceptance: tag filtering exposes checked state to AT.
-
-#### 3.15 `LogViewer` toolbar/renderLine slots
-
-Deployment logs use `LogViewer`; the application Logs tab is hand-rendered to
-match Dokploy's container select/filter bar/colored lines. Proposal:
-`toolbar` slot and `renderLine(frame, index)` plus `container`/`limit` props.
-Acceptance: application Logs tab uses `LogViewer` without losing the toolbar.
-
-#### 3.16 `ContextMenu`
-
-Not hit in the strict screenshots, but Docker/row actions will need right-click
-semantics. Proposal: adapter ContextMenu (same item model as Menu). Acceptance:
-Docker row menu can be triggered by right-click and keyboard.
-
-#### 3.17 `Terminal` / stream-backed terminal
-
-"Open Terminal" and server terminal actions are placeholders. Proposal:
-surface `Terminal` view with an injectable xterm adapter and a `Stream`/command
-transport contract. This is the largest item; keep out of the P0 batch.
-
-#### 3.18 `Combobox` / searchable select
-
-Provider/repository/server pickers will outgrow `Select`. Proposal: controlled
-`Combobox` (options, query, value, onChange, empty) in the adapter contract.
-
-### P2 — consistency / cleanup
-
-- `FormPage` header cancel vs `FormView` footer cancel inconsistency.
-- `FieldInput` hidden/meta field (still use `defaultValues` workaround).
-- Card/toolbar composition helpers (`Toolbar`, `CardRail`) if repeated after
-  the P0/P1 work.
-- Shared clock/now context instead of one timer per `RelativeTime` and the
-  root server clock re-rendering the shell every second.
-- `Breadcrumb` router context (currently app-wired; design keeps it
-  Router-agnostic, so only revisit if another consumer needs it).
-
-## 4. Suggested batches
-
-1. **Shell & feedback:** Tooltip + StatusDot + Kbd/useHotkey + CommandPalette +
-   Toast + AppShell variants/icon rail/mobile drawer + `--ui-sidebar`.
-2. **Forms & editor:** InputGroup + SecretInput + CodeEditor + useTabParam
-   values + FormPage/FieldInput consistency.
-3. **Data display:** MetricChart readout + Tabs segmented + ColumnPicker +
-   LogViewer slots + PageLayout title size/width.
-4. **Heavy surfaces:** FileTree + ContextMenu + Menu submenu/check/radio +
-   Combobox + Terminal.
-
-Each batch should land with the demo consuming the new API (no demo-only CSS or
-duplicated markup left behind) and with the Dokploy screens in
-`apps/demo` as the acceptance fixture.
-
-## 5. Verification baseline
-
-- `pnpm check` green (all packages + spike).
-- `pnpm --filter demo build` green.
+| `DokployCard` page rail | Dokploy-specific page frame; `PageLayout` owns the h1 |
+| Server clock, Server Time badge | Header slot content |
+| Dokploy/provider brand marks | Brand assets/licensing; app inlines Simple Icons |
+| Project/environment/service breadcrumb dropdowns | Needs app data + Router |
+| Four service detail routes | TanStack Router route shape |
+| Permission matrix | Identity model; `useCan` exists |
+| Fixtures/timestamps/servers | Demo data |
+| Top-level page composition | Preset/app decision, not a primitive |
+
+## 5. Coverage boundary (app fidelity, not core API)
+
+### Implemented and visually checked
+
+Home, Projects, Project Environment (service grid), Application General/
+Environment/Domains/Deployments/Logs/Monitoring, Postgres General credentials,
+Deployments global, Traefik, Docker, Requests, Schedules, Settings Servers/
+Web Server/SSH/Git/Users/Notifications/Profile.
+
+### Partial
+
+| Screen | What is missing |
+|---|---|
+| Application `Preview Deployments` / `Schedules` / `Volume Backups` / `Patches` | Honest placeholders; official has content |
+| Application `Advanced` | Simplified card list; official has Run Command/arguments + Cluster Settings/registry/replicas |
+| Database `Backups` | Empty placeholder; official has backup cards and Create/Restore |
+| Database `Advanced` | Simple list; official has cluster/registry settings |
+| Compose detail | Missing Containers/Backups/Schedules/Volume Backups tabs and provider/compose editor |
+| Project Environment dialog | Read-only info; official can manage the environment |
+| Mobile | Sidebar stays open; h1 disappears; header time clips |
+| Environment selector | No search input, Esc handling, or checked state (official uses a command menu) |
+| Bulk actions | Delete selected is disabled; only select/clear works |
+| Settings Sessions/Deployments/Tags | Placeholders |
+
+### Not implemented (official screenshots exist)
+
+- Top-level Monitoring (`server-monitoring.webp`): CPU/Memory/Disk/Docker disk/
+  Block I/O/Network cards and charts.
+- Swarm overview/containers.
+- Templates / create-from-template dialog.
+- Settings AI, Audit Logs, Certificates, Registry, S3 Destinations, SSO,
+  License, Whitelabeling.
+- Build-log modal (different from the deployment log drawer).
+- Create Backup and Create Custom Role dialogs.
+- Notification add/edit and most server/git/deploy action flows are local
+  placeholders.
+
+This matters for planning: the remaining "strict clone" work is not mainly
+more core primitives; a large part is page composition and real data/commands.
+
+## 6. Core backlog
+
+### P0 — blocks shell/layout parity or repeats on every page
+
+#### 6.1 AppShell: floating/inset variants, icon rail, mobile drawer, tokens
+
+- **Layer:** surfaces + adapter token/Tooltip integration.
+- **Evidence:** demo `theme.css` overrides the sidebar width/margins/border;
+  `surfaces.css` hardcodes `14rem`, `3rem` header and shrinks the sidebar to
+  `11rem` below 640px; collapsed mode is `display:none`; `home-mobile.png` is
+  unusable.
+- **Proposal:**
+  - `variant="plain" | "floating" | "inset"`, `sidebarWidth`, `headerHeight`.
+  - `collapsedMode="hide" | "icon"` with a real rail and tooltip labels.
+  - `mobileOpen` / `onMobileOpenChange` + drawer integration.
+  - Persist collapsed/mobile state (`storageKey` or controlled by app).
+  - `--ui-sidebar`, `--ui-sidebar-fg`, `--ui-sidebar-accent`,
+    `--ui-sidebar-border` tokens for light/dark and both adapters.
+- **Acceptance:** demo deletes its shell CSS overrides; 390px uses a drawer and
+  the h1/actions remain visible; collapsed mode is an icon rail.
+
+#### 6.2 PageLayout contract: title size, divider, tabs variant, width, mobile
+
+- **Layer:** surfaces.
+- **Evidence:** official pages have a full-width divider under the header;
+  demo uses `PageLayout` without one. Titles need 30/24/20px across pages and
+  demo repeats `[&_.ui-page-layout__title]:text-2xl`. Settings need 53rem,
+  between `narrow` 48 and `wide` 72. `PageLayout` hardcodes
+  `variant="underline"`, so the demo bypasses it with `.dokploy-tabs`.
+  At 390px the non-wrapping header lets actions squeeze the h1 out.
+- **Proposal:** `titleSize`, `headerDivider`, `tabsVariant`, `maxWidth`/
+  `width="content"`, and responsive header stacking (`flex-wrap`; actions move
+  below the heading on narrow screens).
+- **Acceptance:** no title arbitrary variants, no `.dokploy-tabs`, no settings
+  `max-w` wrapper; mobile title visible; dividers match official.
+
+#### 6.3 Command palette + searchable command menu + Kbd/hotkey
+
+- **Layer:** surfaces (composite), not a new adapter compound.
+- **Evidence:** `command-palette.tsx` is ~200 lines of Dialog/Input/filter/
+  arrows; environment switcher (`environments.webp`) is a popover with a search
+  input, checked current item and Esc hint; demo uses a plain `Menu`.
+- **Proposal:** one headless list-navigation hook (`query`, `activeIndex`,
+  arrow/Home/End/Enter/Escape, scroll-into-view) used by:
+  - `CommandPalette` (Dialog wrapper, items/groups/onSelect/footer shortcut);
+  - `CommandMenu` (Popover/trigger wrapper for environment/provider pickers);
+  - `Kbd` display.
+  Keep the data `Command` name untouched; use `CommandPalette` or
+  `SearchPalette`, and document the naming distinction from preset
+  `CommandDialog`.
+- **Acceptance:** palette and environment switcher both use the primitive; no
+  custom keyboard code in demo.
+
+#### 6.4 Toast / useToast
+
+- **Layer:** surfaces provider + adapter viewport (ui-shadcn Base UI toast;
+  ui-plain accessible fallback).
+- **Evidence:** demo uses inline `role="status"` messages under cards; official
+  uses `sonner` toasts.
+- **Proposal:** `ToastProvider` + imperative `toast.success/error/info` with
+  action, duration, dismiss; `aria-live`.
+- **Acceptance:** deploy/save/delete/placeholder actions use toasts; no inline
+  messages remain; SSR/queue behavior tested.
+
+#### 6.5 Tooltip
+
+- **Layer:** adapter.
+- **Evidence:** icon-only buttons and collapsed nav use `title`/`aria-label`;
+  official has tooltips.
+- **Proposal:** `Tooltip` trigger/content/side/align/delay; use for icon
+  buttons and icon rail; never replace `aria-label`.
+- **Acceptance:** no `title`-only actions in demo.
+
+#### 6.6 StatusDot
+
+- **Layer:** surfaces value.
+- **Evidence:** `SERVICE_STATUS_DOT`, `statusDotClass`, status breakdown and
+  header dots repeat tone maps.
+- **Proposal:** `StatusDot` with `tone`, `label`, `aria-label`, optional pulse;
+  maps via `StatusTone`.
+- **Acceptance:** no app-level dot color maps.
+
+#### 6.7 CodeEditor
+
+- **Layer:** surfaces value + optional lazy adapter/editor (CodeMirror).
+- **Evidence:** env/Traefik/compose use `textarea` + manual gutter; official
+  uses CodeMirror with properties/YAML/compose languages, line numbers and
+  `-webkit-text-security` for masked environment editing; compose screenshot
+  shows syntax-highlighted YAML.
+- **Proposal:** `value`, `onChange`, `language` (`properties|yaml|json|shell|
+  compose`), `lineNumbers`, `wrap`, `readOnly`, `masked` (text-security or
+  overlay), `minHeight`, `completion`, `onMaskedChange`; textarea fallback.
+- **Acceptance:** Environment, Traefik and Compose use one component; masked
+  mode keeps line alignment and can reveal without losing the draft.
+- **Risk:** CodeMirror is heavy; export under an optional adapter entry or
+  lazy-load it; textarea fallback must remain dependency-free.
+
+#### 6.8 MetricChart: axis/readout/area/threshold/stable colors
+
+- **Layer:** surfaces.
+- **Evidence/correction:** legend + last values + x min/max already exist.
+  Missing y-axis ticks, hover readout, area fill, thresholds, units,
+  `showLegend`, per-series colors/formatters. `colorIndex` uses array index,
+  so series colors are not stable despite the `key` comment. Official server/
+  app monitoring uses progress bars, area charts and a donut.
+- **Proposal:** add `showLegend`, `showYAxis`, `area`, `tooltip`, `unit`,
+  `domain`, `thresholds`, `series.color/label`, `valueFormatter`; keep the
+  dependency-free SVG and `chart` escape hatch for Recharts/donuts.
+- **Acceptance:** application monitoring and top-level monitoring use the same
+  chart; no index-based color drift; no chart library added to surfaces.
+
+#### 6.9 InputGroup + SecretInput
+
+- **Layer:** surfaces controls; adapter may need a bare/grouped input variant.
+- **Evidence:** credential rows repeat Input + reveal + CopyButton; official
+  has `InputGroup` and a `Secrets` editor with vault import/toggle.
+- **Proposal:** `InputGroup` (inline/block addons, input/textarea, button,
+  text), `SecretInput` (masked/reveal/copy/generate, `text-security` or
+  type=password); keep `SecretValue` for display cells.
+- **Acceptance:** Postgres/Redis credentials and env secret fields use one
+  control.
+
+#### 6.10 useTabParam value validation
+
+- **Layer:** `react/router`.
+- **Evidence:** each tab route repeats `values.some(...) ? value : "general"`
+  and casts; `useEnumSearch` validates but `useTabParam` does not.
+- **Proposal:** `useTabParam({ from, values, defaultValue })`, returning a
+  typed value; same for a generic `useSearchEnum`.
+- **Acceptance:** route wrappers contain no manual validation/casts.
+
+### P1 — shared display/controls; high value after P0
+
+| Gap | Layer | Evidence | Proposal / acceptance |
+|---|---|---|---|
+| `Alert` | surfaces value | Traefik/Requests warning banners; Advanced info banner in `application-advanced.webp` | Tone (`info|success|warning|danger`), icon, title/description, action, `live` control; replace `WarningAlert`. |
+| `Progress` | surfaces value | CPU/Memory bars in app/server monitoring | `value`, `max`, `indeterminate`, tone, label; replace raw bar divs. |
+| `Tabs` segmented/full-width | adapter + `PageLayout` | Demo `.dokploy-tabs`; official segmented app tabs | `variant="segmented"`, `fullWidth`, `className`; `PageLayout.tabsVariant`. |
+| `Menu` checked/radio/submenu | adapter | Environments selector, tags filter, row actions | `kind: item|checkbox|radio|separator|label|submenu`, `checked`, `onCheckedChange`; AT semantics. |
+| `ColumnPicker` | surfaces control | Docker/Requests/Audit Logs "Columns" | Pairs with DataTable visibility state; menu/checkbox list. |
+| `LogViewer` toolbar/renderLine | surfaces view | Application Logs custom toolbar; build-log modal | `toolbar` slot, `renderLine(frame,index): ReactNode`, `hideHeader`, `limit`; keep text `formatLine` for simple use. |
+| `FileTree` | surfaces control | Traefik file tree | Items (file/dir), expanded/selected, keyboard, folder/item icons; official uses accordion + scroll area. |
+| `DateRangePicker` / `Calendar` | adapter + surfaces | Requests date range; Audit Logs date range | Date range value, presets, timezone; single `DateTimeInput` already exists. |
+| `Card`/`SectionCard` header divider/footer | adapter/surfaces | Web Server/Users cards; official section headers have dividers | `headerDivider`, `footer`, `bodyClassName`; avoid raw section markup. |
+| `Popover`/`Select`/`Menu` styling escapes | adapter | Fixed `w-72` Popover; Select has no className; Menu no width | `className`, `contentClassName`, `width`/`size`, `sideOffset`, `aria-label`; app currently wraps with fixed divs. |
+| `Combobox` | adapter/surfaces | environment/provider/repository search | Searchable single/multi select; may share the command-list hook with 6.3. |
+
+### P2 — consistency, lower urgency
+
+| Gap | Layer | Note |
+|---|---|---|
+| `Avatar` | adapter/surfaces | Account/org/provider logos; initials fallback. |
+| `Separator` | surfaces | Header vertical divider and section lines; CSS spans currently. |
+| `RelativeTime` approximate wording | surfaces | `format="long"` gives "1 hour ago"; official/date-fns uses "about 1 hour ago". Add `format="distance"`/`approximate` (and document the threshold table) if exact wording matters. |
+| `ThemeProvider` system mode | surfaces | Only light/dark; `resolvedTheme` is a placeholder, no `system` mode or OS change listener. Official uses next-themes. Add `theme="light|dark|system"` if needed. |
+| `Dialog`/`Drawer` width escape | adapter | `Dialog` max is `lg` (2xl); build-log modal needs ~850px/fullscreen. Add `xl`/`fullscreen`/`className`; same for Drawer. |
+| `StatCard` icon/link/action | surfaces | Home hand-builds cards because StatCard lacks link/asChild/icon/footer. |
+| `useSelection` (non-table) | react | Project service card bulk selection repeats Set/indeterminate logic; DataTable already has row selection. |
+| `FormPage` cancel vs `FormView` footer cancel | preset | Known inconsistency; route-page form affected. |
+| `FieldInput` hidden/meta | surfaces | Known gap; use `defaultValues` workaround. |
+| `ScrollArea` | adapter | Official file tree uses it; native thin scrollbars are acceptable until then. |
+| `Terminal` | surfaces + adapter | Open Terminal placeholders; xterm + stream/command transport; largest item. |
+| `ContextMenu` | adapter | Not hit by current screenshots; add when row right-click is needed. |
+| `Dropzone` | adapter | Backups/uploads not implemented; defer. |
+| `RadioGroup`/`ToggleGroup`/`NumberInput`/`InputOTP` | adapter | Not needed by the current clone; do not grow the contract yet. |
+| `Toolbar`/`CardRail` composition | surfaces/preset | Repeated search/filter rows; decide after P0/P1 rather than pre-building. |
+
+## 7. Preset-console gaps
+
+These are **not** core primitives, but they explain why the demo hand-writes
+pages:
+
+1. `SettingsPage` only supports `sections[].items` label/control rows. Dokploy
+   settings need free-form card sections (form grid, danger zone, invitations,
+   provider rows). Add `sections[].content`/children or keep demo pages custom.
+2. `CollectionPage` is table-first (`CollectionView` + `DataTable`). Dokploy
+   Projects is a card grid; either add a card layout/renderCard slot or keep
+   card pages custom.
+3. `CommandDialog` (data mutation) collides conceptually with a future
+   `CommandPalette`; document names now.
+4. `FormPage` header `cancel` vs `FormView` footer cancel remains inconsistent.
+5. No preset for a floating/card page frame (`DokployCard`), which is why every
+   demo page imports it; decide whether a `PageFrame` preset belongs in
+   `preset-console` or stays app-level.
+
+## 8. Documentation and test drift (fix with the next code batch)
+
+- `docs/SKILL.md` still says "demo 不再用 flow 混排"; the clone now uses
+  `width="flow"` on every page and centers settings at 53rem inside the card.
+  Update the width rule.
+- `apps/demo/DOKPLOY_DOGFOOD.md` still lists Sessions/Notifications in the
+  Settings nav; they were removed from the sidebar to match the screenshots.
+- The audit route table marks application/database/compose screens as complete;
+  annotate the four placeholder application tabs, database Backups/Advanced,
+  compose Containers/Backups/Schedules/Volume Backups, and Project Environment.
+- No mobile e2e, visual regression, or a11y check. The strict clone needs:
+  - Playwright mobile viewport (390×844) for shell/nav/settings;
+  - screenshot baselines for the official pages (desktop + mobile);
+  - axe or Lighthouse checks for dialog/menu/tooltip/command list;
+  - adapter contract tests in `ui-plain` for any new primitive.
+
+## 9. Implementation risks / sequencing notes
+
+- **Adapter parity is the hidden cost.** Each new adapter primitive must be
+  implemented in `ui-shadcn` and `ui-plain`, plus tests. Keep `Alert`,
+  `Progress`, `StatusDot`, `Kbd`, `Avatar`, `Separator` in surfaces; add
+  adapter primitives only for portal/focus/styling needs.
+- **Heavy dependencies stay optional.** CodeEditor/Terminal/chart libraries
+  must be lazy/optional entry points; `surfaces` stays dependency-free.
+- **Command naming.** `Command` is the data mutation primitive; do not add an
+  adapter `Command` for the palette. Prefer `CommandPalette`/`SearchPalette`
+  and `CommandMenu` composition.
+- **One list-navigation hook.** Palette, environment menu and Combobox share
+  active-index/scroll/keyboard logic; duplicating it three times would recreate
+  the current 200-line palette.
+- **Mobile is a state machine.** expanded/collapsed/mobile-open must not be
+  three independent booleans; AppShell should own the transitions.
+- **Tokens before CSS overrides.** Add sidebar/header tokens and define them in
+  both themes/adapters before deleting demo overrides.
+- **Masked editor portability.** `-webkit-text-security` is not uniformly
+  supported; provide an overlay/fallback and keep the underlying value
+  unchanged.
+- **Visual verification.** Keep official screenshots outside the repo if
+  licensing is a concern; use them locally for Playwright screenshot baselines.
+
+## 10. Suggested batches
+
+1. **Shell + layout:** AppShell variants/icon rail/mobile/tokens; PageLayout
+   title/divider/tabs/mobile; StatusDot; Tooltip.
+2. **Command + feedback:** CommandPalette + CommandMenu + Kbd/useHotkey;
+   Toast; Alert; Progress.
+3. **Editors + credentials:** CodeEditor; InputGroup; SecretInput; useTabParam
+   values; FormPage/FieldInput consistency.
+4. **Data display:** MetricChart axes/readout/stable colors; Tabs segmented;
+   ColumnPicker; LogViewer slots; FileTree.
+5. **Heavy/later:** DateRange/Calendar; Popover/Select styling escapes;
+   Combobox; ContextMenu; Terminal; Dropzone.
+
+Acceptance for every batch: the demo consumes the new API, removes the
+corresponding CSS/duplicated implementation, and keeps `pnpm check` +
+`pnpm --filter demo e2e` green.
+
+## 11. Evidence index
+
+| Evidence | Where |
+|---|---|
+| Floating sidebar override / 16rem geometry | `apps/demo/theme.css` |
+| Fixed sidebar 14rem, mobile 11rem, collapsed display:none | `packages/surfaces/src/surfaces.css` (`ui-app-shell`) |
+| Shell slots, active matching, collapsed state | `packages/surfaces/src/chrome/app-shell.tsx` |
+| PageLayout header/tabs/width/title CSS | `packages/surfaces/src/chrome/page-layout.tsx`, `surfaces.css` |
+| MetricChart legend/axis/color-index implementation | `packages/surfaces/src/values/metric-chart.tsx` |
+| Tabs variants | `packages/surfaces/src/controls/tabs.tsx`, `packages/ui-shadcn/src/primitives/tabs.tsx` |
+| DataTable column visibility | `packages/surfaces/src/controls/data-table.tsx` |
+| LogViewer fixed header / string formatter | `packages/surfaces/src/views/log-viewer.tsx` |
+| Adapter contract (no Tooltip/Toast/Alert/Progress/etc.) | `packages/surfaces/src/adapter.ts` |
+| SettingsPage fixed label/control rows | `packages/preset-console/src/pages/settings-page.tsx` |
+| App-level palette | `apps/demo/src/components/command-palette.tsx` |
+| Environment plain Menu | `apps/demo/src/features/dokploy/project-detail.tsx` |
+| WarningAlert app component | `apps/demo/src/features/dokploy/fleet.tsx` |
+| Credential rows / Input+Copy composition | `apps/demo/src/features/dokploy/service-detail.tsx` |
+| Mobile shell capture | `/home/qiulin/artifacts/dokploy-live/home-mobile.png` |
+| Official reference screens (38) | `/home/qiulin/artifacts/dokploy-ui/*.webp` |
+
+## 12. Verification baseline
+
+- `pnpm check` green (layer-check / doc-check / typecheck / size-check /
+  tests / v3 spikes).
+- Unit tests: core 44, react 33, testing 7, surfaces 89, ui-shadcn 29,
+  ui-plain 25, preset 34, cli 5, spike 10.
+- `pnpm --filter demo build` green (existing >500 kB chunk warning only).
 - `pnpm --filter demo e2e` 16/16 green.
 - `pnpm exec biome check apps/demo/src apps/demo/e2e` green.
-- Official screenshots and live captures kept outside the repo under
-  `/home/qiulin/artifacts/dokploy-{ui,live}/`.
+- Desktop captures: `/home/qiulin/artifacts/dokploy-live/*.png`; mobile capture:
+  `/home/qiulin/artifacts/dokploy-live/home-mobile.png`.

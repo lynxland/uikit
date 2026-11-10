@@ -49,8 +49,9 @@ quickstart, scopes, settings, boom and their libs/features/e2e were deleted.
 - Sidebar sections mirror Dokploy: Home (Home, Projects, Deployments,
   Monitoring, Schedules, Traefik File System, Docker, Swarm, Requests),
   Settings (Web Server, Profile, Remote Servers, Deployments, Users, Audit Logs,
-  SSH Keys, AI, Tags, Git, Sessions, Notifications), Extra (Documentation,
-  Support).
+  SSH Keys, AI, Tags, Git), Extra (Documentation, Support). The Sessions and
+  Notifications routes exist but intentionally stay out of the sidebar so the
+  visible list matches the official screenshots.
 - Sidebar header: Dokploy logo, organization switcher with Enterprise badge,
   notification bell. Footer: Update Available card, account menu (theme switch
   inside), version line.
@@ -87,6 +88,22 @@ quickstart, scopes, settings, boom and their libs/features/e2e were deleted.
 - Settings: 53rem centred cards for Servers, Web Server, SSH Keys, Git,
   Users, Notifications and Profile; provider brand colours and brand icons.
 
+## Coverage boundary
+
+Implemented and visually checked: Home, Projects, Project Environment,
+Application General/Environment/Domains/Deployments/Logs/Monitoring, Postgres
+credentials, global Deployments, Traefik, Docker, Requests, Schedules, and
+Settings Servers/Web Server/SSH/Git/Users/Notifications/Profile.
+
+Partial or placeholder: Application Preview/Schedules/Volume Backups/Patches,
+Application Advanced, database Backups/Advanced, compose Containers/Backups/
+Schedules/Volume Backups, Project Environment dialog, mobile shell, bulk delete,
+and Settings Sessions/Deployments/Tags. Top-level Monitoring, Swarm, Templates,
+Settings AI/Audit Logs/Certificates/Registry/S3/SSO/License/Whitelabeling,
+build-log modal, Create Backup and Create Custom Role are not implemented.
+The full status and core backlog are in
+[`docs/audits/2026-11-10-dokploy-core-gaps.md`](../../docs/audits/2026-11-10-dokploy-core-gaps.md).
+
 ## Remaining gaps
 
 1. **Command palette primitive** — the adapter has Dialog/Input but no
@@ -94,8 +111,10 @@ quickstart, scopes, settings, boom and their libs/features/e2e were deleted.
 2. **Icon-rail collapse** — `AppShell` hides the sidebar in collapsed mode.
 3. **Breadcrumb link context** — `Breadcrumb` is Router-agnostic; the shell
    wires `<Link>` per crumb.
-4. **MetricChart is a sparkline** — no legend/hover readout/y-axis; the
-   monitoring tab composes cards + `formatValue`.
+4. **MetricChart is a sparkline** — it already has a legend, last values and
+   x-axis min/max, but no y-axis ticks/hover readout/area mode/thresholds, and
+   series colors are index-based (not stable by `key`); the monitoring tab
+   composes cards + `formatValue`.
 5. **No ContextMenu / CodeEditor / FileTree / Terminal** adapter primitives;
    Traefik/Docker/compose editing uses app-side monospace textareas.
 6. **Permission matrix** — no `useCan` gating; the clone is a single admin.

@@ -18,9 +18,9 @@ aliases.
 |---|---|
 | `/dashboard/home` | Welcome, projects/services/deploys/status stats, recent deployments |
 | `/dashboard/projects` | Compact project cards, URL search/tag/sort, create/delete/action menu |
-| `/dashboard/project/$projectId/environment/$environmentId` | Project + environment switcher, one service-card grid, bulk actions, create service |
-| `/dashboard/project/.../services/application/$applicationId` | General / Environment / Domains / Deployments / Preview / Schedules / Volume Backups / Logs / Patches / Monitoring / Advanced |
-| `/dashboard/project/.../services/postgres|redis|compose/$serviceId` | Database/compose header, credentials, environment, logs, monitoring, backups, advanced |
+| `/dashboard/project/$projectId/environment/$environmentId` | Project + environment switcher, one service-card grid, bulk actions, create service; Project Environment dialog is read-only |
+| `/dashboard/project/.../services/application/$applicationId` | General / Environment / Domains / Deployments / Preview / Schedules / Volume Backups / Logs / Patches / Monitoring / Advanced; Preview/Schedules/Volume Backups/Patches are honest placeholders |
+| `/dashboard/project/.../services/postgres|redis|compose/$serviceId` | Database/compose header, credentials, environment, logs, monitoring; database Backups/Advanced and compose Containers/Backups/Schedules/Volume Backups are partial |
 | `/dashboard/deployments` | Global deployment table, URL status filter, pagination, streamed logs |
 | `/dashboard/traefik` | Traefik file tree + configuration editor + warning |
 | `/dashboard/docker` | Container table with filter, state/status/image columns |
@@ -84,7 +84,7 @@ aliases.
 | 11 | Tabs/env/status URL params need hand-written validators | **Fixed**: `useEnumSearch` / `useTabParam` |
 | 12 | Nested nav group cannot also be a destination | Remaining by design: groups are toggles |
 | 13 | Breadcrumb link needs internal CSS class each time | Remaining: Router-agnostic `Breadcrumb`; shell wires links |
-| 14 | `MetricChart` has no legend/tooltip/y-axis readout | Remaining: sparkline; `chart` slot accepts a full chart |
+| 14 | `MetricChart` has no y-axis/tooltip/area/thresholds (legend + last values + x labels already exist; colors are index-based) | Remaining: sparkline; `chart` slot accepts a full chart |
 | 15 | Relative time only rendered Intl short form (`1 hr. ago`) | **Fixed**: `RelativeTime format="long"` (`1 hour ago`) |
 | 16 | `StatusBadge` vocabulary is generic | Expected: pass a per-domain `map` |
 | 17 | `FormPage.cancel` is a header action vs `FormView` footer cancel | Remaining API inconsistency |
@@ -101,13 +101,16 @@ aliases.
 - `useEnumSearch` / `useTabParam` URL hooks.
 - Preset `CommandDialog` / `CommandDrawer` / `ConfirmCommandDialog`.
 - `ThemeProvider` / `useTheme` / `ThemeToggle` / `themeScript` and `Breadcrumb`.
-- `RelativeTime format="long"` for date-fns-style wording.
+- `RelativeTime format="long"` for long Intl wording (closer to date-fns; the
+  exact "about 1 hour ago" phrasing is still a P2 gap).
 - DateTimeInput and Wizard footer fixes from the prior review pass.
 
 ## 6. Remaining gaps (intentional, not silent)
 
-1. **MetricChart is a sparkline** — no hover readout/y-axis; use the `chart`
-   slot for full Recharts/other charts until a real chart layer is designed.
+1. **MetricChart is a sparkline** — it has a legend/last values/x labels, but
+   no y-axis ticks, hover readout, area mode or thresholds, and colors follow
+   array index rather than `key`; use the `chart` slot for full Recharts/other
+   charts until the chart layer is extended.
 2. **ContextMenu** — not exposed; right-click actions need a separate adapter
    primitive if a consumer needs it.
 3. **CodeEditor** — env/YAML/Traefik editing uses monospace textarea surfaces;
@@ -126,6 +129,18 @@ aliases.
    Monitoring is implemented.
 10. **Generic brand marks** — provider icons are inlined Simple Icons; Dokploy's
     own globe/elephant marks are approximated with Lucide glyphs.
+
+## 6.1 Coverage boundary
+
+Implemented: Home, Projects, Project Environment grid, Application General/
+Environment/Domains/Deployments/Logs/Monitoring, Postgres credentials, global
+Deployments, Traefik, Docker, Requests, Schedules, and core Settings.
+Partial/placeholder: the four application tabs above, database Backups/Advanced,
+compose extra tabs, Project Environment dialog, mobile shell, bulk delete.
+Not implemented: top-level Monitoring, Swarm, Templates, Settings AI/Audit/
+Certificates/Registry/S3/SSO/License/Whitelabeling, build-log modal, Create
+Backup/Custom Role. See the full matrix in
+[`2026-11-10-dokploy-core-gaps.md`](2026-11-10-dokploy-core-gaps.md) §5.
 
 ## 7. Prioritized core backlog
 
