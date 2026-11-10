@@ -1,40 +1,30 @@
-import type { ApiError, Cursor, FrameSource, Transport } from "../kernel";
+import type { ApiError, Cursor, FrameSource, StreamSource } from "../kernel";
 
 /**
- * mockTransport —— Transport 契约的内存实现（测试工具 + demo 数据源）。
+ * In-memory StreamSource for tests/demos.
  *
- * 命令式控制（emit/interrupt/close/failNext）作用于**当前连接**（最近一次 open）；
- * 控制落在已被引擎 abort 的死连接上时静默丢弃——现实语义：重连间隙发出的帧就是丢了。
- *
- * 自动模式（demo events 流）：每次 open 按 intervalMs 递增 seq 生成帧；
- * 引擎带游标重开时从 seqOfCursor(cursor)+1 续发（backlog→follow 的续订方言）。
+ * Command controls act on the current (most recent) connection. Controls sent
+ * to a connection already aborted by the engine are dropped, mirroring the
+ * reality that frames emitted between reconnects are lost.
  */
 
 export interface MockTransportHandle<F> {
-  /** 向当前连接递送一帧 */
   emit(frame: F): void;
-  /** 当前连接以未知错误中断（引擎按 backoffMs 重连） */
   interrupt(): void;
-  /** 当前连接正常收流，上报 closeReason（终态分诊入口） */
   close(reason: FrameSource<F>["closeReason"]): void;
   gap(): void;
   end(): void;
-  /** 下一次 open 立即抛出该 ApiError（auth 闭环/不可重试失败测试） */
+  /** The next open throws this ApiError (auth/terminal failure tests). */
   failNext(error: ApiError): void;
-  /** open 调用记录（含游标快照，供断言重连/续订行为） */
   readonly opens: ReadonlyArray<{ cursor: Cursor | null }>;
 }
 
 export interface MockTransportOptions<F> {
-  /** 帧游标投影（供引擎恢复点；缺省不产生游标） */
-  cursorOf?: (frame: F) => Cursor | undefined;
-  /** 自动生成：按 seq 递增（手动 emit 与自动生成可并存） */
   auto?: {
     intervalMs: number;
     frame: (seq: number) => F;
-    /** 起始 seq（无游标开流时） */
     startSeq?: number;
-    /** 由游标解析续发起点；缺省 parseInt */
+    /** Resume sequence from a cursor; default parseInt. */
     seqOfCursor?: (cursor: Cursor) => number;
   };
 }
@@ -44,20 +34,13 @@ type MockStep<F> =
   | { kind: "close"; reason: FrameSource<F>["closeReason"] }
   | { kind: "fail"; error: unknown };
 
-export type MockTransport<F> = Transport<F> & MockTransportHandle<F>;
-
-class MockAbortError extends Error {
-  constructor() {
-    super("mock: aborted");
-    this.name = "AbortError";
-  }
-}
+export type MockTransport<F> = StreamSource<F> & MockTransportHandle<F>;
 
 export function mockTransport<F>(options: MockTransportOptions<F> = {}): MockTransport<F> {
   const opens: { cursor: Cursor | null }[] = [];
-  const failQueue: ApiError[] = [];
+  const failures: ApiError[] = [];
 
-  interface Conn {
+  interface Connection {
     alive: boolean;
     reason: FrameSource<F>["closeReason"];
     steps: MockStep<F>[];
@@ -65,17 +48,16 @@ export function mockTransport<F>(options: MockTransportOptions<F> = {}): MockTra
     timer: ReturnType<typeof setInterval> | null;
     detach(): void;
   }
-  let active: Conn | null = null;
 
-  /** 直接投递到指定连接（绕过 alive 检查——abort 也要能唤醒等待者） */
-  function post(conn: Conn, step: MockStep<F>): void {
-    conn.steps.push(step);
-    conn.waiters.shift()?.();
+  let active: Connection | null = null;
+
+  function post(connection: Connection, step: MockStep<F>): void {
+    connection.steps.push(step);
+    connection.waiters.shift()?.();
   }
 
-  /** 面向句柄控制：只投给活着的当前连接 */
   function send(step: MockStep<F>): void {
-    if (active?.alive) post(active, step);
+    if (active?.alive === true) post(active, step);
   }
 
   const handle: MockTransportHandle<F> = {
@@ -85,7 +67,7 @@ export function mockTransport<F>(options: MockTransportOptions<F> = {}): MockTra
     gap: () => handle.close("gapped"),
     end: () => handle.close("ended"),
     failNext: (error) => {
-      failQueue.push(error);
+      failures.push(error);
     },
     get opens() {
       return opens;
@@ -96,62 +78,63 @@ export function mockTransport<F>(options: MockTransportOptions<F> = {}): MockTra
     ...handle,
     open(cursor: Cursor | null, signal: AbortSignal): FrameSource<F> {
       opens.push({ cursor });
-      const failure = failQueue.shift();
-      if (failure) throw failure;
+      const failure = failures.shift();
+      if (failure !== undefined) throw failure;
 
-      const auto = options.auto;
-      const conn: Conn = {
+      const connection: Connection = {
         alive: true,
         reason: "transport",
         steps: [],
         waiters: [],
         timer: null,
         detach() {
-          conn.alive = false;
-          if (conn.timer) clearInterval(conn.timer);
+          connection.alive = false;
+          if (connection.timer !== null) clearInterval(connection.timer);
           signal.removeEventListener("abort", abort);
-          // 唤醒所有等待者：它们会看到 steps 空 + 已死 → done（防提前 return 挂起）
-          for (const wake of conn.waiters.splice(0)) wake();
+          for (const wake of connection.waiters.splice(0)) wake();
         },
       };
-      active = conn;
+      active = connection;
 
-      const abort = () => {
-        if (!conn.alive) return;
-        conn.detach();
-        post(conn, { kind: "fail", error: new MockAbortError() });
+      const abort = (): void => {
+        if (!connection.alive) return;
+        connection.detach();
+        post(connection, {
+          kind: "fail",
+          error: new DOMException("mock: aborted", "AbortError"),
+        });
       };
       signal.addEventListener("abort", abort, { once: true });
 
-      if (auto) {
-        const seqOfCursor = auto.seqOfCursor ?? ((c: Cursor) => Number.parseInt(c, 10));
+      const auto = options.auto;
+      if (auto !== undefined) {
+        const seqOfCursor = auto.seqOfCursor ?? ((value: Cursor) => Number.parseInt(value, 10));
         let seq = cursor === null ? (auto.startSeq ?? 0) : seqOfCursor(cursor) + 1;
-        conn.timer = setInterval(() => {
-          if (!conn.alive) return;
-          send({ kind: "frame", frame: auto.frame(seq) });
+        connection.timer = setInterval(() => {
+          if (connection.alive) send({ kind: "frame", frame: auto.frame(seq) });
           seq += 1;
         }, auto.intervalMs);
       }
 
       const iterator: AsyncIterator<F> = {
         async next(): Promise<IteratorResult<F>> {
-          while (conn.steps.length === 0 && conn.alive) {
+          while (connection.steps.length === 0 && connection.alive) {
             await new Promise<void>((resolve) => {
-              conn.waiters.push(resolve);
+              connection.waiters.push(resolve);
             });
           }
-          const step = conn.steps.shift();
+          const step = connection.steps.shift();
           if (step === undefined) return { done: true, value: undefined };
           if (step.kind === "frame") return { done: false, value: step.frame };
-          conn.detach();
+          connection.detach();
           if (step.kind === "close") {
-            conn.reason = step.reason;
+            connection.reason = step.reason;
             return { done: true, value: undefined };
           }
           throw step.error;
         },
         async return(): Promise<IteratorResult<F>> {
-          conn.detach();
+          connection.detach();
           return { done: true, value: undefined };
         },
       };
@@ -159,21 +142,26 @@ export function mockTransport<F>(options: MockTransportOptions<F> = {}): MockTra
       return {
         [Symbol.asyncIterator]: () => iterator,
         get closeReason() {
-          return conn.reason;
+          return connection.reason;
         },
       };
     },
   };
 }
 
-/** 数字帧的便捷构造（测试：seq 即帧即游标）。 */
+/** Convenience numeric stream: seq is both frame and cursor. */
 export function mockSeqTransport(
   options: { intervalMs?: number; startSeq?: number } = {},
 ): MockTransport<number> {
   return mockTransport<number>({
-    cursorOf: (frame) => String(frame),
-    auto: options.intervalMs
-      ? { intervalMs: options.intervalMs, frame: (seq) => seq, startSeq: options.startSeq ?? 0 }
-      : undefined,
+    ...(options.intervalMs !== undefined
+      ? {
+          auto: {
+            intervalMs: options.intervalMs,
+            frame: (seq: number) => seq,
+            startSeq: options.startSeq ?? 0,
+          },
+        }
+      : {}),
   });
 }

@@ -1,25 +1,52 @@
 # @lynxland/uikit
 
-> Data-dense console UI library: three interaction primitives (Query / Command / Subscription) + one interaction surface (Resource), Effect in the seams, five families of UI blocks, on TanStack engines.
+> Data-dense console UI library: three **data capabilities** (Query / Command / Stream)
+> composed through explicit bindings and presentation layers, on TanStack engines.
 > Built agent-first, for agents guided by humans.
 
-- Design doc (authoritative, audited): [docs/design.md](docs/design.md)
-- Page-author skill: [docs/SKILL.md](docs/SKILL.md)
-- Repo guide: [AGENTS.md](../AGENTS.md)
+- **Current architecture (v3 `3.0.0` cutover)**: [docs/design.md](docs/design.md) — two axes, seven layers, target APIs, migration plan.
+- **Concept audit (why v2 was confusing)**: [docs/audits/2026-11-07-conceptual-audit.md](docs/audits/2026-11-07-conceptual-audit.md)
+- **Current v3 API guide**: [docs/SKILL.md](docs/SKILL.md)
+- **Supported versions**: [docs/versions.md](docs/versions.md)
+- **Archived draft-2 design + decision log**: [docs/design-history.md](docs/design-history.md)
+- **Repo guide**: [AGENTS.md](../AGENTS.md)
 
 ## Map
 
-- `/kernel` — contracts: CollectionQuery, Segment, ApiError, CommandResult, Resource (defineResource/scoped), Transport/FrameSource, cursor algebra, invalidation selectors
-- `/schema` — CollectionQuery URL codec (q / filter / sort / cursor / page / size), Standard Schema wrapper
-- `/adapters` — createHttp (Effect inside, 401 hook, raw body/blob), clientCollection, mockResource/mockFetchAll
-- `/react` — useCollection / useRecord / useBatch (+ queryOptions factories for loader prefetch)
-- `registry/` — blocks: values / query / command / subscription / shell (shadcn-style, copy-distributed)
-- `apps/demo` — living docs: dual-dialect list pages, custom content page, reference select, four states
+- `@lynxland/uikit-core` — headless contracts + schema + adapters (**no React**):
+  CollectionSource/RecordSource/LookupSource, CollectionState/Request/Page, Command/Outcome,
+  StreamSource/FrameSource, ApiError, Entity.
+- `@lynxland/uikit-react` — data/command/stream bindings + queryOptions; `/router` for URL/search
+  (`useCollectionPage`, `useSearchState`).
+- `@lynxland/uikit-surfaces` — UI-library-agnostic values/controls/views/chrome/fields +
+  `UiAdapter` contract.
+- `@lynxland/uikit-ui-shadcn` — default UI adapter: Base UI + shadcn primitives/tokens.
+- `@lynxland/uikit-ui-plain` — optional minimal adapter: plain HTML/CSS, no Tailwind/Base UI.
+- `@lynxland/uikit-preset-console` — opinionated, runnable pages/views/chrome/fields/CRUD.
+- `@lynxland/uikit-testing` / `@lynxland/uikit-cli` — test harness / init·eject·doctor·scaffold.
+- `@lynxland/uikit` — one-install meta entry; re-exports the preset.
+- `@lynxland/uikit-cli` — `init` / `eject surfaces|preset-console` / `doctor` (copy-owned code).
+- `apps/demo` — living docs: every Page Template is a runnable page
 
-## Concepts (all 4 of them)
+## Concepts (two axes)
 
-Ask (Query, cached reads), Tell (Command, named verbs with structured outcomes), Listen (Subscription, cursor-positioned frames) — addressed through Resource. Everything else derives; see design.md §3.
+**Data capabilities**: Query (cached reads), Command (named writes with structured outcomes),
+Stream (cursor-positioned frames). **Entity** is an optional named grouping for keys/scope/invalidation;
+`Resource` is **deleted** in v3; Entity is not a fourth primitive.
+
+**Presentation layers**: Value → Control → View → Chrome → Page Composition. Controls are controlled props
+(no data fetching, no Router); Views bind handles; Chrome owns the page shell; preset pages are thin compositions;
+Page Templates / scaffold are not stable component APIs.
+
+**Preset** is the out-of-the-box layer: default pages/views/chrome/fields/CRUD. **UI Adapter** is the UI
+adaptation seam: visual primitives + tokens. Core stays headless; preset is opinionated but ejectable;
+UI adapter is replaceable.
+
+Everything else derives from these two axes; see design.md §1–§6.
 
 ## Status
 
-Vertical slice (Query line) complete: kernel contracts, URL codec, http adapter, client/server dialect bindings, list-page blocks, demo, e2e. Command/Subscription lines are specified in the design doc and land next.
+Current package: `3.0.0` (v3). The cutover has **no backward compatibility** (design.md §8):
+v2 APIs were deleted, not aliased; v2 history is in design-history.md.
+Batch 1–4 are implemented (core/react/testing/surfaces/ui-shadcn/ui-plain/preset/meta/demo/CLI);
+remaining: clean-room install smoke and external fleetly/torchwood migration.

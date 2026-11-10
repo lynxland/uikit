@@ -1,254 +1,631 @@
-# @lynxland/uikit SKILL.md（页面作者册）
+# @lynxland/uikit v3 — 页面作者手册
 
-> 面向用 @lynxland/uikit 写 console 页面的 AI agent 与开发者。适配器作者册见文末指针。
-> 完整设计：docs/design.md。反模式与幻觉诱饵在最后——先读它们能省一半调试。
+> **版本**：`3.0.0`（v3 greenfield cutover）
+> **规范**：[docs/design.md](design.md) · **理念**：[docs/philosophy.md](philosophy.md)
+> **历史**：[docs/design-history.md](design-history.md)（v2 只作证据，不是 API）
+>
+> v3 不向后兼容：`Resource` / `FieldDef` / `Page` / `*Panel` / `TablePage` /
+> `useCollectionData` / `useBatch` / `useSubscription` 已删除，没有别名。
+> 旧代码用 [v3-execution-plan](migrations/v3-execution-plan.md) 的 codemod 改消费方。
 
-## 心智模型（就 4 个名词）
+## 1. 心智模型
 
-- **Query（问）**：缓存读。列表用 `useCollection`，详情 `useRecord`，外键 `useBatch`。
-- **Command（令）**：具名动词写面。`useCommand(descriptor, { scope, onSettled })`（rejected/conflict 是结果、失败才走 error 通道、ok 后默认失效同资源查询）；表单用 `useCommandForm(descriptor, { defaultValues, onSettled })` + `<Form>` 块 + `TextField/SelectField`；行删除用 `<DeleteButton descriptor input />`（内置确认框）。
-- **Subscription（听）**：帧流。`useSubscription(descriptor | transport, { cursor, getCursor, onFrame, policy? })` 返回引擎句柄（status/error/resyncs + pause/resume/restart/resync/clear）。见下方"订阅页"一节。
-- **Resource**：后端某实体/流的交互面，由适配器作者用 `defineResource` 定义——你在页面上只管 import 它。
+两条轴，不许混：
 
-页面 = 路由（search schema）→ 绑定 hook → 块组件。三步，每个页面同构。
+| 数据能力 | 角色 |
+|---|---|
+| **Query** | 缓存读：collection / record / lookup |
+| **Command** | 具名写：`Outcome` 结果 + `Effect[]` 失效 |
+| **Stream** | 游标定位的帧流：backlog → follow → resync |
 
-## 列表页（90% 的页面）
+| 呈现层（L5–L7） | 角色 |
+|---|---|
+| **Value** | 纯展示：StatusBadge / RelativeTime / StatCard / states |
+| **Control** | 受控 props：DataTable / FilterBar / Pager / Tabs / Form |
+| **View** | 绑定句柄 → 控件 props：CollectionView / RecordView / FormView |
+| **Chrome** | 页壳：PageLayout / AppShell / SectionCard（唯一 h1 所有者） |
+| **Page Composition** | preset 页面、Page Template、脚手架 |
+
+**Entity 只是可选分组**，不是第四原语。裸 `CollectionSource` 完全可用。
+
+## 2. 安装与启动
+
+默认一键（meta → preset → surfaces + ui-shadcn）：
+
+```bash
+pnpm add @lynxland/uikit @tanstack/react-query @tanstack/react-router \
+  @tanstack/react-form @tanstack/react-table
+```
+
+应用根：
 
 ```tsx
-// 1) 模块级建 search schema（与路由共用同一实例）
-const widgetsSearch = collectionQuerySchema({
-  text: ["name"], filters: [{ field: "status", op: "eq", options: [...] }], defaultSize: 8,
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createRouter, RouterProvider } from "@tanstack/react-router";
+import { PresetProvider } from "@lynxland/uikit";
+import "@lynxland/uikit/preset.css"; // surfaces.css + shadcn tokens.css
+
+const queryClient = new QueryClient();
+const router = createRouter({ routeTree });
+
+createRoot(root).render(
+  <QueryClientProvider client={queryClient}>
+    <PresetProvider>
+      <RouterProvider router={router} />
+    </PresetProvider>
+  </QueryClientProvider>,
+);
+```
+
+按层使用（不装 preset）：
+
+```bash
+pnpm add @lynxland/uikit-core @lynxland/uikit-react @lynxland/uikit-surfaces @lynxland/uikit-ui-shadcn
+```
+
+- `@lynxland/uikit-core`：零 React、零 Effect；根 / `kernel` / `schema` / `adapters`。
+- `@lynxland/uikit-react`：数据/命令/流绑定；`/router` 才有 URL。
+- `@lynxland/uikit-surfaces`：values/controls/views/chrome/fields + `UiAdapter` contract。
+- `@lynxland/uikit-ui-shadcn`：Base UI + shadcn 默认 adapter + `/tokens.css`。
+- `@lynxland/uikit-preset-console`：默认可运行页面。
+- `@lynxland/uikit`：meta，只转发 preset + 少量 core 类型。
+
+## 3. Core：source / entity / command / stream
+
+### 3.1 裸 source
+
+```ts
+import { collectionSource, recordSource, lookupSource } from "@lynxland/uikit-core";
+
+export const widgets = collectionSource<Widget>({
+  name: "widgets",                 // kebab-case；进 query key
+  scope: ["projectId"],            // 声明的 scope 键（可选）
+  async read(request, ctx, signal) {
+    return api.listWidgets(request, ctx.projectId, signal);
+  },
 });
 
-// 2) 路由：Standard Schema 直传 validateSearch
-export const Route = createFileRoute("/widgets/")({
-  validateSearch: widgetsSearch.toSearchSchema(),
-  component: WidgetsPage,
+export const widget = recordSource<Widget>({
+  name: "widgets",
+  scope: ["projectId"],
+  async read(id, ctx, signal) {
+    return api.getWidget(id, ctx.projectId, signal); // null = empty
+  },
 });
 
-// 3) 页面：绑定 + 块
-function WidgetsPage() {
-  const list = useCollection(widgetsClient, { from: Route.id, search: widgetsSearch });
-  return (
-    <ListPage list={list} title="Widgets"
-      toolbar={<FilterBar list={list} schema={widgetsSearch} />}
-      pagination={<Pagination list={list} />}>          {/* keyset 方言用 KeysetPagination */}
-      <DataTable list={list} columns={columns} getRowId={(r) => r.id} />
-    </ListPage>
-  );
+export const owners = lookupSource<Owner>({
+  name: "owners",
+  key: (owner) => owner.id,        // byId / missingIds 的行 → id 投影
+  async read(ids, ctx, signal) {
+    return api.getOwners(ids, signal);
+  },
+});
+```
+
+### 3.2 Entity（可选）
+
+```ts
+import { defineEntity } from "@lynxland/uikit-core";
+
+export const widgetEntity = defineEntity<Widget>({
+  name: "widgets",
+  key: (row) => row.id,
+  scope: ["projectId"],
+  collection: { read: widgets.read },
+  record: { read: widget.read },
+  lookup: { read: owners.read },
+  commands: { create, update, remove },
+});
+```
+
+`defineEntity` 只把 `name`/`scope` 附加到能力上，没有 `__resource`/`__scopeKeys`。
+
+### 3.3 Request / Page / Window
+
+```ts
+type CollectionWindow =
+  | { kind: "cursor"; size: number; cursor?: string }
+  | { kind: "offset"; size: number; offset: number }
+  | { kind: "all"; size?: number };
+
+interface CollectionRequest {
+  where?: Predicate;
+  order?: readonly Sort[];
+  window: CollectionWindow;
+}
+
+interface CollectionPage<T> {
+  rows: readonly T[];
+  paging:
+    | { kind: "cursor"; nextCursor?: string; total?: number }
+    | { kind: "offset"; total: number; offset: number; size: number }
+    | { kind: "all"; total: number };
 }
 ```
 
-- URL 键名：`q` / `filter=field:op:value` / `sort=field:dir` / `cursor` / `page` / `size`。
-- **`from` 传 `Route.id`**（不是 fullPath）：pathless 布局（如 `_shell`）下 id 含布局段而 fullPath 不含，
-  `useSearch` 按路由 id 找活跃 match——fleetly 试点实咬（design §12.1 kit 修复 #2）。
-- "URL + schema 默认值"即真相；翻页=push（历史栈即分页栈），过滤/排序=replace+回第一页。
-- 四态（loading/empty/error/success）由 ListPage 切换；你只写 success 态的 children。
-- 预取：`collectionQueryOptions(resource, query)` 进 route loader 的 `ensureQueryData` + `Link preload="intent"`。
-- **validateSearch 无损**：schema 外的键（tab/自定义参数）缺省透传存活——双 schema 挂同一路由直接组合
-  两个 `toSearchSchema().validate` 返回值，零手写合并器；严格丢弃需显式 `toSearchSchema({ unknownKeys: "drop" })`。
+### 3.4 Command / Outcome / Effect
 
-## 伴读数据（无 URL 的读）
+```ts
+import { ok, rejected, conflict, invalidate } from "@lynxland/uikit-core";
 
-```tsx
-// 壳层组件 / 表单下拉 / 统计条——不进 URL、不受列表页 q/page/cursor 影响
-const data = useCollectionData(resource, { scope?, size?, window?, refetchInterval?, enabled?, retry? });
-// window: "all" = 整取方言全量行（clientCollection）；rows 直出（status/total/isFetching/refetch 同备）
+const createWidget: Command<CreateWidget, Widget> = {
+  // 必须是函数属性，不能写方法签名（方法参数 bivariant，会破坏 Input 类型）
+  run: async (input, ctx) => {
+    const row = await api.createWidget(input, ctx.projectId);
+    return ok(row);
+  },
+  effects: [invalidate("widgets")],
+  // 协议层 not-found/forbidden 的领域语义：
+  treatAs: { "not-found": ok(undefined as never) },
+};
 ```
 
-- 禁为伴读再包一层 useCollection 空路由或手写 `.data?.rows` 解包——`useCollectionData` 就是该形态。
-- **多集合同路由**（双列表/多 tab）：`collectionQuerySchema({ namespace: "tasks", ... })` 显式开启——
-  URL 键带扁平前缀（`tasks.q` / `tasks.page`），与 `schedules.q` 并存互不携带；缺省 off（存量 URL 零变化）。
+- `ApiError`（`network` / `auth` / `forbidden` / `not-found` / `server` / `decode`）走失败通道。
+- `Outcome`（`ok` / `rejected` / `conflict`）走返回值；预期内拒绝不是异常。
+- `effects` 是纯数据；绑定层应用。`effects: []` 表示不失效。
 
-## 详情 / 自定义内容页
+### 3.5 Stream
 
-- 详情配方：`useRecord(resource, { id })` + `<DetailPage record title meta actions tabs activeTab onTabChange>`。
-  句柄带 `isFetching`（后台刷新期 true，与 status:"loading" 的初载互补）——刷新态 UI 勿再用
-  loading 近似（fleetly 换装前两处挂账注释的复原位）。
-  **tab 进 search、切 tab = replace**（页面形态非分页，不吃历史栈）——页面从 `useSearch` 读、
-  经 `navigate({ to: ".", search: prev => ({...prev, tab}), replace: true })` 写回（函数式 search）。
-  demo：`apps/demo/src/routes/widgets.$id.tsx`。
-- 内容槽组合：字段网格是页面词汇（自己写 dl/grid）；分区用 `<SectionCard title>`（设置页 = SectionCard × n）；
-  结构化 spec 查看/编辑用 `<JsonField value onChange>`——**坏 JSON 不回写**（Apply 只在 parse 成功时 onChange）；
-  字段级旧/新差异用 `<DiffView entries=[{path, old?, new?}]>`（对齐行 + 行内 token 高亮；无 diff 库）。
-- clone 配方：`useCommandForm(create, { defaultValues: 从 record 投影 })` + 提交后 `navigate` 到新记录——demo 详情页 Clone 按钮。
-- **自定义内容页没有特殊机制**：普通文件路由 + `Page` + 任意组合（无 CustomPage——框架不拥有页面类型）。
-
-## 仪表盘（统计 + 图表）
-
-- 统计卡：`<StatCard label value tone? hint?>`（纯文字三段；pending 传 "…"）。
-- 时序图：`<MetricChart series formatValue? maxSeries? serverCap?>`——**时序是 collection**
-  （时间窗谓词 `t >= from`，行分组到序列是页面投影）：
-
-```tsx
-const query = useQuery(collectionQueryOptions(metricsResource, {
-  predicate: { all: [{ field: "metric", op: "eq", value: "cpu" }, { field: "t", op: "gte", value: from }] },
-  order: [{ field: "t", dir: "asc" }], window: { size: 2000 },
-}));
-const series = keys.map(k => ({ key: k, label: k, points: rows.filter(r => r.series === k).map(r => ({ t: r.t, v: r.value })) }));
-<MetricChart series={series} formatValue={formatPercent} maxSeries={10} serverCap={{ shown: 12, total: 34 }} />
+```ts
+const stream: StreamSource<LogEvent> = {
+  open(cursor, signal) {
+    return ndjsonTransport({ url: "/api/logs", cursor, signal });
+  },
+  beforeReconnect() { /* refresh token, etc. */ },
+};
 ```
 
-- 序列治理四件套块内已带：活跃窗排序 / 渲染上限 + "+N more" / 服务端截断披露 / protojson 零值=0
-  （`v` 缺席按 0 解释；`missingValue: "gap"` 显式断线）。`t` 一律 ms epoch（数值时间轴），
-  刻度格式化经 `formatTick`；单位词表（bytes/percent）经 `formatValue` 注入——块不认单位。
-- 图表依赖 recharts（registry.json dependencies 声明，拷贝制下落消费方）；需要 vendored `components/ui/chart.tsx`。
+`StreamStatus`：`idle` / `live` / `reconnecting` / `paused` / `gapped` / `stalled` /
+`ended` / `error`。流是帧流，不是 pub/sub。
 
-## 向导（多步 + 等待）
+### 3.6 URL schema：`collectionSearch`
 
-- `<Stepper steps current onStepClick?>`（受控）+ 每步 `<Form>`；步进由事件驱动（提交/终态帧），Stepper 不自决。
-- **fresh-read 步间衔接**：步 1 创建后 `queryClient.fetchQuery(collectionQueryOptions(res, q, { staleTime: 0 }))`
-  绕过 stale 缓存——步 2 的 ReferenceSelect 立刻看到新记录（§3 多请求编排）。
-- 等待步骤：wait 流（`useSubscription` + `onFrame` 看状态，终态帧前进；帧优先于轮询）。
-  demo：`apps/demo/src/routes/quickstart.tsx`（ensure 幂等 + wait 流 3.2s 到 healthy）。
+```ts
+import { collectionSearch } from "@lynxland/uikit-core";
 
-## 配方速记
-
-- **导出 CSV**：`list.rows` + 页面 unparse 纯函数（`toCsv(headers, rows)` RFC4180 最小实现 +
-  `downloadCsv` 触发下载，demo `lib/csv.ts`）——导的是当前窗口（URL 即真相）。
-- **实时失效**：`useInvalidateOnFrame(sub, [{ resource }], { filter?, throttleMs? })`——事件帧到达
-  自动 invalidate 查询（selector 语义同 useCommand 的 invalidates；热流给 throttleMs）。
-- **轮询兜底**：`refetchInterval`（stalled 后切轮询是你的组合）。
-
-## 外键
-
-- 列内显名：`useBatch(resource, ids).byId.get(id)`。
-- 搜索选择：`<ReferenceSelect resource={otherResource} …/>`（局部状态，不进 URL）。
-
-## 权限
-
-- 页级门控：`beforeLoad` 里 loader 预取 identity + redirect（渲染前完成）。
-- 元素级显隐：`useCan`（fail-closed；"未就绪"与"拒绝"是两个渲染态）。
-
-## 订阅页（events / logs 两形）
-
-```tsx
-// 裸 Transport（日志流——logs 这类特殊流可以不造 Resource）
-const sub = useSubscription(logsTransport, { cursor: null }); // null = 活尾，立即开
-<LogViewer sub={sub} formatLine={(f) => `${f.ts} ${f.msg}`} />
-
-// backlog 定锚 × 续订（events 组合页）
-const list = useCollection(eventsResource, { from: Route.id, search: eventsSearch });
-const [anchor, setAnchor] = useState<Cursor | null>(null);
-// …backlog 首次成功 → setAnchor(最新一端)…
-const sub = useSubscription(eventsStream, { cursor: anchor ?? undefined, getCursor: (f) => String(f.seq) });
-<EventFeed sub={sub} backlog={list.rows.slice().reverse()} /* 时间正序传入 */ getKey={(f) => f.seq} />
-```
-
-- **cursor 语义**：`undefined` = 待命不开（等 backlog 定锚）；`null` = 活尾立即开；值 = 从锚点续订。
-- **状态机**：live（连接建立）/ reconnecting（含首连与退避）/ paused / gapped / stalled（退避耗尽，轮询兜底是你的组合）/ ended（服务端收流）/ error（带 ApiError）。
-- **gapped 配方**：黄条出现 → 重跑 backlog（`queryClient.fetchQuery` fresh-read）→ `sub.resync(newAnchor)`（resyncs++ 供黄条）。
-- 块内部经 `sub.subscribeFrames/getFrames` 订帧存储——页面级帧到达不重渲染。
-- descriptor 形态（`Resource.subscriptions` 条目）**必须声明 `policy`**（buffer/retry 声明在流侧，兼作运行时判别）。
-- 阶段时间线：`<StageTimeline sub stages onStage>`——页面声明阶段目录（次序+文案），帧经
-  `onStage(frame) → {key, status, at?} | undefined` 投影（undefined = 与时间线无关）。
-- 帧失效查询：见"配方速记"的 `useInvalidateOnFrame`。
-
-## Shell 三件（作用域 / 设置页 / 错误边界）
-
-- **作用域切换**：`<ScopeSwitcher label value options onChange staleNote?>`——onChange 带
-  `meta.source: "user" | "correction"`（用户切换 push、陈旧 id 校正 replace）。块内置陈旧 id
-  校正（value 不在 options 时 effect 期回落首个可用）。双通道同步（URL↔localStorage）是页面
-  四件套配方：写方向规则 / storage 事件桥 / synced 守卫（同值不写）/ 防乒乓（setItem 幂等）
-  ——demo `routes/scopes.tsx` 是参照实现。
-- **设置页**：`SectionCard × n × usePreference(key, fallback)`——独立页（`Page width="narrow"`）
-  与详情 settings tab 是同一配方的两种宿主。demo `routes/settings.tsx`。
-- **每路由错误边界**：路由挂 `errorComponent: ({ error, reset }) => <RouteErrorBoundary error reset>`
-  ——页面崩溃兜底（数据面错误走 ListPage 四态，别混）。Retry 恢复语义归页面（如先清失败参数
-  再 reset）。demo `routes/boom.tsx`（`?fail=1` 注入崩溃）。
-
-## 测试配方（/testing 出口）
-
-```tsx
-import { createTestRouter, renderWithKit } from "@lynxland/uikit-core/testing";
-
-// 单路由 + Query/Router/Scope 三上下文一体接线（useCollection 系绑定缺一即假绿）
-const r = await renderWithKit(<MyPage />, {
-  path: "/widgets",
-  searchSchema: widgetsSearch,      // 与真实 validateSearch 同路归一
-  search: { q: "web" },
-  scope: { projectId: "p1" },       // 挂 ResourceScopeProvider
-});
-expect(r.getSearch().q).toBe("web");// 断言读解析后的 search 对象（非原始 query 串）
-// r.queryClient：同键断言/失效观察入口
-
-// 多路由（命令 onSettled navigate 的目标必须注册——未注册会因 not-found rejection 时序漂移）
-const router = createTestRouter({
-  routes: [
-    { path: "/items/$id", component: DetailPage, searchSchema: detailSearch },
-    { path: "/items", component: ListPage },
+export const widgetsSearch = collectionSearch({
+  text: ["name", "id"],             // q → OR of contains
+  filters: [
+    { field: "status", op: "eq" },
+    { field: "owner", op: "in" },
   ],
-  initial: { path: "/items", search: { q: "x" } },
+  defaultSize: 20,
+  defaultSort: [{ field: "createdAt", dir: "desc" }],
+  // offset 分页必须声明；否则 URL 无 page 时按 cursor 解释
+  defaultPage: { kind: "offset", offset: 0 },
+  namespace: "widgets",             // 多集合同路由：widgets.q / widgets.filter
 });
-render(<RouterProvider router={router} />, { wrapper: QueryClientProvider });
+
+// TanStack Router
+validateSearch: widgetsSearch.schema,
+parseSearch: widgetsSearch.serializer.parseSearch,
+stringifySearch: widgetsSearch.serializer.stringifySearch,
 ```
 
-- mock 面从"数据源"上移到"resource 动词"（defineResource 的 collection/commands 覆写）；
-  `mockCollection`/`mockFetchAll`（延迟/失败注入/行替换）是现成驱动。
-- 命令测试断言失效：`r.queryClient.getQueryState(key)?.isInvalidated`（键经
-  `collectionQueryOptions(...).queryKey` 单源取，勿手拼）。
-- **多资源取键帮手的类型写法**：帮手参数勿手拼 `Resource<T, ID, C, S, K>` 五参泛型
-  （fleetly 迁移实测的线程噪音源）——用 `Parameters<typeof collectionQueryOptions>[0]`
-  钉死精确参数类型，零泛型线程：
+- `schema` 是 Standard Schema，`validateSearch` 直收。
+- `encode` / `decode` / `patch` / `reset` / `toRequest`。
+- repeated key：`filter=a:eq:1&filter=b:in:x,y`；`stringifySearch` 返回前导 `?`。
+- 单元素数组 parse 后是 scalar；`decode` 用 `toArray` 归一。
+- `patch({ filters })` 会清 `cursor` / `page`。
+- 默认分页模式：`defaultPage`；`decode` 不把默认值写回 state。
+
+### 3.7 adapters
 
 ```ts
-function kitKey(resource: Parameters<typeof collectionQueryOptions>[0], query: CollectionQuery) {
-  return collectionQueryOptions(resource, query).queryKey;
-}
+import {
+  restCollection, restRecord, restFetchAll,
+  clientCollection, mockCollection,
+  mockTransport, ndjsonTransport, sseTransport,
+} from "@lynxland/uikit-core";
 ```
 
-## 反模式（必读）
+- `restCollection({ url, fetch? })` / `restRecord` / `restFetchAll`。
+- `clientCollection({ fetchAll })`：整取 + 本地求值 + 伪造 cursor。
+- `mockCollection(rows, { dialect: "offset" | "keyset" })`。
+- `mockTransport` / `ndjsonTransport` / `sseTransport`：纯 TS async iterables。
+- 没有 `createHttp`；鉴权/401 用注入的 `fetch` 解决。
 
-1. 禁给块传 url/resource 让它自己拉数——块只消费 `list` 句柄。
-2. 禁 useState 存分页/过滤/排序——URL 即真相（竞品训练反射是反的）。
-3. 禁渲染期 navigate——setter 走事件（库内已保证）。
-4. 禁 try/catch 处理命令拒绝——rejected 是返回值；只有失败（网络/401/解码）走 error 通道。
-5. 禁用 Zod 写 search schema（Effect Schema 单源）；禁 Radix 路径（Base UI 方言）。
-6. 禁页面层 catch 401 跳登录——全局闭环已接三通道。
-7. 禁乐观更新/undo——C 类拒签项，默认同步等待。
-8. 禁造 CustomPage / 页面登记——自定义页面就是普通路由。
-9. 禁把 Resource 当 react-admin 的 `<Resource>`（路由注册）——纯数据契约，路由自己写。
-10. 禁用换 cursor prop 的方式重锚——gapped 后用 `sub.resync(newAnchor)`（原地重锚 + resyncs 计数）；cursor prop 变化 = 整个订阅重建。
-11. 禁在页面层逐帧消费 `sub.frames` 做渲染——页级只读状态；帧渲染交给 LogViewer/EventFeed（它们订帧存储）。
-12. 禁给 transport 的迭代器写"完成即收流"——完成是终态判据（closeReason），想要重连语义应当**抛错**（§5.3 分诊矩阵）。
-13. 禁详情 tab 用 useState——tab 进 search（切 tab = replace，深链/分享即所得）。
-14. 禁给 MetricChart 传预格式化时间字符串——`t` 一律 ms epoch，刻度格式化经 `formatTick`（torchwood 的类目桶是页面对桶 epoch 的格式化选择）。
-15. 禁 JsonField 外部再包一层校验——Apply 只在 parse 成功时 onChange（坏 JSON 不回写是块契约）。
+## 4. React 绑定
 
-## 幻觉诱饵（训练数据 → 正确姿势）
+### 4.1 Scope
 
-| 你可能想写的                                           | 正确的                                                                    |
-| ------------------------------------------------------ | ------------------------------------------------------------------------- |
-| refine `useSubscription(channel, params, onEvent)`     | kit `useSubscription(descriptor\|transport, {cursor, getCursor, onFrame})` 返回引擎句柄（完全同名不同义！） |
-| EventSource 自动重连                                   | 引擎拥有重连（backoffMs 序列）；SSE transport 断开即抛错交引擎退避         |
-| 心跳/中断分不清就当 ended                              | 完成是终态判据（isEnded/endEvent 帧内容裁决）；分不清就抛错让引擎重连     |
-| react-admin `<Resource name list create>`              | Resource = 纯数据契约；路由自己写                                         |
-| dataProvider `{pagination:{page,perPage},sort,filter}` | `CollectionQuery {predicate, order, window}`                              |
-| refine useTable 的 tableProps / pagination.current     | `useCollection` 的 list 句柄 / `window.size`                              |
-| Zod validateSearch                                     | `collectionQuerySchema(...).toSearchSchema()`                             |
-| useNotify / notificationProvider                       | 无内置 toast；`onSettled` + sonner                                        |
-| Relay pageInfo/endCursor                               | `Segment {rows, total?, nextCursor?}`                                     |
+```tsx
+<ScopeProvider value={{ projectId }}>
+  <App />
+</ScopeProvider>
+```
 
-## 适配器作者
+- 绑定 scope 优先级：`options.scope` > `ScopeProvider`（source 声明了 scope 时）> `{}`。
+- 声明的 scope 键缺失 → `status: "idle"` / 不请求；命令 `ready: false`。
+- 跨 scope 失效必须显式 `invalidate("widgets", { allScopes: true })`。
 
-见 docs/design.md §2（契约签名）、§5（Effect 缝隙）、§5.2（protojson 配方：int64 双策略/枚举全名/repeated 序列化/零值缺席）、§5.1（401 闭环管线次序）、§5.3 实现期裁决（订阅引擎分诊矩阵）。核心入口：`createHttp({ onUnauthorized })`、`defineResource`、`clientCollection(fetchAll)`、`restCollection`/`restRecord`（REST-over-fetch 工厂：path 回调组 URL + 信封展平 + 404 空态（`notFound: "null"`）+ 错误收敛内置，fetch 可注入——bring-your-own-fetch 是主干）、`restFetchAll`（整取方言——clientCollection 组合件，见下）、`mockCollection`、`ndjsonTransport`/`sseTransport`（终态判据 isEnded/endEvent 归你的适配器）、`mockTransport`（测试/demo 帧流）、`createSubscriptionEngine`（命令式消费，quickstart 直开 Transport `for await` 亦可）。
-
-命令的 scope 同源（M2）：descriptor 声明 `scopeOf: (input) => ({ projectId, appId })`——引擎把同一份 scope 喂 `run(ctx)` 与失效匹配（投影匹配：读资源声明的 scope 键集逐键相等即命中）；工厂命令的身份从闭包迁入 input 或 scopeOf 派生，调用点零手传 scope。声明了 scope 键的资源命令，显式传 scope 必须覆盖全部声明键（partial 编译红）。scopeOf 的适用判据：**身份完整在 input/工厂闭包里**——部分在 input、部分在环境上下文的嵌套 scope 域（torchwood collections），显式全量 scope 仍是正解（half-scope 陷阱，§12.12）。
-
-**鉴权/401 闭环 = fetch 注入点（bring-your-own-fetch 的横切配方）**：rest 工厂族（restCollection/restRecord/restFetchAll）的 `fetch` 选项是消费方管线的并轨位——只做 Bearer 头注入与 401 全局闭环通知，**错误体解析留给工厂内置的 Response→ApiError 单源**（authFetch 不判 `res.ok`、不抛错——Response 原样交还工厂分诊）：
+### 4.2 数据
 
 ```ts
-// kit/http.ts（消费方持有，fleetly 参照实现）
-export async function authFetch(url: string, init?: RequestInit): Promise<Response> {
-  const res = await fetch(url, { ...init, headers: authHeaders(init?.headers) });
-  if (res.status === 401 && getToken() !== "") notifyUnauthorized(); // 全局闭环（三通道同源）
-  return res;
-}
-// 资源：restFetchAll({ path: () => "/v1/users", envelope: ..., fetch: authFetch })
+const list = useCollection(widgets, {
+  where: { field: "status", op: "eq", value: "running" },
+  window: { kind: "offset", size: 20, offset: 0 },
+}, { scope, staleTime: 5_000, keepPrevious: true });
+
+list.status;      // idle | loading | empty | error | success
+list.emptyReason; // source | filter
+list.rows; list.page; list.total; list.refetch();
+
+const record = useRecord(widget, id, { scope }); // id undefined -> idle
+const lookup = useLookup(owners, ids, { scope }); // byId / missingIds
 ```
 
-axios 管线同题（torchwood 形态）：包一层 FetchLike，把 axios 响应重组为 `new Response(JSON.stringify(data), { status, headers })`——同壳不同传输，工厂无感。
+- `useCollection` **没有 setter**、不读 URL、不 import Router。
+- Query key 由 core `collectionKey` / `recordKey` / `lookupKey` 单源生成。
+- Key 只投影 source 声明的 scope 键；命令 scope 里的多余键不会污染读键。
 
-**整取方言（服务端端点无谓词/游标下发）**：`clientCollection(restFetchAll({ path, envelope?, params? }))`——REST 整取 + 客户端求值谓词/排序/窗口。restFetchAll 与 restCollection/restRecord 共用取数核心（错误收敛/信封缺省/行过滤内置）；params 签名是 `(ctx)`（query 与服务端无关，limit 类取数上限经闭包组装）；无 notFound——整取面 404 是父资源消失/端点错，不是空集合（裁决见 design.md §12.13）。
+### 4.3 命令
 
-keyset（服务端 token）方言的完整实装范本：torchwood 批 A 的 audit-logs 切片（design.md §12.2 实现期回写）——`window.cursor → page_token`、`order.dir → 枚举名`、谓词白名单展开、`Page → Segment`、消费方 axios 失败在适配器收敛 ApiError、URL 存绝对时刻。两个易咬点：schema 不设 defaultOrder（排序三态要能落回服务端默认序）；TanStack 把数组 search 值 JSON 编码，断言读解析后对象不读原始 query 串。
+```ts
+const create = useCommand(createWidget, {
+  entity: widgetEntity,          // 默认失效同 Entity
+  scope: { projectId },
+  onSettled: (result, failure) => { /* ... */ },
+});
+
+create.mutate(input);
+await create.mutateAsync(input);
+create.result; create.failure; create.pending; create.ready;
+```
+
+- `treatAs` 把协议 `not-found`/`forbidden` 映射成领域结果。
+- `effects` 优先级：`options.effects` > `command.effects` > Entity 默认失效。
+- `effects: []` 显式不失效。
+- 未就绪时 `mutate` 抛开发期错误，不静默 no-op。
+
+### 4.4 表单
+
+```ts
+const form = useCommandForm(createWidget, {
+  schema,                         // 任意 Standard Schema
+  fields: createFields,           // FieldInput<CreateInput>[]
+  defaultValues: { replicas: 1 },
+}, { entity: widgetEntity, scope });
+
+form.form; form.submitting; form.error; form.fieldErrors;
+form.reveal;  // ok payload，一次性；不进 query cache
+form.submit(); form.run(input); form.reset();
+```
+
+### 4.5 流
+
+```ts
+const stream = useStream(logStream, {
+  cursor: null,                   // undefined = standby；null = live tail；string = anchor
+  getCursor: (frame) => frame.cursor,
+  onFrame: (frame) => { /* ... */ },
+  policy: { buffer: 500, retry: { backoffMs: [500, 1000, 2000] } },
+});
+
+stream.status; stream.frames; stream.error; stream.resyncs;
+stream.start(); stream.pause(); stream.resume(); stream.restart();
+stream.resync(anchor); stream.clear();
+```
+
+实时失效是组合：
+
+```ts
+useInvalidateOnFrame(stream, [invalidate("widgets")], {
+  filter: (frame) => frame.type === "widget.updated",
+  throttleMs: 250,
+});
+```
+
+### 4.6 URL / Router（`@lynxland/uikit-react/router`）
+
+```ts
+import { useCollectionPage, useEnumSearch, useSearchState, useTabParam } from "@lynxland/uikit-react/router";
+
+const page = useCollectionPage(widgets, {
+  search: widgetsSearch,
+  from: "/widgets",
+  scope,
+});
+
+page.state;        // decoded CollectionState（q/filters/sort/page/size）
+page.rows; page.status; page.pager;
+page.patchState({ q: "web" });
+page.setFilters([...]);
+page.setSort([{ field: "name", dir: "asc" }]);
+page.reset();
+```
+
+- 只有这个子路径 import `@tanstack/react-router`。
+- 写入律：自由过滤/排序 replace；翻页/离散 tab push；详情 tab replace。
+- `PagerModel`：offset 本地算 prev/next；cursor prev 走 `router.history.back()`，
+  深链 cursor 历史为空时 prev 不可用。
+- offset 分页的 schema 必须声明 `defaultPage: { kind:"offset", offset:0 }`。
+- `useEnumSearch({ from, key, values, defaultValue })` / `useTabParam({ from })`
+  处理 tab/status/env 等单键 URL 参数，默认值不写入 URL。
+
+## 5. Surfaces：UI 无关的呈现层
+
+### 5.1 UiAdapter
+
+```tsx
+import { UiAdapterProvider } from "@lynxland/uikit-surfaces/adapter";
+import { shadcnAdapter } from "@lynxland/uikit-ui-shadcn";
+
+<UiAdapterProvider adapter={shadcnAdapter}>
+  <App />
+</UiAdapterProvider>
+```
+
+契约：`Button` / `Input` / `Textarea` / `Select` / `Checkbox` / `DateTimeInput` /
+`Switch` / `Field` / `Popover` / `Menu` / `Tabs` / `Dialog` / `Drawer` / `Badge` /
+`Card` / `Table` slots / `icons` / 可选 `cx`。`Button asChild` 可把 Router `<Link>` 渲染成按钮。具体 UI 库的 compound API 不泄漏到 surfaces。
+
+- 默认：`@lynxland/uikit-ui-shadcn`（Base UI 1.9 + shadcn）。
+- 参考最小实现：`@lynxland/uikit-ui-plain`（无 Tailwind/Base UI）。
+- 自定义：实现 `UiAdapter`，不必 fork surfaces。
+
+**Light/Dark**：`@lynxland/uikit-ui-shadcn/tokens.css` 提供 `:root` 亮色与 `.dark`
+覆盖。`@lynxland/uikit-surfaces` 提供 `ThemeProvider` / `useTheme` / `ThemeToggle`，
+统一处理 class、localStorage 与默认值；SSR/静态 HTML 可用 `themeScript()` 在首屏前
+注入，避免闪白。
+
+### 5.2 Controls（全部受控）
+
+```tsx
+<DataTable
+  rows={rows}
+  columns={columns}                // Column<Row>：id/header/accessor/cell/sortField
+  getRowId={(row) => row.id}
+  sorting={sort}
+  onSortingChange={setSort}
+  selection={selection}
+  onRowClick={openDetail}
+  getRowProps={(row) => ({ "data-testid": `row-${row.id}` })}
+/>
+
+<FilterBar
+  fields={filterFields}
+  value={state.filters ?? []}
+  onChange={(filters) => patch({ filters })}
+  text={{ value: state.q ?? "", onChange: (q) => patch({ q }) }}
+/>
+
+<Pager
+  paging={page.paging}
+  onPrev={...}
+  onNext={...}
+  onPageSizeChange={...}
+/>
+
+<AsyncState status={list.status} error={list.error} onRetry={list.refetch}>
+  <DataTable ... />
+</AsyncState>
+```
+
+- 控件不取数、不 import Router、不调用 setter、不读 `window.history`。
+- `DataTable` 可以渲染静态数组；`onRowClick` 同时支持 Enter/Space 键盘激活；
+  `getRowProps` 可加 `data-testid`/ARIA/行级属性。`FilterBar` 没有完整本地 Draft 镜像。
+- 一个受控 `Tabs` 覆盖模块/详情/过滤三种形态。
+- `RelativeTime` 默认 `Intl` short（`2 min. ago`）；`format="long"` 输出
+  `2 minutes ago`，`numeric="always"` 可避免 “yesterday” 之类的自动措辞。
+
+### 5.3 Views
+
+```tsx
+<CollectionView
+  list={page}
+  columns={columns}
+  filters={filterFields}
+  filterState={{ text: page.state.q ?? "", filters: page.state.filters ?? [] }}
+  onFilterChange={({ text, filters }) => page.patchState({ q: text, filters })}
+  sort={page.state.sort}
+  onSortChange={(sort) => page.setSort(sort.length ? sort : null)}
+  pagerModel={page.pager}
+  onRowClick={openDetail}
+/>
+
+<RecordView
+  record={record}
+  title={(row) => row.name}
+  meta={(row) => <StatusBadge status={row.status} />}
+  tabs={[{ key: "overview", label: "Overview", render: (row) => <FieldGrid ... /> }]}
+  activeTab={tab}
+  onTabChange={setTab}
+/>
+
+<FormView form={form} fields={createFields} submitLabel="Create" />
+```
+
+- View 不渲染 h1/页宽/页头。
+- `RecordView` tab 懒渲染；`FormView` 消费 `useCommandForm` 句柄，不创建表单。
+- `LogViewer` / `EventFeed` / `StageTimeline` 消费 `StreamHandle`。
+
+### 5.4 Chrome
+
+```tsx
+<PageLayout
+  title="Widgets"
+  description="..."
+  actions={<Button>New</Button>}
+  tabs={moduleTabs}
+  currentTab={tab}
+  onTabChange={setTab}
+  breadcrumb={
+    <Breadcrumb
+      items={[
+        { label: "Widgets", render: <Link to="/widgets">Widgets</Link> },
+        { label: "Widget" },
+      ]}
+    />
+  }
+  width="wide" // flow | narrow | wide
+>
+  <CollectionView ... />
+</PageLayout>
+```
+
+```tsx
+<AppShell
+  sidebarHeader={<TeamSwitcher />}
+  sidebarFooter={<UserMenu />}
+  nav={nav}
+  activePath={pathname}
+  header={<GlobalActions />}
+  collapsible
+>
+  <Outlet />
+</AppShell>
+```
+
+`AppShellNavItem` 支持 `icon`、`badge`、`children`（嵌套可折叠分组）；`activePath`
+用 `findActiveNavItem()` 做最长前缀匹配，`exact: true` 可关闭子路径匹配。
+
+- `PageLayout` 是唯一 h1 所有者；应用可换成自己的壳。
+- **宽度规则**：`wide` = 72rem（列表/详情/日志/事件等数据页，默认）；
+  `narrow` = 48rem（表单/设置等阅读型页面）；`flow` = 不设 max-width（真正的边缘到边缘页面）。
+  preset 的 `FormPage`/`SettingsPage` 默认 `narrow`，其余默认 `wide`；
+  demo 不再用 `flow` 混排，避免同一应用内宽度漂移。
+- `AppShell` 只管导航/高度链；用 `renderLink` / `activePath` 接 Router，不 import Router。
+  侧边栏有 `sidebarHeader` / `sidebarFooter` 两个完整插槽（团队切换器、用户菜单等），
+  主内容区有 `header` 插槽；`collapsible` + `collapsed`/`defaultCollapsed`/`onCollapsedChange`
+  提供内置收起按钮与受控状态。
+- `Breadcrumb` / `SectionCard` / `ScopeSwitcher` / `Stepper` / `RouteErrorBoundary` 同层。
+
+### 5.5 字段三拆
+
+```ts
+const viewFields: FieldView<Widget>[] = [
+  { name: "name", kind: "text" },
+  { name: "status", kind: "enum", options: [...] },
+  { name: "owner", kind: "reference", reference: { source: owners, getLabel: (o) => o.name, getValue: (o) => o.id } },
+];
+
+const createFields: FieldInput<CreateWidget>[] = [
+  { name: "name", kind: "text", required: true },
+  { name: "replicas", kind: "number" },
+];
+
+const filterFields: FilterField[] = [
+  { field: "status", kind: "enum", options: [...] },
+  { field: "createdAt", kind: "datetime", as: "range" },
+];
+
+const fields = crudFields<Widget, CreateWidget, UpdateWidget>({
+  view: viewFields,
+  create: createFields,
+  update: updateFields,
+  filters: filterFields,
+  createDefaults: { replicas: 1 },
+  toUpdateInput: (row) => ({ id: row.id, name: row.name, status: row.status }),
+});
+```
+
+- `FieldView<Row>` 只列表/详情；`FieldInput<Input>` 只表单；`FilterField` 只过滤。
+- `Input` 类型独立于 Row；Row → Input 必须显式 `toUpdateInput`。
+- `ReferenceValue` / `ReferenceInput` 在 `fields/` 里用 `useLookup`；控件层不取数。
+
+## 6. Preset 页面
+
+```tsx
+import {
+  CollectionPage, RecordPage, FormPage, CrudPage,
+  SettingsPage, WizardPage, EventsPage,
+} from "@lynxland/uikit-preset-console";
+```
+
+| 页面 | 组合 | 退出方式 |
+|---|---|---|
+| `CollectionPage` | PageLayout + CollectionView + useCollectionPage | 手装同三件 |
+| `RecordPage` | PageLayout + RecordView + useRecord | 手装同三件 |
+| `FormPage` | PageLayout + FormView + useCommandForm | 手装同三件 |
+| `CrudPage` | CollectionPage + create/edit/delete + CrudFields | CollectionView + 自己接命令 |
+| `SettingsPage` | PageLayout + SectionCard × n + PreferenceItem | 手装 |
+| `WizardPage` | PageLayout + Stepper + step slots | 手装 |
+| `EventsPage` | backlog useCollection × useStream × EventFeed | 手装 |
+
+叠加宿主（preset 导出）：`CommandDialog` / `CommandDrawer`（打开时跑 command form，ok 自动关闭）
+与 `ConfirmCommandDialog`（bare command 的确认/危险操作）。
+
+示例：一个带 URL/过滤/分页/CRUD 的列表页：
+
+```tsx
+<CrudPage
+  title="Widgets"
+  source={widgets}
+  search={widgetsSearch}
+  from="/widgets"
+  fields={widgetFields}
+  filters={widgetFilterFields}
+  create={{ command: createWidget, host: "dialog" }}
+  update={{ command: updateWidget, host: "drawer", toInput: (row) => ({ ...row }) }}
+  delete={{ command: deleteWidget }}
+  getRowId={(row) => row.id}
+/>
+```
+
+- preset 允许调用官方 binding，但不实现业务/协议/错误映射。
+- 每个 part 都是 ReactNode/函数槽；可以逐层退出。
+- `CrudPage` 的 `CreateInput`/`UpdateInput`/`DeleteInput` 独立；不要 `any`。
+- **新增/编辑三种 host**：
+  - `host: "dialog"` / `"drawer"`：CrudPage 内置宿主；
+  - `host: "page"`：CrudPage 调用 `onPageHost({ mode, row? })`，由应用导航到
+    `FormPage` 路由（`/widgets/new`、`/widgets/:id/edit`）。preset 不内嵌 Router 约定。
+
+## 7. 测试
+
+```ts
+import { renderWithKit, mockSource, mockCommand, mockStream } from "@lynxland/uikit-testing";
+
+const source = mockSource("widgets", rows, { scope: ["projectId"] });
+const kit = renderWithKit(<Page />, {
+  path: "/widgets",
+  search: { q: "web" },
+  searchSchema: widgetsSearch,
+  scope: { projectId: "p1" },
+});
+```
+
+- `renderWithKit`：QueryClient + Router + ScopeProvider。
+- `createTestRouter`：memory router + 真实 `parseSearch/stringifySearch`。
+- `renderCollection(source, request)`：无 Router 的数据绑定测试。
+- `renderSearchState(search, initial)`：URL 绑定测试。
+- `mockSource` / `mockCommand` / `mockStream`：按能力 mock，不按 Resource。
+
+## 8. 自定义 UI 设计
+
+1. 新建 `@scope/uikit-ui-*` 或应用内 `adapter.tsx`，实现 `UiAdapter`。
+2. 用 `UiAdapterProvider` 注入；页面/控件代码不变。
+3. token 用 CSS 变量（shadcn 语义名 + `--status-*` + `--chart-*`）或你自己的命名；
+   surfaces 的 `--ui-*` 有 fallback，不强制 Tailwind。
+4. 不要 fork `ui-shadcn`；不要 import 消费方 `@/components/ui/*` 到 surfaces。
+
+## 9. v2 → v3 映射（消费方 codemod）
+
+| v2 | v3 |
+|---|---|
+| `defineResource` | `defineEntity`（或裸 source） |
+| `useCollectionData` | `useCollection` |
+| `useCollection`（页面） | `useCollectionPage` |
+| `useBatch` | `useLookup` |
+| `useSubscription` | `useStream` |
+| `ListPage` / `ListPanel` | `CollectionView` / preset `CollectionPage` |
+| `TablePage` / `TablePanel` | preset `CrudPage` / `CollectionPage` |
+| `DetailPage` / `DetailPanel` | `RecordView` / preset `RecordPage` |
+| `FormDialog` / `FormDrawer` / `FormPage` | `Dialog`/`Drawer`/`PageLayout` + `FormView` |
+| `FieldDef` / `specOf` | `FieldView`/`FieldInput`/`FilterField` + 显式 `collectionSearch` |
+| `Page` + `ListPage` | `PageLayout` + `CollectionView` |
+| `Pagination` + `KeysetPagination` | `Pager` |
+
+**不保留** deprecated 包装、双 API、运行时兼容层；codemod 只改消费方源码。
+
+## 10. 反模式
+
+- 在 `surfaces/controls` 里 `useQuery` / `useNavigate` / 读 `window.history`。
+- 在 View 里渲染 `h1`/页宽/页头（壳归 Chrome/preset）。
+- 在公开类型里放 `__resource` / `__scopeKeys` / `__id`。
+- 用 `FieldDef<T>` 同时驱动 Row/Input/URL；v3 三拆。
+- 用命令 scope 里多余的 key 生成读键；只投影 source 声明的 scope。
+- 把 cursor 分页和 offset 分页混在同一个 URL schema 而不声明 `defaultPage`。
+- 给 `Command.run` 写方法签名（参数 bivariant，破坏 Input 类型）。
+- 为 v2 名字写 alias；v3 直接删除，codemod 改消费方。
+- 把 `Resource` 当第四原语；它不存在，用 Entity 或裸能力。

@@ -1,1199 +1,2018 @@
-# @lynxland/uikit 设计文档
+# @lynxland/uikit 设计 v3
 
-- **版本**：draft-2（六视角审查 + 交叉审核修订版）
-- **日期**：2026-10-23
-- **状态**：阶段 A3 产物。已经过六个独立视角只读审查（概念审计 / React·TanStack DX / 双 Console 可实现性 / 竞品对标 / Agent 可用性 / Effect 集成），约 130 条发现经主会话逐条裁决，13 条 P0 全部采纳修订。裁决记录见附录 C。
-- **上游输入**：`~/workspace/qiulin/ui-components` 全仓尸检；refine / react-admin / TanStack / shadcn / Effect v4 生态调研；fleetly console 与 torchwood console 全量盘点；十轮设计迭代与四项概念审计修复。
-- **待办**：A4——用户评审本文档，通过后进入阶段 B（monorepo 骨架）/ C（垂直切片）。
+- **版本**：v3.0（greenfield 概念重写）
+- **日期**：2026-11-07
+- **状态**：**v3 已落地（3.0.0，2026-11-08）**。Batch 1–3 已把 core/react/testing、
+  surfaces/ui-shadcn/ui-plain/preset/meta 与 demo 切到本文规范；v2 代码删除，
+  **不保留向后兼容层、不保留旧 API 别名、不做双 API 过渡**。
+  Batch 4 已收口：CLI `init/eject/doctor`、changesets、release/CI、issue/PR 模板、
+  `publint` 审计、版本矩阵；剩余净房安装冒烟与外部仓（fleetly/torchwood）迁移。
+- **设计立场**：[`docs/philosophy.md`](./philosophy.md)
+- **取代**：draft-2 已归档为 [`docs/design-history.md`](./design-history.md)。
+  **代码/注释中所有 `design.md §N`（尤其 §2/§3/§5/§6/§12/§13/§14）都是 draft-2 旧编号，
+  指 `design-history.md`；本文件的 § 编号是 v3 新编号。**
+- **证据**：[`docs/audits/2026-11-07-conceptual-audit.md`](./audits/2026-11-07-conceptual-audit.md)。
+- **一句话**：
+  **数据面三能力（Query / Command / Stream）→ 绑定 → 受控控件 → 视图 → 页面组合（Page Composition）；
+  壳由 preset/应用提供，内容归 kit。**
 
----
+> **TL;DR**：旧 uikit 不是功能少，而是把“数据能力”当成了“UI 家族”，把“页面模板”
+> 做成了“运行时组件”，把“可选分组” `Resource` 当成了“第四原语”，把“URL 策略”
+> 焊进了“读原语”。v3 用两条轴（能力/呈现）+ 七层依赖把这些问题结构消除；
+> **开箱即用归 preset，自定义归每层退出，UI 适配归 UI adapter，页面模板归 docs/scaffold。**
 
-## 0. 定位与非目标
+## 阅读路径
 
-**@lynxland/uikit** 是一个数据密集 console UI 库：由人指导 AI Agent 构建，同样服务于人指导 AI Agent 的使用。
+| 你是 | 先读 | 再读 |
+|---|---|---|
+| 第一次了解 | [`philosophy.md`](./philosophy.md) → §0 结论 → §1 两条轴 | §2 七层 / §3 术语表 |
+| 页面作者 | §6 呈现面 → §5.2 URL 绑定 | §9 反模式 |
+| 适配器作者 | §4 数据面 | §5 绑定面 |
+| 维护者/评审 | §2 依赖规则 → §7 质量门 | §8 迁移 → 审计文档 |
+| 只想看“删什么” | §8 Batch 4 收口 | 附录 A 映射表 |
 
-**定位**：
-1. **内部优先、开源友好**——首要消费者是 fleetly console 与 torchwood console 的重写；但无业务残留：英文命名、文案全走 messages 覆盖通道、不含任何业务名词。
-2. **TanStack 原生**——Router（typed file routes + `validateSearch`）、Query、Table、Form 是引擎层，**借用不重建**。@lynxland/uikit 不在引擎上再包一层抽象（refine 的 routerProvider 两次重写是前车之鉴）。
-3. **分发双通道**——无头核心 `@lynxland/uikit-core` 发 npm（semver + changesets）；UI 块走 shadcn registry 拷贝制（open code，归消费方所有）。
-4. **Agent-first**——SKILL.md（TanStack Intent 格式）、llms.txt、AGENTS.md 随包分发；集中反模式清单（§13）与幻觉诱饵对照表（§14）直接进 SKILL.md。
+## 目录
 
-**非目标（持证拒签，理由与重启条件见 §8）**：
-- 不造路由抽象层（不支持多路由器/SSR 元框架绑定）
-- 不做页面原型 / 词表 / 登记制本体论（旧项目死因）
-- 不做 undo / 乐观更新（双 console 零使用证伪；**明码标价**：react-admin 与 shadcn-admin-kit 的编辑/删除默认即 undoable，@lynxland/uikit 默认同步等待——这是有意的体验取舍）
-- 不做后端适配器生态（自持后端，适配缝即插件点）
-- 不做完整 i18n 语言包（messages 通道 + 消费方词条）
-- 不内置 toast/通知系统（`useCommandForm` 暴露 `onSettled` 回调，消费方接 sonner 等——shadcn 生态惯例）
-
-**一句话**：@lynxland/uikit = 三个交互原语（Query / Command / Subscription）+ 一个交互面（Resource）+ Effect 缝隙 + 五族 UI 块，架在 TanStack 引擎上。
-
----
-
-## 1. 第一性推导：交互类型学
-
-### 1.1 状态空间
-
-数据密集 console UI 的本质状态空间 = **数据 × 意图 × 时间**。把两个真实 console（fleetly / torchwood，合计约 100 条路由）的全部页面拆到底，对后端做的事穷尽为三种**消息**：
-
-| 原语             | 中文 | 语义                           | 引擎落点                                        |
-| ---------------- | ---- | ------------------------------ | ----------------------------------------------- |
-| **Query**        | 问   | 参数化缓存读，无副作用         | TanStack Query                                  |
-| **Command**      | 令   | 有副作用的意图，可被结构化拒绝 | TanStack Query mutation + 失效                  |
-| **Subscription** | 听   | 按游标定位的帧递送             | @lynxland/uikit 自建（Effect 引擎在 /adapters，见 §5） |
-
-三者同属一个语域（交互消息类型学，CQRS + 订阅的标准词汇），彼此正交（§2 各节论证）。
-
-### 1.2 引擎借用
-
-缓存/去重/失效（Query）、URL/类型化路由/历史栈（Router）、表格状态机（Table）、表单状态机（Form）已经由 TanStack 提供。@lynxland/uikit 的价值不在重建引擎，而在：
-1. 定义**用户实现的契约**（后端交互的统一形状）；
-2. 提供**绑定**（把契约接到引擎与 URL 的 headless hooks + queryOptions 预取工厂）；
-3. 提供**块**（消费绑定输出的 shadcn 风格组件）。
-
-### 1.3 为什么不是别的切法（负空间记录）
-
-- **按数据形状切**（Record/Collection/Sequence）：错误通道、422→表单映射、缓冲重连这些真实接缝都是**交互形状**的而非数据形状的——接缝长在哪儿，概念就该切在哪儿。
-- **View 作为元概念**：View 是 `collection()` 的输入类型，离了 Query 无意义——"函数的参数表"不是与"函数"并列的原语（范畴错误，第 7 轮迭代修正）。
-- **Source 打包读+写**：名字只覆盖读（"来源"不接受命令），且把两种正交原语焊在一个只适合其中一个的名字下。
-
-### 1.4 分层与自洽性检验
-
-```
-kernel（元概念：契约+类型+纯代数，零依赖，零 react import）
-   ↑                ↑
-schema            adapters
-（Effect Schema     （http 管线(Effect 内部)、evaluateQuery/clientCollection、
- 工厂；公开面零      订阅引擎(Stream/Queue/Schedule 管线，零 React)、
- effect/schema      transport、scoped、mock）
- 泄漏）
-   ↑                ↑
-   └────┬───────────┘
-      react（绑定 hooks：useSyncExternalStore 接线 + queryOptions；peer: TanStack 系；
-            目录级禁 import effect）
-        ↑
-     blocks（registry 五族）
-        ↑
-   消费方 app（features/ 业务组件）
-```
-
-**机械可查的不变量**（layer-check，目录级 import 禁令 + 声明扫描）：
-1. kernel 零运行时依赖、零 react import；
-2. 依赖严格单向向上；
-3. **react 目录零 effect import**（订阅引擎已挪 /adapters，此规则从签名级检查退化为更强更便宜的目录级禁令）；
-4. /schema 公开 API 零 `effect/schema` 类型泄漏（只出纯函数 + Standard Schema 包装——对 effect v4 中 schema 模块 unstable 身份的防线，升格为不变量）；
-5. 块不含业务实体名、不自带数据获取语义（只消费绑定输出）。
-
-**名词预算**：领域元名词 = 4（Query / Command / Subscription / Resource）。新增名词必须先证明它不是既有概念的别名或可推导组合。
+- [0. 先读：这次重写解决什么](#0-先读这次重写解决什么)
+- [1. 两条轴](#1-两条轴)
+- [2. 七层模型](#2-七层模型)
+- [3. 术语表](#3-术语表层级定义禁止)
+- [4. 数据面（L2–L3）](#4-数据面l2l3)
+- [5. 绑定面（L4）](#5-绑定面l4)
+- [6. 呈现面（L5–L7）](#6-呈现面l5l7)
+- [7. 分发、文档与质量门](#7-分发文档与质量门)
+- [8. Cutover 路线（无向后兼容）](#8-cutover-路线无向后兼容)
+- [9. 反模式与幻觉诱饵](#9-反模式与幻觉诱饵)
+- [10. 裁决与开放问题](#10-裁决与开放问题)
+- [附录 A：当前 → 目标映射](#附录-a当前--目标映射)
+- [附录 B：一句话记忆](#附录-b一句话记忆)
 
 ---
 
-## 2. 元概念（kernel）
+## 0. 先读：这次重写解决什么
 
-### 2.1 Query —— 参数化缓存读
+旧设计不是“缺功能”，而是四个层级错位：
 
-**三种形**：
+1. **UI 按数据原语分族**（values/query/command/subscription/shell），
+   导致 query 族 import command 族、values 族 import 数据层。
+2. **页面模板被做成组件**（`ListPage`/`TablePage`/`DetailPage`/`FormPage`
+   及对应 Panel），导致 Page/Panel 组合爆炸与双壳。
+3. **`Resource` 被当成第四原语**，实际是可选分组；隐藏的
+   `__resource`/`__scopeKeys`/`__id` 与 5 个泛型参数是 god object 的症状。
+4. **字段声明同时承担 Row/Input/URL/三视角**，导致表单边界 `any` 化。
 
-| 形         | 签名                                                  | 服务的场景                                          |
-| ---------- | ----------------------------------------------------- | --------------------------------------------------- |
-| collection | `(query: CollectionQuery, ctx) → Promise<Segment<T>>` | 列表页、keyset 审计、事件 backlog、**时序**（见下） |
-| record     | `(id: ID, ctx) → Promise<T>`                          | 详情页                                              |
-| batch      | `(ids: ID[], ctx) → Promise<T[]>`                     | 外键解析（引用列/ReferenceSelect）                  |
+v3 不增加新的“元概念层”。它做三件事：
 
-**时序与单例的推导（审查补遗）**：metrics 时序 = collection（数据点=行、时间范围=谓词 `{field:"ts",op:"gte"}` 等——时间窗谓词约定成文）；仪表盘单值统计 = 消费方普通 `useQuery` + `select` 聚合（引擎既有能力），或对 collection 派生——**不需要第四种形**，这是配方不是缺口。
+- **命名层级**：把数据能力、绑定、控件、视图、壳、页面模板分开。
+- **约束依赖**：层与层之间只允许单向依赖，机械可查。
+- **收缩公开面**：能用页面模板/脚手架解决的，不做成稳定组件。
 
-**CollectionQuery —— 集合查询的结构化意图**：
+**本文不追求“只有 4 个名词”。** 旧设计的“名词预算 = 4”把不同层级的概念
+硬压成同一层，反而制造了 god object。v3 的规则是：
+**每个名字只属于一个层级；层级内的名字可以多，跨层不许混。**
+
+### 0.1 现状与目标的对照（先看这张表，避免把目标 API 当成现状）
+
+| 能力/层 | 当前 0.6（v2） | v3 目标 |
+|---|---|---|
+| 读绑定 | `useCollection`（绑 URL）+ `useCollectionData`（无 URL） | `useCollection`（无 URL）+ `useCollectionPage`（URL 糖） |
+| 单记录/外键 | `useRecord` / `useBatch` | `useRecord` / `useLookup` |
+| 写绑定 | `useCommand` / `useCommandForm` | 同左；effects/scope 出 descriptor |
+| 流绑定 | `useSubscription` | `useStream` |
+| 分组 | `Resource`（5 泛型 + `__` 内部字段） | `Entity`（2 泛型，无隐藏字段） |
+| 页面壳 | `Page` / `PageFrame`（消费方） | `PageLayout`（可选 Chrome）/ 应用壳 |
+| 列表内容 | `ListPage` + `ListPanel` | `CollectionView` |
+| 详情内容 | `DetailPage` + `DetailPanel` | `RecordView` |
+| 表单内容 | `Form` / `CommandForm` / `FormPanel` | `Form` + `FormView` |
+| 字段 | `FieldDef<T>` 三视角 | `FieldView<Row>` + `FieldInput<Input>` + `FilterField` |
+| 控件 | `DataTable list` / `FilterBar list` / `Pagination`+`KeysetPagination` | 受控 props / `Pager` |
+| 页面模板 | `*Page` 组合糖（运行时组件） | preset 薄页面（可运行）+ Page Template（可 fork） |
+| UI 适配 | token profile 正则重写 + 消费方 ui 基元 | UI adapter contract + token contract + `classNames` 槽 |
+| 分发 | core npm + 40 块 registry | core npm + preset/UI adapter + registry 块 |
+| Effect | 硬依赖（2 文件使用） | 可选适配器/移除（待裁决） |
+
+### 0.2 五个稳定层 + Page Template（不是五个包名）
+
+| 层 | 内容 | 稳定性 | 谁拥有 |
+|---|---|---|---|
+| **Core** | kernel / schema / adapters（无 React） | semver（1.0 后） | uikit 维护 |
+| **React** | bindings + `/router`（数据/命令/流/URL） | semver（1.0 后） | uikit 维护 |
+| **Surfaces** | values / controls / views / chrome / fields + `UiAdapter` contract | semver（1.0 后） | uikit 维护 |
+| **Preset** | 默认 PageLayout/AppShell/CollectionView/RecordView/FormView/默认字段/CRUD/动作 | 可独立演进；copy-owned 或独立包 | uikit 维护默认 preset，第三方可 fork |
+| **UI Adapter** | Button/Input/Select/Dialog/Drawer/Tabs/Card 等视觉基元 + token | 小 contract，可独立演进 | uikit 维护默认 UI adapter，第三方可实现 |
+| **Page Template** | 页面模板/脚手架/`templates/` | 不承诺 API | docs/scaffold/消费方 |
+
+**开箱即用 = preset；可定制 = 每层可退出；适配不同 UI = UI adapter；开源 = core 稳定 + preset/UI adapter 可替换。**
+
+- 只用 core：headless，自己组合 UI。
+- 用 core + react + surfaces：自己写页面/壳/页面模板。
+- 用 preset：默认页面/壳/字段/动作直接可用。
+- 换 UI adapter：保留 preset/surfaces，只换视觉基元与 token。
+- fork preset/Page Template：copy-owned，消费方拥有代码。
+
+---
+
+## 1. 两条轴
+
+### 1.1 能力轴（数据面）
+
+Console 对后端做的事，穷尽为三种**能力**：
+
+| 能力 | 语义 | 例子 |
+|---|---|---|
+| **Query** | 参数化、可缓存的读 | 列表、详情、外键解析、时序点 |
+| **Command** | 有副作用、可结构化拒绝的写 | create / update / delete / cordon / rotate / cancel |
+| **Stream** | 按游标定位的帧递送 | 日志、事件、部署阶段、变更流 |
+
+三种能力是**正交的**，可以独立使用：
+
+- 只读页面不需要 Command；
+- 纯命令页面（登录/登出）不需要 Query；
+- 纯流页面（日志）不需要 Entity；
+- 一个实体可以只实现其中一两种能力。
+
+### 1.2 呈现轴（UI 面）
+
+UI 不按能力分族。UI 按**呈现什么**分层：
+
+| 层 | 回答的问题 | 例子 |
+|---|---|---|
+| **Value** | 一个值怎么显示？ | StatusBadge、RelativeTime、FieldValue、DiffView |
+| **Collection** | 一组行怎么显示？ | DataTable、FilterBar、Pager、CollectionView |
+| **Record** | 一条记录怎么显示？ | RecordView、FieldGrid |
+| **Form** | 一次写怎么输入？ | Form、FieldInputs、FormView |
+| **Stream** | 一帧流怎么显示？ | LogViewer、EventFeed、StageTimeline |
+| **Chrome** | 页面骨架是什么？ | PageLayout、AppShell、SectionCard |
+| **Page Composition** | 一整页怎么组合？ | CollectionPage、CrudPage、SettingsPage |
+
+**两条轴不许互相镜像。** 旧设计的错误就是把 UI 五族做成
+Query/Command/Subscription/Resource/Shell 的镜像。
+
+### 1.3 Preset 与 UI Adapter 是分发/适配轴
+
+Preset 和 UI Adapter 不是新的数据/呈现层，而是**分发与适配轴**：
+
+- **Preset** 把 L4–L7 的默认组合打包成“开箱即用”的页面套件；
+- **UI Adapter** 把 L5 Controls 依赖的视觉基元与 token 打包成“可替换皮肤”。
+
+```
+Core（能力/绑定/适配器）
+  └─ Preset（默认 controls/views/chrome/pages + 默认字段/CRUD）
+       └─ UI Adapter（默认 primitives/tokens；可替换）
+```
+
+- 一个 preset 可以选择一个 UI adapter；也可以 preset 内置 UI adapter。
+- 第三方可以只实现 UI adapter，不 fork preset；也可以 fork preset，不换 UI adapter。
+- core 不依赖 preset，也不依赖 UI adapter；preset 依赖 core + UI adapter contract。
+
+---
+
+## 2. 七层模型
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ L7  App / Page Composition     页面模板、脚手架、可 fork 的整页组合  │  消费方或 uikit init/docs
+├────────────────────────────────────────────────────────────┤
+│ L6  Chrome              PageLayout / AppShell / SectionCard │  可选；不取数
+├────────────────────────────────────────────────────────────┤
+│ L5  Views               CollectionView / RecordView / ...    │  消费绑定句柄
+│      └─ Controls        DataTable / FilterBar / Form / ...   │  受控 props；不取数
+│      └─ Values          StatusBadge / RelativeTime / ...     │  纯值；零数据知识
+├────────────────────────────────────────────────────────────┤
+│ L4  Bindings            useCollection / useCommand / ...      │  React + TanStack
+│      └─ URL bindings    useCollectionPage / useSearchState    │  可选；react-router 子路径
+├────────────────────────────────────────────────────────────┤
+│ L3  Adapters            rest / clientCollection / mock / ...  │  零 React
+├────────────────────────────────────────────────────────────┤
+│ L2  Contracts           Source / Command / Stream / Outcome   │  kernel；零依赖
+└────────────────────────────────────────────────────────────┘
+
+分发/适配轴（不参与依赖层级）：
+  Preset  = 默认 L4–L7 组合 + 默认字段/CRUD/动作（开箱即用）
+  UI Adapter    = L5 依赖的视觉基元 + token（适配不同 UI 设计）
+  Page Template  = 页面模板/脚手架（不承诺 API）
+```
+
+### 2.1 依赖规则
+
+| 层 | 允许依赖 | 禁止 |
+|---|---|---|
+| L2 Contracts | 无（零运行时依赖） | React、TanStack、Effect、DOM |
+| L3 Adapters | L2 | React、Router、UI |
+| L4 Bindings | L2、L3、React、TanStack Query/Form | UI、Router（URL 绑定除外） |
+| L4 URL bindings | L4、React Router | UI |
+| L5 Values | L2（仅类型） | 一切取数、Router、UI 基元以外的数据层 |
+| L5 Controls | L5 Values、L2 类型 | 取数、Router、URL、绑定句柄 |
+| L5 Views | L5 Controls/Values、L4 类型 | Router、URL、Chrome |
+| L6 Chrome | L5 Values/Controls（可选） | 取数、URL、绑定 |
+| L7 Page Composition | 任意下层 | 被下层反向 import |
+
+**机械执法**（替换当前 `layer-check` 的 registry 白名单）：
+
+1. `packages/surfaces/src/controls/**` 禁 import `@lynxland/uikit-react`、
+   `@tanstack/react-router`、`@tanstack/react-query`、`useQuery`、`useNavigate`、
+   `window.history`、绑定句柄。
+2. `packages/surfaces/src/values/**` 禁 import 任何 data/form/stream 目录。
+3. `packages/surfaces/src/views/**` 禁 import `packages/surfaces/src/chrome/**`。
+4. `packages/surfaces/src/chrome/**` 禁 import views/controls 的取数面。
+5. 只有 `packages/preset-console/src/pages/**` 与 `docs/page-templates/**` 可以同时 import 多层。
+6. `packages/react/src/**` 禁 import Router；URL 绑定住在 `packages/react/src/router/**`。
+7. `packages/surfaces/**` 禁 import 任何具体 UI 库（只依赖 `UiAdapter` contract）；
+   `packages/ui-shadcn/**` 才能 import `@base-ui/react`。
+
+### 2.2 为什么是七层而不是五族
+
+五族是**分发目录**，不是依赖层。一个组件属于哪一族，取决于它“消费哪个绑定”；
+但一个 `CollectionView` 可能同时需要 `DataTable`、`FilterBar`、`Pager`、`AsyncState`，
+这些控件属于不同的呈现面；一个 `CrudPage` 页面组合又需要 Collection + Form + Chrome。
+按数据能力分族，必然跨族 import；按呈现层分，依赖图才是 DAG。
+
+**规则：族名只用于 registry 分发与 import 路径，不用于解释架构。**
+架构解释一律用 L2–L7。
+
+---
+
+## 3. 术语表（层级、定义、禁止）
+
+| 术语 | 层 | 定义 | 不要混淆 |
+|---|---|---|---|
+| **Query** | L2 能力 | 参数化、可缓存的读 | 不是 URL 状态；不是 UI 家族 |
+| **Command** | L2 能力 | 有副作用、可结构化拒绝的写 | 不是键盘命令面板 |
+| **Stream** | L2 能力 | 按游标定位的帧流 | 不是 pub/sub；不是 React state |
+| **Source** | L2 契约 | 一个读能力的实现（Collection/Record/Lookup） | 不是 Resource |
+| **Entity** | L2 分组（可选） | 命名的一组能力 + key/scope | **不是第四原语**；不是路由注册 |
+| **Resource** | 已删除 | v2 的旧名；v3 中不存在（用 Entity 或裸能力） | 不是 react-admin `<Resource>`；不是第四原语 |
+| **CollectionState** | L2/L4 | URL 可序列化的查询状态（q/filters/sort/page/size） | 不是 `CollectionRequest` |
+| **CollectionRequest** | L2 | 后端中立的查询请求（where/order/window） | 不是 URL 状态 |
+| **CollectionPage** | L2 | 结果（rows + paging） | 不是 UI 的 Page |
+| **Outcome** | L2 | 命令结果分支（ok/rejected/conflict） | 不是失败通道 |
+| **ApiError** | L2 | 失败通道封闭集 | 不是 Outcome |
+| **Binding** | L4 | 把契约接到 React/TanStack 的 hook | 不是 UI |
+| **Surfaces** | L5（包） | 与 UI 库无关的 values/controls/views/chrome/fields 集合 | 不是 UI adapter；不是 preset |
+| **UI Adapter** | 适配轴 | 视觉基元 + token 的 contract/实现（Base UI + shadcn 默认） | 不是 Theme；不是完整组件库 |
+| **Control** | L5 | 受控呈现组件；不取数、不碰 Router | 不是 View |
+| **View** | L5 | 消费绑定句柄、组合控件的呈现层 | 不是 Page |
+| **Chrome** | L6 | 页面壳（h1/宽度/衬垫/页头） | 不是内容块 |
+| **Page Composition** | L7 | 页面组合（preset 页面 + Page Template）；可 fork；不承诺 API | 不是稳定组件 |
+| **FieldView** | L5 | 行字段的列表/详情呈现声明 | 不是 FieldInput |
+| **FieldInput** | L5 | 表单输入声明（Input 类型独立） | 不是 FieldView |
+| **FilterField** | L5 | 过滤控件声明 | 不是 Predicate |
+| **Page** | L6/L7 | 页面壳或页面组合 | **不是核心内容组件** |
+| **Block / 块** | 分发 | registry 的一个拷贝单元 | 不是层级 |
+
+**命名政策**：
+
+- 契约 = 是什么（`CollectionSource`、`StreamSource`）。
+- 绑定 = use + 能力（`useCollection`、`useCommand`、`useStream`）。
+- 控件 = 呈现什么（`DataTable`、`FilterBar`、`Pager`、`Tabs`）。
+- 视图 = 绑定句柄的呈现（`CollectionView`、`RecordView`、`FormView`）。
+- 壳 = Layout/Shell（`PageLayout`、`AppShell`）。
+- 页面模板 = 特殊页面组合（Page Template），只存在于 `templates/` 或文档；
+  preset 页面（`CollectionPage`/`CrudPage`）是默认可运行组合，不在 core。
+- UI 适配 = `UI Adapter`（不是 `Skin`/`Theme`）；实现包用 `ui-*` 前缀。
+- 包 = `core` / `react` / `surfaces` / `preset-*` / `ui-*`；不按“数据原语”拆包。
+- **禁止**在公开类型里出现 `__resource`/`__scopeKeys`/`__id` 这类内部字段。
+- **禁止**用 `policy` 字段是否存在来判别两个概念。
+
+---
+
+## 4. 数据面（L2–L3）
+
+### 4.1 三个读能力
 
 ```ts
-interface CollectionQuery {
-  predicate?: Predicate; // 谓词树
-  order?: Order[]; // 排序（多键）
-  window: QueryWindow; // 窗口 —— 分页只是 window 的字段，不是概念
+export type Scope = Readonly<Record<string, string | undefined>>;
+export type Cursor = string;
+/** 查询键/失效目标的稳定标识；由 source/entity 显式提供，不靠闭包嗅探。 */
+export type SourceName = string & { readonly __sourceName?: unique symbol };
+
+export interface CollectionSource<T> {
+  readonly name: SourceName;
+  /** 声明参与 scope 分区/自动停用的键；不是运行时注入协议 */
+  readonly scope?: readonly string[];
+  read(
+    request: CollectionRequest,
+    ctx: Scope,
+    signal?: AbortSignal,
+  ): Promise<CollectionPage<T>>;
 }
 
-type Predicate =
-  | { field: FieldKey; op: Operator; value: FieldValue }
-  | { all: Predicate[] } // AND
-  | { any: Predicate[] }; // OR
-
-type Operator = "eq" | "ne" | "contains" | "in" | "gt" | "lt" | "gte" | "lte" | "exists";
-
-/** 构造侧类型化、解码侧宽容的两层结构：
- *  页面/适配器构造时 FieldKey 收窄为 `keyof T & string`；
- *  URL 解码侧保持 string（运行时值无法变 literal），字段合法性归适配器校验。 */
-type FieldKey<F extends string = string> = F;
-
-type FieldValue = string | number | boolean | ReadonlyArray<string>;
-// 约定：日期一律 ISO-8601 字符串（encode/decode 往返无损）
-
-interface Order {
-  field: FieldKey;
-  dir: "asc" | "desc";
+export interface RecordSource<T, ID = string> {
+  readonly name: SourceName;
+  readonly scope?: readonly string[];
+  /** null = 记录不存在（empty 态）；not-found 失败由适配器选择 throw */
+  read(id: ID, ctx: Scope, signal?: AbortSignal): Promise<T | null>;
 }
 
-interface QueryWindow {
-  // 原 Window —— 与 DOM 全局撞名，按复合词政策改名
-  size: number; // 必传（torchwood 契约：pageSize 缺省即截断事故）
-  cursor?: Cursor; // keyset 方言：不透明续读令牌
-  range?: { offset: number }; // offset 方言（配合 Segment.total）
+/** 外键解析；旧名 useBatch/BatchSource 停用。 */
+export interface LookupSource<T, ID = string> {
+  readonly name: SourceName;
+  readonly scope?: readonly string[];
+  /** 行 → id 投影，供 byId/missingIds；省略时绑定回退到 row.id。 */
+  readonly key?: (row: T) => ID;
+  read(ids: readonly ID[], ctx: Scope, signal?: AbortSignal): Promise<readonly T[]>;
+}
+
+/** 裸 source 工厂：name/scope 显式，绑定层据此生成 query key。 */
+export function collectionSource<T>(spec: CollectionSource<T>): CollectionSource<T>;
+export function recordSource<T, ID>(spec: RecordSource<T, ID>): RecordSource<T, ID>;
+export function lookupSource<T, ID>(spec: LookupSource<T, ID>): LookupSource<T, ID>;
+```
+
+三个能力彼此独立。`defineEntity` 只是可选的组合糖；它把 `name`/`scope`
+附加到内部 capability 上，**不是隐藏协议**：
+
+```ts
+export interface EntitySpec<T, ID = string> {
+  readonly name: SourceName;
+  readonly key?: (row: T) => ID;
+  readonly scope?: readonly string[];
+  readonly collection?: Omit<CollectionSource<T>, "name" | "scope">;
+  readonly record?: Omit<RecordSource<T, ID>, "name" | "scope">;
+  readonly lookup?: Omit<LookupSource<T, ID>, "name" | "scope">;
+  readonly commands?: Record<string, Command<any, any>>;
+  readonly streams?: Record<string, StreamSource<any>>;
+}
+
+export interface Entity<T, ID = string> {
+  readonly name: SourceName;
+  readonly key?: (row: T) => ID;
+  readonly scope?: readonly string[];
+  readonly collection?: CollectionSource<T>;
+  readonly record?: RecordSource<T, ID>;
+  readonly lookup?: LookupSource<T, ID>;
+  readonly commands?: Record<string, Command<any, any>>;
+  readonly streams?: Record<string, StreamSource<any>>;
+}
+
+export function defineEntity<T, ID>(spec: EntitySpec<T, ID>): Entity<T, ID>;
+```
+
+`defineResource` 在 v3 中**直接删除**（不是 alias）；旧消费方由同批 codemod 改成
+`defineEntity` 或裸能力。
+
+**规则**：
+
+- 一个页面可以只用裸 `CollectionSource`，不必造 Entity；绑定读 `source.name` +
+  `source.scope` 生成 query key。
+- 一个 Entity 可以没有 `collection`/`record`/`lookup`/`commands`/`streams` 中的任意项。
+- Entity 的 `name` 只用于 query key 与诊断；不生成路由，不注册页面。
+- `Entity.name` 与内部 source 的 `name` 必须一致（`defineEntity` 负责附加/校验）；
+  query key 永远只认 source 的公开 `name`/`scope`。
+- 不再有 `__resource`/`__scopeKeys`/`__id`/`legacyKeys`；需要这些信息的绑定
+  从 Entity 的公开字段或调用点选项读取。
+
+### 4.2 `CollectionState` 与 `CollectionRequest` 分开
+
+**URL 状态**是用户可分享的视图状态；**请求**是后端中立的查询意图。
+两者形状不同，不能共用一个类型。
+
+```ts
+export type FilterValue =
+  | { field: string; op: "eq" | "ne" | "contains" | "in" | "gt" | "lt" | "gte" | "lte" | "exists";
+      value: string | number | boolean | readonly string[] };
+
+export type Sort = { field: string; dir: "asc" | "desc" };
+
+export type PageState =
+  | { kind: "cursor"; cursor?: Cursor }
+  | { kind: "offset"; offset: number }
+  | { kind: "all" };
+
+export interface CollectionState {
+  q?: string;
+  filters?: readonly FilterValue[];
+  sort?: readonly Sort[];
+  page?: PageState;
+  size?: number;
+}
+
+export type CollectionWindow =
+  | { kind: "cursor"; size: number; cursor?: Cursor }
+  | { kind: "offset"; size: number; offset: number }
+  | { kind: "all"; size?: number };
+
+export interface CollectionRequest {
+  where?: Predicate;
+  order?: readonly Sort[];
+  window: CollectionWindow;
+}
+
+export interface CollectionPage<T> {
+  rows: readonly T[];
+  paging:
+    | { kind: "cursor"; nextCursor?: Cursor; total?: number }
+    | { kind: "offset"; total: number; offset: number; size: number }
+    | { kind: "all"; total: number };
 }
 ```
 
-- **QueryWindow 是结构类型而非模式枚举**：三种真实分页方言同构映射——torchwood 全站 keyset 无 total（cursor）、fleetly 全站整取+客户端过滤（无 window，客户端求值）、**leaderboards 的"token 游标 + 附带 total"**（cursor + total 并存，审查修正：不是数值 offset——源码仍走 `page_token`， prev 靠历史栈）。方言判断交给适配器，类型系统不预设。
-- **Segment（查询结果段）**——字段命名刻意与 TanStack Query 的 `getNextPageParam: (lastPage) => lastPage.nextCursor` 对齐：
+**URL schema 只负责 `CollectionState`**：
 
 ```ts
-interface Segment<T> {
-  rows: T[];
-  total?: number; // offset 方言必有；leaderboards 型 keyset 也附带
-  nextCursor?: Cursor; // 仅还有下页时出现（"返回数<size"不代表到底——torchwood 契约）
+const search = collectionSearch({
+  text: ["name", "id"],              // q 的字段白名单
+  filters: [                          // URL 可序列化的过滤字段
+    { field: "status", op: "in", options: [...] },
+    { field: "createdAt", op: "gte", kind: "datetime" },
+  ],
+  defaultSize: 20,
+  defaultSort: [{ field: "createdAt", dir: "desc" }],
+  defaultPage: { kind: "offset", offset: 0 }, // offset 分页必须显式声明；否则 URL 无 page 时按 cursor
+  namespace: "widgets",              // 可选：多集合同路由时 URL 键带 widgets. 前缀
+});
+
+// search.schema   → Standard Schema（validateSearch 直收）
+// search.encode(state) / decode(params) / patch(part) / reset()
+// search.toRequest(state) → CollectionRequest
+// search.serializer → { parseSearch, stringifySearch }（可选，见下）
+```
+
+**规则**：
+
+- URL 只承载 `CollectionState`；不承载任意 `Predicate` 树。
+  OR 不在 URL 里表达；需要 OR 的页面用自定义参数或本地状态。
+- `Predicate` 仍是**请求侧**的树；`FilterValue` 是**状态侧**的叶子。
+  `toRequest` 负责把叶子组装成 AND（文本 `q` 组装成 OR），并映射到 `CollectionWindow`。
+- `toRequest` 是纯函数；适配器只接收 `CollectionRequest`，不知道 URL 键。
+- **默认分页模式必须显式**：URL 没有 `page`/`cursor` 时，`toRequest` 默认按
+  `cursor`；offset 分页的 schema 必须声明 `defaultPage: { kind: "offset", offset: 0 }`，
+  否则第一页会被误判为 cursor 模式（`pager.mode` 漂移）。`decode` 不把默认值写回
+  state，默认值只由 `toRequest` 应用。
+- `CollectionState` 的默认值 + URL = 真相；UI 从 state 派生，不另存一份完整查询。
+- 过滤控件用 `FilterField[]` 渲染；`FilterField` 可由 schema 或字段视图派生，
+  但只有一份运行时来源。
+- **namespace**：多集合同路由时显式开启；URL 键带扁平前缀（`widgets.q` /
+  `widgets.page`），各 schema 只读自己的前缀，其他键 passthrough。
+- **URL 数组序列化必须显式定案**：
+  - 方案 A（推荐）：`collectionSearch.serializer` 提供 repeated-key 解析/序列化
+    （`filter=a:eq:1&filter=b:in:x,y`），消费者挂到 Router 的
+    `parseSearch/stringifySearch`；未知键仍走默认 JSON。
+  - 方案 B：接受 TanStack 默认 JSON 数组（`filter=%5B%22...%22%5D`），
+    文档写明；不假装是 repeated key。
+  - **单元素数组的方言**：repeated-key 的 `filter=a:eq:1` 在 parse 后是 scalar，
+    不是 `["a:eq:1"]`；`decode` 必须 `toArray` 归一（spike 已实证）。
+  - **serializer 合约**：`stringifySearch` 返回带前导 `?` 的字符串（空结果返回 `""`），
+    与 TanStack Router 默认 serializer 一致；`parseSearch` 接受前导 `?`。
+  - 不能两套并存；v3 一次定死。
+
+### 4.3 命令与结果
+
+```ts
+export type Outcome<P = unknown> =
+  | { status: "ok"; payload: P }
+  | { status: "rejected"; code?: string; message: string; fieldErrors?: Record<string, string> }
+  | { status: "conflict"; message: string };
+
+export interface Command<I, O = unknown> {
+  /** 必须写成函数属性，不写方法签名——方法参数是 bivariant，
+   *  会让 `Command<UpdateInput>` 静默赋给 `Command<CreateInput>`。 */
+  run: (input: I, ctx: Scope) => Promise<Outcome<O>>;
+  /** 命令作者裁决协议层状态的领域语义（delete 已删 → ok 等） */
+  treatAs?: Partial<Record<"not-found" | "forbidden", Outcome<O>>>;
+  /** 纯数据的效果声明；绑定负责应用。不是隐藏的缓存实现 */
+  effects?: readonly Effect[];
 }
 ```
 
-#### 2.1.1 URL 编解码与写入契约（审查后新增，关闭附录 B-Q1/Q3 部分）
-
-**键名定案**（扁平、可读、repeated 形式天然匹配 grpc-gateway 序列化）：
-
-| 语义     | URL 键   | 形态                                                                      |
-| -------- | -------- | ------------------------------------------------------------------------- |
-| 文本搜索 | `q`      | 单值（字段白名单在 schema 工厂声明）                                      |
-| 谓词     | `filter` | 重复键 `filter=field:op:value`（AND 语义；OR 树的场景走消费方自定义参数） |
-| 排序     | `sort`   | 重复键 `sort=field:dir`（多键有序）                                       |
-| 游标     | `cursor` | 单值（keyset 方言）                                                       |
-| 页码     | `page`   | 单值 1-based（offset 方言）                                               |
-| 页大小   | `size`   | 单值                                                                      |
-
-**真相语义**：**"URL + schema 默认值"即真相**（TanStack Router 实测：validateSearch 产生的默认值出现在 `useSearch` 但**不写回 URL**——分享链接的语义 = URL + 默认值，措辞如此）。
-
-**写入契约**（TanStack Router 三条暗规则的对策）：
-1. 一切 setter 走 `navigate({ to: ".", from, search: (prev) => ({ ...prev, ...patch }), replace })`——**必须函数式**（对象字面量会静默 strip 未提及的参数，含消费方自定义参数）。
-2. **历史纪律**：翻页（cursor/page 前进）= `push`（历史栈即分页栈）；谓词/排序变化 = `replace` + 清游标回第一页；程序化归一化 = `replace` 且只在 effect / search middleware 中发生——**绑定不得在渲染期 navigate**。
-3. **职责单一归属**：默认值归 schema 工厂（validateSearch 幂等、全默认值）；"换向/改谓词清游标"归绑定 setter；两者不重叠。深链进入带 cursor 的 URL 时历史为空、prev 退化不可用——**已知行为成文**（torchwood 现状根本无法深链中栈，这是新能力的新边界）。
-
-**工厂签名**：
+**命令只声明效果，不执行缓存策略。** 失效是**效果（Effect）**，由 Command 或绑定声明：
 
 ```ts
-// /schema
-interface QuerySchemaSpec {
-  text?: ReadonlyArray<string>; // q 参与字段白名单
-  filters?: ReadonlyArray<FilterFieldDef>;
-  defaultSize?: number; // 默认 20
-  defaultOrder?: ReadonlyArray<Order>;
+export type Effect =
+  | {
+      type: "invalidate";
+      entity: SourceName;
+      kind?: "collection" | "record" | "lookup";
+      id?: unknown;
+      /** 显式跨 scope 失效；缺省与命令 ctx scope 相交 */
+      allScopes?: true;
+    }
+  | { type: "invalidateKey"; key: readonly unknown[] };
+
+export interface CommandOptions<I, O> {
+  scope?: Scope | ((input: I) => Scope);
+  /** 绑定到 Entity 时缺省失效同 Entity；显式 [] 表示不失效 */
+  effects?: readonly Effect[];
+  /** 只有绑定提供 entity 时才有缺省 effect；裸命令默认不失效 */
+  entity?: Entity<any, any>;
+  onSettled?: (result: Outcome<O> | null, failure: ApiError | null) => void;
 }
-function collectionQuerySchema(spec: QuerySchemaSpec): {
-  toSearchSchema(): StandardSchemaV1; // 内部经 toStandardSchemaV1 包装（Effect Schema 不能裸传 validateSearch）
-  encode(q: CollectionQuery): Record<string, string | undefined>;
-  decode(params: Record<string, unknown>, defaults): CollectionQuery; // 容忍脏输入
-  defaults: CollectionQuery;
-};
 ```
 
-**客户端求值方言的两个成文细节**：① `clientCollection(fetchAll)` 适配器在整取后本地求值谓词/排序/窗口，**伪造不透明游标**（把 offset 编进 token）以兑现"游标进 URL、历史即分页栈"；② fetchAll 的取数上限是适配器内部常量（fleetly 现状：projects=100 / apps=200 / deployments=50 参差，照搬即可，但文档不再笼统说"整取即全量"）。
+- `scopeOf` 从 Command 移到 `CommandOptions.scope`（绑定层解析）。
+- `legacyKeys` 变成显式 `{ type: "invalidateKey", key }`，不再藏在 descriptor 里。
+- `treatAs` 留在 Command：它是领域语义，不是缓存策略。
+- `run` 的 `ctx` 就是绑定解析出的同一份 scope；失效匹配用同一份。
+- 命令绑定执行顺序：`run` → `ok` → 应用 effects → `onSettled`。
+- 失效效果是数据，可单测；不需要 QueryClient 就能断言。
 
-### 2.2 Command —— 具名动词与"失败/结果两分"
-
-**写面是具名动词集，不是固定 CRUD**。两个真实 console 的写面一大半是 cordon / drain / rotate / redeliver / rollback / verify / setPassword / cancel；create / update / delete 只是带默认失效的内置动词。
-
-```ts
-// 命令描述符（kernel 纯数据）
-interface CommandDescriptor<Input, Payload, ID = never> {
-  run(input: Input, ctx: ResourceScope): Promise<CommandResult<Payload>>;
-  invalidates?: ReadonlyArray<QuerySelector>; // 跨资源失效声明（纯数据）
-  /** 结果覆写钩子：命令作者裁决协议层状态在"结果通道"的语义。
-   *  例：delete 已删的资源，服务端 404 → 覆写为 ok（幂等成功）或 rejected。 */
-  treatAs?: Partial<Record<"not-found" | "forbidden", CommandResult<Payload>>>;
-}
-
-type QuerySelector =
-  | { resource: ResourceName } // 该资源全部查询（默认 ∩ 同 scope，见下）
-  | { resource: ResourceName; kind: "collection" | "record" | "batch"; id?: ID }
-  | { resource: ResourceName; allScopes: true }; // 显式跨作用域失效（罕见，如管理端命令）
-```
-
-**失效语义（审查补遗）**：
-- `kind: "batch"` 的外延 = 键中含有指定 id 的 batch 查询（外键解析缓存，失效矩阵单测必覆盖）；
-- **scope 交运算**：selector 默认与命令执行时的 ctx scope 相交（project A 里的命令不清 project B 的缓存）；`allScopes: true` 显式逃逸——过度失效虽安全但破坏其它作用域的缓存体验，默认同 scope 是裁决。
-- `resource: ResourceName` 是 **branded string**（`defineResource` 返回值的 name 字段携带 brand），selector 收 branded 类型——拼错资源名编译期爆炸（"字符串寻址"是本设计批评竞品的病，自家不能犯）。
-
-#### 失败 / 结果两分（划界原则，审查后重写）
-
-|      | 失败（Failure）                                            | 结果（Outcome）                                 |
-| ---- | ---------------------------------------------------------- | ----------------------------------------------- |
-| 定义 | **无法产出领域可用值**：传输/会话/协议层的封闭状况         | 交互发生，服务端给出**领域语义**的回应          |
-| 词汇 | `ApiError`（**封闭集**）                                   | `CommandResult`（**已知分支 + ok 载荷兜底**）   |
-| 通道 | reject（Query/Command/Subscription 三通道统一，见 §5）     | 正常返回值，供表单/交互渲染                     |
-| 例子 | 网络断层、401 会话过期、403（无领域语义时）、解码失败、5xx | `rejected`（业务拒绝）、`conflict`（OCC）、`ok` |
+### 4.4 流
 
 ```ts
-// 失败通道：封闭集（kernel）
-type ApiError =
-  | { kind: "network"; cause?: unknown }
-  | { kind: "auth" } // 401：会话过期（触发全局闭环）
-  | { kind: "forbidden" } // 403：无领域语义时（命令可用 treatAs 覆写）
-  | { kind: "not-found" } // Query 侧默认；Command 侧经 treatAs 裁决
-  | { kind: "server"; status: number; message?: string }
-  | { kind: "decode"; detail: string };
-// 取消（abort/interrupt）既非失败也非结果——边界显式吞掉，见 §5 runApi。
-// 重试分类配套：绑定为 Query/Mutation 注入默认 retry 策略
-// isRetryable(ApiError)：network/server 可重试，auth/forbidden/not-found/decode 不重试。
-
-// 结果通道：已知分支 + ok 载荷（kernel）
-type CommandResult<P = unknown> =
-  | { status: "ok"; payload: P } // payload 可为一次性 reveal 载荷（token/邀请/webhook URL）
-  | { status: "rejected"; code?: string; message: string; fieldErrors?: Record<string, string> } // code：机器可判别（双 console 后端都有 code/message——契约不能丢 code）
-  | { status: "conflict"; message: string }; // OCC：输入携带 version，服务端比对失败
-```
-
-- **网络断层 = typed failure（ApiError.network）**，不是 Effect defect——它是预期中的失败（用户断网/后端重启），必须可捕获、可重试、可渲染三态；**defect 只留给程序错误**（不可预期异常、不变量破坏——边界 catchDefect 归一进监控，见 §5）。此裁决消除 draft-1 §2.2 与 §5 的自相矛盾。
-- **命令侧 404/403 的仲裁**：协议层默认归失败，但 `CommandDescriptor.treatAs` 让命令作者裁决领域语义（delete 幂等成功、cancel 已结束→rejected 带码）。
-- **`fieldErrors` 是可选能力**：两个真实后端今天都只有 code/message——表单绑定以**表单级错误盒**为主形态，字段级回填在后端提供时自动启用。
-- **OCC（乐观并发）**：torchwood 文档 update/delete 必带 version → 命令输入携带，`conflict` 分支渲染"已被他人修改，请刷新"。**迁移注记**：torchwood 现状无 conflict 分支实证（一律 message-only toast）——迁移时先验证服务端 OCC 失败是否回可判别状态码，否则保持 message-only 行为等价。
-- **一次性 secret 揭示**：`ok` 载荷的生命周期语义（只在这一帧存在）由 SecretReveal 块承接（§6）；reveal 载荷不进 Query 缓存、失效不冲刷、卸载即弃。
-- **raw body**：命令输入可为字节流（fleetly 确定性 tar → 裸 POST `application/x-tar`）或 **FormData**（torchwood 分片上传的单片）；tar/分片状态机本身是消费方纯函数/自持。**raw-response 逃生口**：`http` 管线对 Blob 响应（备份下载、文件预览）不过 Schema 解码——不是一切响应都走 decode。
-- **"开放分支"的诚实表述**：CommandResult 是已知分支的封闭 union + `ok.payload` 泛型兜底；扩展 = 载荷里携带判别字段，不再造新 status（避免类型层开口子）。
-
-### 2.3 Subscription —— 按游标定位的帧递送
-
-```ts
-// 订阅描述符（kernel；审查补遗——订阅从此有对等的类型化声明）
-interface SubscriptionDescriptor<Params, Frame> {
-  open(params: Params, ctx: ResourceScope): Transport<Frame>;
-  policy?: SubscriptionPolicy; // 流属性默认在资源侧声明；调用点可覆盖
-}
-
-interface SubscriptionPolicy {
-  buffer: number; // 环形缓冲容量（超限丢最旧——Queue.sliding 语义）
-  pauseable?: boolean;
-  retry?: {
-    backoffMs: ReadonlyArray<number>; // 例 [1000, 2000, 4000]——fleetly wait 流
-    // 注意：没有 fallbackPollMs —— 退避耗尽转"轮询另一资源查询"是消费方组合（见 stalled）
-  };
-}
-
-// 传输契约（kernel 接口；NDJSON/SSE 通用实现在 /adapters）
-interface Transport<F> {
-  open(cursor: Cursor | null, signal: AbortSignal): FrameSource<F>;
-  /** 可选重连前钩子：torchwood realtime 的"先 refresh 再重订"在此；
-   *  引擎驱动重连时调用；自带恢复的 transport 可不实现，此时 policy.retry 对其失效。 */
-  beforeReconnect?(): Promise<void>;
-}
-
-/** 帧源 = 异步迭代 + 类型化终止（审查补遗——关闭 B-Q7）：
- *  终态分诊归 transport：票据/base64/E_EVENTS_GONE/部署 state 解析全在消费方适配器，
- *  引擎只消费 reason。 */
-interface FrameSource<F> {
+export interface FrameSource<F> {
   [Symbol.asyncIterator](): AsyncIterator<F>;
-  /** 正常结束（迭代器 return）时引擎可读到的终结原因。
-   *  - "ended"：服务端正常收流（部署终态、日志关窗）——注意 NDJSON-over-fetch 的
-   *    "收流"与"中断"在传输层不可严格区分，真终态判据是帧内容（如部署 state），
-   *    由 transport 解析后以此上报。
-   *  - "gapped"：断档，保留窗滑过（fleetly 410 E_EVENTS_GONE）
-   *  - "auth" | "transport"：不可恢复错误（引擎转 error 状态并携带 ApiError） */
   readonly closeReason: "ended" | "gapped" | "auth" | "transport";
 }
 
-type SubscriptionStatus =
-  | "live" // 正在递送
-  | "reconnecting" // 传输中断，按策略重连中
-  | "paused" // 用户手动暂停（从游标续订）
-  | "gapped" // 断档：需重新定锚（重跑 backlog Query）
-  | "stalled" // 退避预算耗尽：等待 restart 或消费方接管（如切轮询查询）
-  | "ended" // 服务端正常收流（终态 ≠ 断流）
-  | "error"; // 不可恢复；携带 ApiError（401 在订阅通道也进全局闭环）
+export interface StreamSource<F> {
+  open(cursor: Cursor | null, signal: AbortSignal): FrameSource<F>;
+  beforeReconnect?(): void | Promise<void>;
+}
 
-interface SubscriptionHandle<F> {
-  readonly frames: ReadonlyArray<F>; // 环形缓冲快照（useSyncExternalStore）
-  readonly status: SubscriptionStatus;
-  readonly error: ApiError | null; // status === "error" 时
-  readonly resyncs: number; // 重锚计数——EventFeed 黄条"发生过 resync"信号
+export type StreamFactory<P, F> = (params: P, ctx: Scope) => StreamSource<F>;
+
+export interface StreamPolicy {
+  buffer: number;
+  pauseable?: boolean;
+  retry?: { backoffMs: readonly number[] };
+}
+
+export type StreamStatus =
+  | "idle"        // 未启动/待命（新增，替代误导性的 reconnecting）
+  | "live"
+  | "reconnecting"
+  | "paused"
+  | "gapped"
+  | "stalled"
+  | "ended"
+  | "error";
+
+export interface StreamHandle<F> {
+  readonly frames: readonly F[];
+  readonly status: StreamStatus;
+  readonly error: ApiError | null;
+  readonly resyncs: number;
   pause(): void;
   resume(): void;
-  restart(): void; // 手动重连（fleetly "Reconnect stream" / torchwood 手动重连）
-  resync(anchor?: Cursor | null): void; // gapped 后重锚：清缓冲 + 从新锚点重开（缺省锚点=活尾 null）；resyncs++ 供黄条渲染
+  restart(): void;
+  resync(anchor?: Cursor | null): void;
   clear(): void;
+  subscribeFrames(listener: () => void): () => void;
+  getFrames(): readonly F[];
 }
 ```
 
-- **终态与断流严格区分**：`ended` 是服务端正常收流；`reconnecting`/`gapped`/`stalled` 才是需要动作的异常。
-- **退避耗尽转轮询是消费方组合**（审查修正）：fleetly wait 流的真实语义是"退避 [1s,2s,4s]×3 → **另一个资源的查询**（deployments 列表 + find by id）10s 轮询 + 帧优先合并"——`stalled` 状态位 + 消费方组合与源码同构；引擎不内置 `fallbackPollMs`（表达不了"轮询哪个查询、怎么提取、何时启用、与帧的优先级"）。
-- **游标代数与 CollectionQuery 共享**（同一个 `Cursor` 类型）：fleetly events 的 backlog→follow = collection query（cursor window 定锚）+ Subscription（从锚点续订）的组合。
-- **锚点交接约定（关闭 B 系开放问题）**：backlog Segment 的**最新一端**为锚（`nextCursor` 方向约定：指向更新端）；锚的具体取值由消费方适配器决定（events 的锚是 `last_seq` 算术——`after_seq` 是过滤参数而非不透明 cursor，适配器吸收此方言并写进配方）；backlog 尾帧与首个 live 帧的去重由 EventFeed 按 (cursor, id) 处理。
-- **gapped 重锚责任**：绑定**不**自动重跑 backlog——页面监听 `gapped` → `resync()`（清缓冲、重定锚、`resyncs++` 供黄条渲染）。
-- **帧级失败**：坏帧由 transport 裁决（跳过或以 `closeReason: "transport"` 终止）；`ApiError.decode` 只管 HTTP 响应侧。
-- **AbortError 区分**：引擎主动 abort（暂停/关闭/scope 关闭）导致迭代器以 AbortError reject——必须与传输错误区分，否则暂停被误判为 reconnect（Effect scope ↔ AbortSignal 桥接细节见 §5）。
-- **命令式消费**：Transport 可脱离 `useSubscription` 直接使用（quickstart 第六步在编排里 `for await` 等终态帧）——成文。
-- 实时失效（refine liveMode 的语义）= `invalidateOnFrame` 便利组合（帧到达 → 失效指定查询），**不是原语**。
+**规则**：
 
-### 2.4 Resource —— 三原语可选的交互面
+- 删掉 `SubscriptionDescriptor` 与 `Subscription` 名词。参数化用 `StreamFactory`：
+  ```ts
+  const stream = useStream(
+    (params: { dbId: string; collId: string }, ctx) => makeWsTransport(params, ctx),
+    { params: { dbId, collId }, cursor: null, policy },
+  );
+  ```
+- 运行时判别只允许 `typeof source === "function"`（factory）或 object（source），
+  不再用“有没有 policy 字段”。
+- `policy` 是绑定选项，不是 source 的字段；source 只负责 I/O。
+- `idle` 是合法状态；未启动不再伪装成 `reconnecting`。
+- `closeReason` 与终态分诊保留；`ended` ≠ 断流。
+- `beforeReconnect` 保留；`restart`/`resync` 语义保留。
+
+### 4.5 失败与错误
 
 ```ts
-interface ResourceSpec<
-  T,
-  ID,
-  C extends Record<string, CommandDescriptor<any, any, ID>> = {},
-  S extends Record<string, SubscriptionDescriptor<any, any>> = {},
-> {
-  name: string; // defineResource 返回值中变为 branded ResourceName
-  getId?: (row: T) => ID; // 可选（审查修正）——command-only/流式资源无 id 语义；
-  // DataTable/绑定的 getRowId 显式传入（TanStack Table 本就需要）
-  scope?: ReadonlyArray<string>; // scope 键名（如 ["projectId"]），见 scoped 约定
-
-  collection?: (q: CollectionQuery, ctx: ResourceScope) => Promise<Segment<T>>;
-  record?: (id: ID, ctx: ResourceScope) => Promise<T>;
-  batch?: (ids: ReadonlyArray<ID>, ctx: ResourceScope) => Promise<T[]>;
-
-  commands?: C; // 逐键保留具体 CommandDescriptor<Input, Payload, ID>——
-  subscriptions?: S; // 泛型不被擦成 any（审查 P0 修复：defineResource 的
-} // 参数与返回值逐键推断，useCommand(r,'create') 得精确 Input）
-
-interface Resource<T, ID = string, C = {}, S = {}> extends ResourceSpec<T, ID, C, S> {
-  readonly name: ResourceName; // branded
+export class ApiError extends Error {
+  readonly kind: "network" | "auth" | "forbidden" | "not-found" | "server" | "decode";
+  readonly status?: number;
+  readonly detail?: string;
+  readonly cause?: unknown;
 }
 
-function defineResource<T, ID, C, S>(spec: ResourceSpec<T, ID, C, S>): Resource<T, ID, C, S>;
-
-type ResourceScope = Readonly<Record<string, string | undefined>>; // 原 Scope——与 Effect Scope 撞名，改名
-function scoped<T, ID, C, S>(
-  resource: Resource<T, ID, C, S>,
-  values: ResourceScope,
-): Resource<T, ID, C, S>;
-// 自由函数而非方法（审查修正）——queryKey 嵌入 scope 段 + ctx 注入；
-// 适配器可在 http 实例上把 ctx 注入 header（torchwood X-Torchwood-Project）
+export function isRetryable(error: ApiError): boolean {
+  return error.kind === "network" || error.kind === "server";
+}
 ```
 
-**三原语各自可选，且绑定层寻址规则成文（审查修正）**：
-- **查询与命令必须经 Resource 寻址**——失效连接键（branded name + scope）依赖资源注册；
-- **订阅允许裸 Transport**（`useSubscription(transport, opts)` 直用）——全局流（events）或特殊流（logs）可以不造 Resource；`Resource.subscriptions` 是**便利挂点**（torchwood documents 的 changes 这类实体绑定流用）。
-- 合法形态：纯查询（routes）、查询+命令（多数 CRUD）、查询+命令+订阅（documents+changes）、查询+订阅（events）、**纯命令（login/logout——getId 可选后成立）**、裸 Transport（logs）。
+- 失败是 typed failure，走 reject/throw；结果是 `Outcome`，走返回值。
+- `ApiError` 必须是 `Error` 子类（retro M9 的裁决），这样通用 Error UI、
+  TanStack 默认渲染、`instanceof Error` 都成立。
+- 取消（abort/interrupt）既不是失败也不是结果；边界吞掉。
+- 网络断层是 `ApiError.network`，不是 defect；defect 只留程序错误。
 
-**Resource 不含的东西**（旧项目 L4 的越权，明令禁止）：列定义、导航、权限、guessers、路由生成。页面装配回归 React 组合。
+### 4.6 适配器
 
-### 2.5 kernel 契约一览（修订后完整签名）
+- **一个 REST 适配器族**：`restCollection` / `restRecord` / `restFetchAll` /
+  `clientCollection` / `mockCollection` / `mockFetchAll`。
+- `fetch` 注入点是鉴权/401 闭环/axios 桥的唯一边界；错误体解析归
+  `statusToApiError` 单源。
+- **`clientCollection`**：`clientCollection({ fetchAll, limit? })` 在整取后本地求值
+  `CollectionRequest`（filter/order/window），伪造 cursor；`window.kind:"all"` 直出全量。
+  取数上限是适配器常量/参数，不假装全量。
+- **rest 族**：`restCollection`/`restRecord`/`restFetchAll` 共用
+  fetch/abort/error/envelope 核心；`restRecord({ notFound: "null" })` 把 404 变 `null`
+  （empty 态），其余 404 走失败通道。`restFetchAll` 无 notFound 选项（404 是父资源消失）。
+- **`createHttp` 降级**：它是“可选 HTTP 管线”，不是主路径。若保留，必须
+  复用 rest 的错误收敛与 fetch 注入；不再作为第二套公开适配器。
+- **Effect 降为可选**：订阅引擎可以用 Effect 实现，也可以纯 TS；`effect`
+  不应是 core 的硬依赖。v3 推荐：
+  - core 零 `effect`；
+  - 若保留 Effect 引擎，放 `@lynxland/uikit-core/effect` 可选子路径。
+- 适配器不导出 React、不导出 UI。
+
+---
+
+## 5. 绑定面（L4）
+
+### 5.1 数据绑定（无 Router）
+
+`@lynxland/uikit-react` 只导出数据/命令/流绑定，**禁止 import Router**。
 
 ```ts
-// ============ 流几何 ============
-type Cursor = string;
-interface QueryWindow { size: number; cursor?: Cursor; range?: { offset: number } }
-interface Order { field: FieldKey; dir: "asc" | "desc" }
-type Predicate = { field: FieldKey; op: Operator; value: FieldValue }
-              | { all: Predicate[] } | { any: Predicate[] };
-interface CollectionQuery { predicate?: Predicate; order?: Order[]; window: QueryWindow }
-interface Segment<T> { rows: T[]; total?: number; nextCursor?: Cursor }
+export interface CollectionHandle<T> {
+  readonly rows: readonly T[];
+  readonly page: CollectionPage<T> | undefined;
+  readonly request: CollectionRequest;
+  readonly status: "idle" | "loading" | "empty" | "error" | "success";
+  /** 空态原因：源空 or 过滤空（UI 文案分流） */
+  readonly emptyReason?: "source" | "filter";
+  readonly error: ApiError | null;
+  readonly total: number | undefined;
+  readonly isFetching: boolean;
+  refetch(): void;
+}
 
-// ============ 通道 ============
-type ApiError = /* 封闭失败集，§2.2 */ ;
-type CommandResult<P> = /* 已知分支 + ok 载荷，§2.2 */ ;
-interface Transport<F> { open(cursor, signal): FrameSource<F>; beforeReconnect?(): Promise<void> }
-interface FrameSource<F> { [Symbol.asyncIterator](): AsyncIterator<F>;
-                           readonly closeReason: "ended"|"gapped"|"auth"|"transport" }
-type SubscriptionStatus = "live"|"reconnecting"|"paused"|"gapped"|"stalled"|"ended"|"error";
+export interface RecordHandle<T> {
+  readonly data: T | undefined;
+  readonly status: "idle" | "loading" | "empty" | "error" | "success";
+  readonly error: ApiError | null;
+  readonly isFetching: boolean;
+  refetch(): void;
+}
 
-// ============ 交互面 ============
-interface Resource<T, ID, C, S> { /* §2.4 */ }
-type ResourceName = string & { readonly __resource: unique symbol };  // branded
-type ResourceScope = Readonly<Record<string, string | undefined>>;
-function defineResource<T, ID, C, S>(spec: ResourceSpec<T, ID, C, S>): Resource<T, ID, C, S>;
-function scoped<T, ID, C, S>(r: Resource<T, ID, C, S>, values: ResourceScope): Resource<T, ID, C, S>;
+export interface LookupHandle<T, ID> {
+  readonly rows: readonly T[];
+  readonly byId: ReadonlyMap<ID, T>;
+  /** 请求里未解析到的 id（删除/无权限/不存在） */
+  readonly missingIds: readonly ID[];
+  readonly status: "idle" | "loading" | "error" | "success";
+  readonly error: ApiError | null;
+}
 
-// ============ 查询代数（纯函数） ============
-/** 游标推进：offset 方言可算 prev（page-1）；keyset 的 prev = 浏览器历史（返回无令牌），
- *  本函数返回 null 表示不可算——leaderboards 型（token+total）同样走历史。
- *  唯一能本地算 prev 的是客户端求值方言（伪造游标含 offset）。 */
-function advance(window: QueryWindow, segment: Segment<unknown>,
-                 dir: "next" | "prev"): QueryWindow | null;
+export function useCollection<T>(
+  source: CollectionSource<T>,
+  request: CollectionRequest,
+  options?: CollectionQueryOptions,
+): CollectionHandle<T>;
+
+export function useRecord<T, ID>(
+  source: RecordSource<T, ID>,
+  id: ID | undefined,
+  options?: RecordQueryOptions,
+): RecordHandle<T>;
+
+export function useLookup<T, ID>(
+  source: LookupSource<T, ID>,
+  ids: readonly ID[],
+  options?: LookupQueryOptions,
+): LookupHandle<T, ID>;
+
+export interface CollectionQueryOptions {
+  scope?: Scope;
+  staleTime?: number;
+  refetchInterval?: number | false;
+  enabled?: boolean;
+  retry?: boolean | number;
+  keepPrevious?: boolean;
+}
+
+export type RecordQueryOptions = Omit<CollectionQueryOptions, "keepPrevious">;
+export type LookupQueryOptions<T, ID> =
+  Pick<CollectionQueryOptions, "scope" | "staleTime" | "retry"> & {
+    /** 覆盖 source.key 的行 → id 投影。 */
+    key?: (row: T) => ID;
+  };
 ```
 
-（draft-1 的 `mergeWindows` 占位删除——无真实用例，不做假 API。）
+- `useCollection` **不返回 setter**，不读 URL，不 import Router。
+- 旧 `useCollectionData` 的语义就是新的 `useCollection`；旧名**直接删除**，
+  不做 alias（同批 codemod 替换）。
+- `useRecord`/`useLookup` 同样只做数据。
+- `RecordSource.read` 返回 `null` = 记录不存在（`status:"empty"`）；
+  适配器若要把 404 当失败，则 throw `ApiError`，不返回 null。
+  `useRecord` 的 `id` 为 `undefined` = `status:"idle"` / 不请求。
+- `LookupSource` 返回部分行时，`byId` 缺失的 id 进 `missingIds`；
+  外键显示回退到裸 id 由页面/`ReferenceValue` 决定。
+- `status` 的四态由绑定统一计算；`empty` 来自 `rows.length === 0`，
+  并暴露 `emptyReason`（`source` / `filter`）供页面区分文案。
+- `queryOptions` 工厂保留：`collectionQueryOptions(source, request, options)`、
+  `recordQueryOptions`、`lookupQueryOptions`；key 单源。
+- **query key 形状**：`[kind, source.name, canonicalScope, ...detail]`：
+  - `canonicalScope` = **只取 source.scope 声明的键**，按 key 排序、丢 undefined；
+    命令 scope 里多出来的键（如 appId）不进入读键，避免同一资源因无关 scope 碎片化；
+  - `kind` = `collection` / `record` / `lookup`；
+  - `detail` = 规范化后的 request（predicate/order/window）或 record id / lookup ids；
+  - 不手拼键；测试从 `collectionQueryOptions(...).queryKey` 单源取。
+- **scope 未就绪**：`useCollection` 返回 `status:"idle"` 且不发请求；
+  `useRecord`/`useLookup` 同理。
+- `useCollection` 的句柄引用稳定性是契约：`rows/status/error` 只在数据/状态变化时变；
+  `pager`/setter 必须 `useCallback`/`useMemo` 稳定。
+  `refetch`/setter 必须 `useCallback` 稳定（旧设计承诺但未做到）。
+
+### 5.2 URL 绑定（可选，Router 子路径）
+
+`@lynxland/uikit-react/router`（只有这个子路径 import Router）：
+
+```ts
+export interface SearchStateHandle<S> {
+  readonly state: S;
+  set(next: S, options?: { history?: "replace" | "push" }): void;
+  patch(part: Partial<S>, options?: { history?: "replace" | "push" }): void;
+  reset(): void;
+}
+
+export function useSearchState<S>(
+  search: CollectionSearch<S>,
+  options: { from: string },
+): SearchStateHandle<S>;
+
+/** 页面级组合糖：数据绑定 + URL 绑定；旧 useCollection 的行为住在这里。 */
+export function useCollectionPage<T>(
+  source: CollectionSource<T>,
+  options: {
+    search: CollectionSearch<CollectionState>;
+    from: string;
+    scope?: Scope;
+    query?: CollectionQueryOptions;
+  },
+): CollectionPageHandle<T>;
+
+export interface PagerModel {
+  readonly mode: "cursor" | "offset" | "all";
+  readonly canPrev: boolean;
+  readonly canNext: boolean;
+  readonly pageSize: number;
+  prev(): void;
+  next(): void;
+  setPageSize(size: number): void;
+}
+
+export interface CollectionPageHandle<T> extends CollectionHandle<T> {
+  readonly pager: PagerModel;
+  setState(next: CollectionState, options?: { history?: "replace" | "push" }): void;
+  patchState(part: Partial<CollectionState>, options?: { history?: "replace" | "push" }): void;
+  setFilters(filters: readonly FilterValue[], options?: { history?: "replace" | "push" }): void;
+  setSort(sort: readonly Sort[] | null, options?: { history?: "replace" | "push" }): void;
+  reset(): void;
+}
+```
+
+- `useCollectionPage` 返回 `CollectionHandle` + `pager` + 页面 setter；这是唯一把 URL
+  写入契约与数据绑定组合起来的官方入口。
+- **Pager 规则**：
+  - offset：`canPrev = offset > 0`，`prev()` 回上一 offset；`canNext` 由 `total` 判断。
+  - cursor：`canNext = nextCursor != null`；`canPrev = 非首页`。
+    `prev()` 委托浏览器历史（`router.history.back()`）——这是 URL 绑定层的策略，
+    不是控件策略；深链进入带 cursor 的 URL 时历史为空，prev 退化不可用（成文）。
+  - `all`：不渲染 pager。
+  - `setPageSize`：offset 模式回第一页；cursor 模式保留游标（同一锚点取新 size）。
+- `Pager` 控件只收 `PagerModel`/callbacks；不 import Router、不读 `window.history`。
+- 写入律：
+  - 自由过滤（渐进收窄）= `replace`；
+  - 翻页、离散互斥 tab = `push`；
+  - 详情切面 tab = `replace`；
+  - 缺省 tab 不写 URL。
+- 所有 setter 走函数式 search；不在渲染期 navigate。
+- `useSearchState` 是通用的：页面自定义参数（tab 等）也可以用它，不必绑 Collection。
+
+### 5.3 命令绑定
+
+```ts
+export interface CommandHandle<I, O> {
+  mutate(input: I): void;
+  mutateAsync(input: I): Promise<Outcome<O>>;
+  readonly result: Outcome<O> | null;
+  readonly failure: ApiError | null;
+  readonly pending: boolean;
+  /** scope/权限等前置条件就绪；未就绪时 mutate 抛开发期错误，预设禁用按钮 */
+  readonly ready: boolean;
+  reset(): void;
+}
+
+export function useCommand<I, O>(
+  command: Command<I, O>,
+  options?: CommandOptions<I, O> & { entity?: Entity<any, any> },
+): CommandHandle<I, O>;
+```
+
+- `useCommand` 负责：解析 scope、执行 `run`、ok 后应用 effects、把结果/失败两分。
+- 绑定到 Entity 时，缺省 effect = 失效同 Entity；显式 `effects: []` 表示不失效。
+- 声明了 scope 键但值未就绪：`ready=false`；`mutate` 抛开发期错误（不静默 no-op），
+  预设页面禁用动作按钮。
+- effects 在 `run` 返回 ok 后同步触发；`onSettled` 在 effects 编排后调用。
+- `useCommandForm` 保留，但表单类型参数独立：
+
+```ts
+export interface FormSpec<I extends object> {
+  schema?: StandardSchemaV1<I>;
+  fields: readonly FieldInput<I>[];
+  defaultValues?: Partial<I>;
+}
+
+export function useCommandForm<I extends object, O>(
+  command: Command<I, O>,
+  spec: FormSpec<I>,
+  options?: CommandOptions<I, O>,
+): CommandFormHandle<I, O>;
+```
+
+- 表单校验用 Standard Schema（Zod/Valibot/Effect Schema 均可），不再用
+  `required: boolean` 作为唯一校验机制。
+- `FormSpec` 的 `I` 是**输入类型**，与行类型 `T` 无关。
+- `reveal` 仍是 `Outcome.ok.payload` 的一次性语义；不进 Query 缓存。
+
+### 5.4 流绑定
+
+```ts
+export function useStream<F>(
+  source: StreamSource<F> | StreamFactory<any, F>,
+  options?: {
+    params?: unknown;
+    scope?: Scope;
+    policy?: StreamPolicy;
+    cursor?: Cursor | null;
+    getCursor?: (frame: F) => Cursor | undefined;
+    onFrame?: (frame: F) => void;
+    autoStart?: boolean;
+  },
+): StreamHandle<F>;
+```
+
+- 旧 `useSubscription` **直接删除**，不做 alias；同批 codemod 改为 `useStream`。
+- `undefined` cursor = idle/待命；`null` = 活尾立即开；值 = 从锚点续订。
+- `resync(anchor)` 原地重锚；换 cursor prop = 重建流。
+- 页面级只订阅状态；帧消费视图（LogViewer/EventFeed）自己订阅帧存储。
+- 实时失效是组合，不是原语：
+  `useInvalidateOnFrame(stream, effects, { filter?, throttleMs? })`——帧到达后应用
+  `Effect[]`（与 useCommand 同一 `Effect` 类型）；热流用 trailing throttle。
+
+### 5.5 Scope
+
+**一个 Scope 概念，三条明确规则**：
+
+1. **声明**：Entity/`CollectionSource` 可声明 `scope: readonly string[]`；
+   声明只用于 query key 分区与“未就绪自动停用”。
+2. **值**：应用根挂 `ScopeProvider`；绑定可用 `options.scope` 显式覆盖。
+3. **同源**：一次绑定解析出的 scope 同时用于读 key、命令 ctx、失效匹配；
+   不再有 `scopeOf` + `__scopeKeys` + 隐式 context 采纳链。
+
+```ts
+export function ScopeProvider(props: { value: Scope; children: ReactNode }): ReactNode;
+export function useScope(): Scope;
+export function scopeReady(
+  declared: readonly string[] | undefined,
+  scope: Scope | undefined,
+): boolean;
+```
+
+- 显式 scope 优先于 context。
+- 资源声明了 scope 键而值未就绪 → 查询自动 `enabled: false`；命令不自动执行。
+- 跨 scope 失效必须显式 `{ type: "invalidate", entity, allScopes: true }`（Effect 变体），
+  不能靠“恰好没传 scope”实现。
+- 不再有 `__scopeKeys`；是否需要 context 由“是否声明了 scope 键”这个公开事实决定。
+
+### 5.6 测试契约
+
+- `@lynxland/uikit-testing` 提供 `renderWithKit` / `createTestRouter`。
+- 新增：
+  - `renderCollection(source, request)`：无 Router 的数据绑定测试；
+  - `renderSearchState(search, initial)`：URL 绑定测试；
+  - `mockSource` / `mockCommand` / `mockStream`：按能力而不是按 Resource 造 mock。
+- 测试面与运行面同契约级别维护；`/testing` 的严格 tsc 必须可用。
 
 ---
 
-## 3. 派生概念（每项附推导式；禁止反向进入 kernel）
+## 6. 呈现面（L5–L7）
 
-| 派生概念                                                                           | 推导式                                                                                                                                                                            | 落点      |
-| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| **列表绑定** `useCollection`                                                       | CollectionQuery(URL) → collection Query → Query 引擎 → 稳定句柄                                                                                                                   | /react    |
-| **无限列表** `useCollectionInfinite`（A 类，审查升格）                             | useInfiniteQuery（`getNextPageParam: s => s.nextCursor` 与 Segment 命名对齐；双向 prev 引擎原生）                                                                                 | /react    |
-| **记录绑定** `useRecord`                                                           | record(id) → Query                                                                                                                                                                | /react    |
-| **批解析绑定** `useBatch`                                                          | memo(batch(ids)) keyed by (resource, ids)——外键解析                                                                                                                               | /react    |
-| **命令绑定** `useCommand`                                                          | 命令描述符 → mutation + invalidates 执行 + isRetryable 默认                                                                                                                       | /react    |
-| **表单绑定** `useCommandForm`                                                      | TanStack Form 草稿 ∘ useCommand + CommandResult 分支渲染（映射见 §5.1）                                                                                                           | /react    |
-| **订阅绑定** `useSubscription`                                                     | /adapters 订阅引擎句柄 + useSyncExternalStore 接线                                                                                                                                | /react    |
-| **预取工厂** `collectionQueryOptions` / `recordQueryOptions` / `batchQueryOptions` | 查询 → queryOptions（key 单源；hooks 内部消费同一工厂；route loader `ensureQueryData` + `Link preload="intent"` 接线）                                                            | /react    |
-| **查询代数** `evaluateQuery` / `clientCollection`                                  | `evaluateQuery(q, rows)` 纯函数；`clientCollection(fetchAll)` 包装为 collection 实现 + 伪造游标——**求值策略，非概念**                                                             | /adapters |
-| **scoped 约定**                                                                    | `scoped(resource, {projectId})` → key 嵌入 scope 段 + ctx 注入                                                                                                                    | /adapters |
-| **双通道作用域同步配方**                                                           | URL↔localStorage 写方向规则 + synced 守卫 + storage 事件桥 + 防乒乓（torchwood 实证四件套）                                                                                       | 配方      |
-| **权限门控** `useCan`                                                              | identity record Query + 纯谓词；fail-closed；页级门控走 beforeLoad（identity 经 loader 预取 + redirect），元素级走 useCan（"未就绪"与"拒绝"两态渲染）                             | /react    |
-| **偏好持久化** `usePreference`                                                     | localStorage + schema 的通用受控状态                                                                                                                                              | /react    |
-| **实时失效** `useInvalidateOnFrame`                                                    | 帧到达 → invalidate(选择器) 的组合钩子（throttle 可选；§5.3 裁决 8）                                                                                                              | /react    |
-| **mock** `mockResource` / `mockTransport`                                          | 内存实现 Resource / Transport 契约——测试工具 + demo 数据源                                                                                                                        | /adapters |
-| **401 闭环**                                                                       | 三通道（Query/Command/Subscription）auth 失败 → createHttp 注册的 handler；管线次序见 §5                                                                                          | /adapters |
-| **审计页**                                                                         | keyset CollectionQuery（cursor window）的配方                                                                                                                                     | 配方      |
-| **backlog→follow**                                                                 | Query 定锚 × Subscription 续订（共享游标；锚点交接约定见 §2.3）                                                                                                                   | 配方      |
-| **wait 流降级**                                                                    | stalled → 消费方切轮询 Query + 帧优先合并                                                                                                                                         | 配方      |
-| **轮询**                                                                           | Query 引擎 refetchInterval                                                                                                                                                        | 引擎既有  |
-| **fan-out 聚合**                                                                   | N 个 collection Query + merge——**组合，不升格**                                                                                                                                   | 组合      |
-| **多请求编排**                                                                     | commands + queries 的 async 序列（quickstart、variables diff 链）；**fresh-read**：queryOptions 工厂 + `queryClient.fetchQuery` 绕过 stale 缓存（app-variables 的绕缓存回读语义） | 组合      |
-| **导出 CSV**（B 类，审查补）                                                       | `list.rows` + 消费方 unparse 纯函数（react-admin ExportButton 对应物是配方）                                                                                                      | 配方      |
-| **clone**（B 类，审查补）                                                          | useRecord 预填 + create 命令提交（refine useForm clone / ra CloneButton 对应物）                                                                                                  | 配方      |
+### 6.1 控件（L5 Controls）
 
-**消费方自持清单**（0–1 个消费者，抽象不成立，成文拒签）：
-exec 终端（双向有状态会话，Subscription 单向；受理/观测仍可走 Resource，仅 WS 面自持）、分片续传上传状态机（torchwood；底层 REST 上传单片是 FormData raw body 命令）、GitHub manifest 跨站流（整页离站 POST）、确定性 tar 构建器（纯函数）、CliEquivalent 组件（appendix 槽是公共的）、PermissionEditor 的 op:role 预设（通用 ChipsField 进值块）。
+**规则：控件只收受控 props；不取数、不 import Router、不调用绑定 setter。**
 
----
-
-## 4. 词汇分簇与命名政策
-
-### 4.1 分簇
-
-| 簇               | 成员                                                                                                                                      | 语境                     |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| 交互原语（消息） | Query / Command / Subscription；CollectionQuery、CommandResult（结果通道，与原语同报）、Frame                                             | 问/令/听——同一消息类型学 |
-| 被寻址面         | Resource（name、getId?、scope、collection/record/batch、commands、subscriptions）、ResourceName（branded）                                | 实体交互面               |
-| 流几何           | Segment、Cursor、QueryWindow、predicate、order                                                                                            | 序列几何隐喻             |
-| 通道词汇         | Transport（kernel 接口）、FrameSource（终结原因）、ApiError（封闭失败集）、ResourceScope                                                  | 线缆/故障/语境           |
-| 绑定             | useCollection / useCollectionInfinite / useRecord / useBatch / useCommand / useCommandForm / useSubscription；工具 useCan / usePreference | **原语（或其形）语域**   |
-| 适配器           | evaluateQuery / clientCollection / scoped / mockResource / mockTransport / http / ndjson / sse                                            | 动词语域                 |
-| 块               | DataTable / ListPage / Form / LogViewer / EventFeed / Page…                                                                               | 呈现语域                 |
-
-### 4.2 命名政策
-
-1. **契约以"是什么"命名**；**绑定以"绑定的原语或其形"命名**（useCollection/useRecord/useBatch 是 Query 的形——Query 是四个元名词里唯一没有同名绑定的，政策措辞如此）；**适配器以动词命名**；**块以"呈现什么"命名**。
-2. **受控碰撞消歧**：`Query` 引擎词归 TanStack、契约词一律复合词（CollectionQuery）；永不导出裸标识符 `Query`；kernel/绑定层**禁用 `Event` 一词**（帧叫 Frame）；`Page` 归 UI 外壳块；`QueryWindow`（避 DOM `Window`）、`ResourceScope`（避 Effect `Scope`）——**碰撞检查清单覆盖 DOM / TanStack / Effect 三家词表**。**块名豁免记录**：EventFeed 保留（呈现层词汇，不进类型层，豁免记录在案）。
-3. 全部导出唯一归属一层，机械可查（layer-check）。
-
-### 4.3 消费方视角的 API 面
-
-- **适配器作者**（fleetly/torchwood 迁移的核心工作者）：见 Resource/Transport 契约 + Effect 缝（§5）。需要懂 Effect。
-- **页面作者**（大多数 agent 开发时）：见绑定 + 块 + 配方。零 Effect、零协议细节。
-- 两类角色的文档分册（§10）；幻觉诱饵对照表（§14）进 SKILL.md。
-
----
-
-## 5. Effect 缝隙架构（采纳层级 L1；draft-2 按 Effect v4 实测修订）
-
-**原则：Effect 住在缝里，Promise 站在边界上。**
-
-### 5.0 v4 基线事实与依赖政策
-
-- effect **v4.0**（2026-10-01 stable）：core 零运行时依赖、最小程序 7.1 kB min+gz、LTS 至 2029-09。使用范围：**core 稳定模块**（Effect/Stream/Queue/Deferred/Schedule/Data/Cause/Exit）+ `effect/schema`（**unstable**——minor 可破坏，防线见不变量 4）。
-- **不取 platform Http**（v4 中为 core 的 `effect/http` unstable 模块 + `@effect/platform-browser`，且是 Layer/拦截器取向——与 L1 禁区直接冲突）。手写 fetch + `Effect.tryPromise` 归一层，几十行，零不稳定依赖。
-- **依赖锁 `~4.0`（tilde）**：schema 的 unstable 意味着 minor 可能破坏；caret 会让 `npm update` 自动引入破坏——tilde + changesets 主动吸收 + CI 漂移矩阵（effect@latest-4.x 上跑测试）。
-- **bundle 预算门**：/adapters 入口 gzip ≤ 35 kB（质量门新增）。
-
-### 5.1 缝 1：错误通道与 401 闭环
-
-- 网络断层 = **typed failure**（`Effect.tryPromise` 的 `catch` 归一为 `ApiError.network`）；**defect 只留程序错误**，在边界 `catchDefect` 归一进监控（不进 ApiError）。
-- **唯一边界 `runApi`**：所有 Effect→Promise 只经它——`catchDefect`（监控）→ `mapError`（TaggedError → kernel `kind` 联合）→ interrupt 吞掉（取消不是错误）。kernel 用 `kind` 判别，adapters 层定义 TaggedError 类、边界 mapError 转换（`_tag` 留在缝里，`kind` 站在边界上）。
-- **401 闭环管线次序（成文）**：401 → **适配器内** refresh（单飞：`Ref<Option<Deferred>>` CAS + 失败扇出=断路器；刷新段 `uninterruptible` 或 forkDaemon——刷新 fiber 不得被首个请求者的取消连带杀死）+ **一次性重放**（`__authRetried` 语义）→ 仍 401 才 `ApiError.auth` → `createHttp({ onUnauthorized })` 注册的 handler（清凭证 + 清缓存 + 跳登录）。**免死通道**：登录端点、`missing-project-context` 型 401 不触发闭环；**断路器**：`expired=1` 类参数防 login↔console 互跳（torchwood 实证）。
-- **三通道统一**：Query/Command/Subscription 的 auth 失败都路由到注册 handler（订阅侧 `status:"error"` 携带 ApiError——不再是无载荷字符串）。
-- 已知 v4 坑成文：混合 cause 语义（typed error 后 die 会让 catchTag 跳过——闭环捕获点用 catchCause 级或保证周边无 die finalizer）；`tryPromise` 的 signal arity 陷阱（不能写 rest/默认参数）。
-
-### 5.2 缝 2：Schema 单源
-
-- Effect Schema 为唯一 schema 源（**弃 Zod**）：CollectionQuery URL 编解码工厂、Segment 信封、protojson transform。
-- **"直传 validateSearch"修正**：Effect Schema 须经 `toStandardSchemaV1` 包装（v4 改名）——工厂的 `toSearchSchema()` 内部完成，页面作者无感。
-- **合并发生在函数层而非 schema 层**：`validateSearch` 接受纯函数——消费方在自己的函数体里并行跑自有 Zod parse 与我方 `decode`，返回合并后的普通对象。**不需要两个 schema 库互操作**。
-- protojson 工厂提供 **int64 双策略**（`int64: "string" | "number"`）：torchwood 归一为 number（version 比较）、fleetly 保持 string（避免 2⁵³ 截断）——单一选择会伤一个 console。编码面纪律同factory：proto3 optional"未设置=不发送"、零值缺席、枚举全名、repeated `key=a&key=b`。
-- TanStack Form 同吃 Standard Schema——useCommandForm 可复用同一 schema 工厂。
-
-### 5.3 缝 3：订阅引擎（物理位置修正）
-
-- **引擎核心在 /adapters**（零 React）：`Stream.fromAsyncIterable(openTransport)` → `mapError`（终结原因类型化）→ `Stream.retry(backoffSchedule)` → 环形缓冲 `Queue.sliding(policy.buffer)` + `Stream.fromQueue`；暴露命令式句柄（start/stop/onFrame/restart/resync）。/react 只做 `useSyncExternalStore` 接线。
-- **渲染契约**：帧缓冲为外部存储、快照经 useSyncExternalStore；SubscriptionStatus 单独订阅（帧到达不触发全页重渲染）；**StrictMode 双挂载幂等**（AbortSignal 清理 + 退避状态与 transport 实例分离）。
-- **AbortSignal 桥**：Effect scope finalizer → controller.abort；`Effect.callback`/`tryPromise` signal 桥入；引擎主动 abort 的 AbortError 与传输错误严格区分。
-- Schedule v4 形状按新 API 书写（min/max 组合退避；Mailbox 已移除——用 Queue）。
-
-#### 实现期裁决（subscription 批次落地，2026-10-24；偏离原案处已修订）
-
-1. **退避弃用 Stream.retry/Schedule，改显式索引驱动**：v4 Schedule 无 resettable，schedule 状态无法在"连接恢复递送帧"时归零——而 fleetly 语义要求每次断线从 `backoffMs[0]` 重新计数；且 `Stream.retry` 重跑整流，无法保留"已递送帧的游标"语义。实现为驱动环内的 `attempt` 索引 + `Effect.sleep`，帧递送归零（packages/core/src/adapters/subscription.ts）。
-2. **连接侧弃用 `Stream.runIntoQueue`，改 `runForEach + Queue.offer`**：v4 的 runIntoQueue 会在流完成时以 `Cause.Done` **终结队列**，重连需要复用同一环形缓冲——offer 到 sliding 队列永不挂起且超限丢最旧，队列生命周期归引擎（stop 时 shutdown，泵纤维随 `Stream.fromQueue` 自然退出）。
-3. **状态映射细化（SubscriptionStatus 闭合集不变）**："live" = open 成功而非首帧递送——安静但健康的流（torchwood documents changes 类静流）不该因"暂无新帧"显示 reconnecting；"reconnecting" 覆盖一切连接建立中（含首连与退避等待）；句柄 stop() → "ended"（引擎侧收流，干净终态不区分发起方）。
-4. **终态分诊矩阵成文**：迭代器**正常结束** → closeReason 四值皆终态（ended/gapped 停机待命；auth→error{auth}、transport→error{network}——401 闭环在订阅侧的落点）；迭代器**抛错** → `isApiError` 且不可重试（isRetryable=false）→ error，可重试（network/server）或未知错误 → 传输中断进退避。**抛错=可重试线索，完成=终态判据**——transport 想要重连语义应当抛错而非以 transport 收流。
-5. **`resync(anchor?)` 增加可选锚点参数**（原案签名 `resync(): void` 不充分）：重跑 backlog 得到的新锚必须能传进引擎（缺省 null = 活尾）；resyncs++ 不变。原地进行，不换 cursor prop——`useSubscription` 的 cursor prop 变化语义 = 重建订阅（清缓冲、resyncs 归零）。
-6. **descriptor | transport 运行时判别 = `policy` 字段**：descriptor 必须声明 policy（流属性默认在资源侧声明本就是约定，兼作判别）；裸 Transport 永不带 policy。
-7. **useSubscription 锚点语义**：cursor 传 `undefined` = 待命不开（backlog→follow 等定锚——引擎在 effect 内创建，锚到位才连接）；显式 `null` = 活尾立即开（日志流）。react 层只订阅状态存储；帧存储（subscribeFrames/getFrames）由帧消费块自行接线。
-
-#### 实现期裁决（subscription 尾款，2026-10-24）
-
-8. **invalidateOnFrame 落地为 `useInvalidateOnFrame`**（工具钩子沿 use 前缀政策，§3 派生表措辞如此对齐）：`useInvalidateOnFrame(sub, selectors, { scope?, filter?, throttleMs? })`。selector 与 useCommand 的 invalidates 同源（invalidationPredicate 单源）；filter 帧级谓词；throttleMs 缺省 0 = 每帧即射（invalidateQueries 幂等 + active 查询去重），热日志流给窗口——trailing 合并调度抽为纯函数 `createFrameInvalidator`（可单测；卸载 cancel 不给已卸载组件补射）。
-9. **StageTimeline 块形态 = 帧投影 × 先验目录**：页面声明 `stages`（次序+文案，实体知识留页面），帧经 `onStage(frame) → StageEvent | undefined` 投影（undefined = 与时间线无关的帧，一条流喂多视图的常态）；目录外 key 追加尾部（动态阶段）。耗时由事件时间戳推出（ended − started；进行中随 tick 走，缺省 1000ms）；时间戳缺席以到达时刻兜底——重放口径由页面选择（带 at 的帧可重放）。
-
-### 5.4 useCommandForm × TanStack Form 映射（关闭 B-Q6）
-
-- **`rejected` → 表单级 `onSubmitAsync` 返回 `{ form: message, fields: fieldErrors }`**（v1 官方文档化路径；与 CommandResult 形状逐字对应）。~~setErrorMap~~（v2 alpha 已删除——不建在被删的 API 上）。
-- `conflict` → form-level 消息 + 刷新动作；`ok` → reveal 载荷提升为绑定状态（不进 Query 缓存、卸载即弃）+ `onSettled` 回调（消费方接 toast/关窗/跳转——库不内置通知）。
-- **服务端驱动 defaultValues 重播**：dirty 不覆盖（`specEdited`/`initializedRef` 模式，fleetly DeploySheet 与 torchwood documents 同款）。
-- 已知语义坑成文：服务端错误在字段值变化前不自动清除；字段级校验覆盖同字段表单级错误。
-- **v2 alpha 监测条款**：react-form 锁 ^1 + 跟踪 v2（validators 数组化、ESM-only、无兼容层是已知破坏面）。
-
----
-
-## 6. UI 块体系（registry）
-
-### 6.1 分族轴：消费哪个绑定的输出（与数据层类型学同构）
-
-| 族                | 消费什么                              | 首批成员                                                                                                                                                                                                                                                                                                                          |
-| ----------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **values/**       | 纯值，零绑定知识                      | StatusBadge（状态→语义 token，映射可注入）、RelativeTime（时区感知）、CopyButton、SecretReveal（一次性揭示态）、DiffView、JsonField、StatCard、MetricChart（序列治理内置：活跃窗排序/渲染上限+N more/服务端截断披露/protojson 零值=0）                                                                                            |
-| **query/**        | useCollection/useRecord/useBatch 输出 | DataTable（TanStack Table v9 `useTable+tableFeatures`；行选择/半选/行展开/**四态**）、Pagination（total 或客户端求值）、KeysetPagination（无 total：显示 x–y、空页仍渲染）、FilterBar、SelectionBar、ListPage、DetailPage（hero + URL tabs）、ReferenceSelect（搜索式选择另一资源记录 + 引用列展示，消费 useBatch/useCollection） |
-| **command/**      | useCommand/useCommandForm 输出        | Form 内芯（字段族 × 错误盒 × 提交生命周期；宿主无关——Dialog/Sheet/整页三形态由外壳决定；submit 由内芯渲染，宿主 footer 经 ref 连线）、RowActions、DeleteButton/BulkDelete、ConfirmDialog 接线、行内表单                                                                                                                           |
-| **subscription/** | useSubscription 输出                  | LogViewer（虚拟滚动+智能跟随+jump-to-live+下载/清空）、EventFeed（倒序+gapped 黄条[resyncs 信号]+暂停指示灯）、StageTimeline——**标注为参照实现**                                                                                                                                                                                  |
-| **shell/**        | 无（布局/应用骨架）                   | AppShell（Sidebar navSections + Topbar + ⌘K 位）、**Page**（title/breadcrumb/actions/宽度三档 wide\|narrow\|flow）、ScopeSwitcher（含陈旧 id 校正）、Stepper、SectionCard（命名政策裁决：呈现布局分区而非值 → shell 族）、RouteErrorBoundary                                                                                                                                                  |
-
-**四态**（统一术语，废弃"三态"混用）：loading / empty / error / success——前三者是渲染分支，第四者是数据。渲染归属：四态归 ListPage/页级（DataTable 只渲染 success 态的表体）。
-
-**DataTable 状态归属切分（Table v9 裁决）**：排序/过滤/窗口归 URL（CollectionQuery 的 order/predicate/window——表内**禁用**内建 sorting/filtering 分支）；行选择/行展开归表内瞬态（受控 state 或 v9 atoms 交消费方）。块基于 v9 新 API 书写（`tableFeatures` tree-shaking；实例方法在原型上——禁止解构）。
-
-#### MetricChart 实现期裁决（2026-10-24，双 console 取证后；批内第一性裁决）
-
-**选型 = recharts（vendored shadcn chart.tsx 基元 + 块直用 recharts 原语）**。取证：两 console 现行同库 recharts ^3.10.1（fleetly shadcn 封装 + torchwood 裸用）；密度上限 240 点/序列 × ≤10 序列/图（fleetly 窗宽定死 240 桶）——uPlot 的百万点性能溢价无落点，且 canvas 渲染丢 CSS 变量主题化、tooltip/图例全要自建；自绘 SVG 需重建时间轴 scale/跟随 tooltip/图例，为省一个消费者已有的依赖重造轮子。**分发影响**：registry 拷贝制下 recharts 落消费方——registry.json item `dependencies` 声明（registry-build 扫描块裸导入自动追加）+ root devDeps 供 demo；不进 @lynxland/uikit-core core，/adapters 预算门不受影响。
-
-对齐真实消费者的形态裁决（fleetly metric-chart.tsx 实证）：
-
-1. **序列身份 = 稳定 key**：`MetricSeries { key, label, points }`——key 由页面给、跨刷新稳定（fleetly `s{原始下标}` 同款；曾用 index%5 当键 >5 序列碰撞覆写的教训成文）。配色 `var(--chart-N)` 按输入序取色（序列次序稳定则配色稳定）。
-2. **动画/圆点全局关闭**（`isAnimationActive=false`、`dot=false`）：30s 轮询刷新下动画闪烁是实证问题，不是审美选择。
-3. **数值时间轴单形态**：`t` 一律 ms epoch（XAxis `type="number" scale="time"`）；torchwood 的预格式化桶 label 是页面对桶 epoch 的 `formatTick` 选择，类目轴不进块。
-4. **四件套接口化**：`maxSeries`（缺省 10）+ "+N more" 溢出披露；`activeWindowMs`（缺省 5min）活跃窗排序（末样本近窗尾者优先、峰值次之、声明序兜底——fleetly"死副本残骸不淹没活副本"的泛化）；`serverCap { shown, total }` 服务端截断披露条；点对齐统一时间轴行 + protojson 零值缺省（`v` 缺席按 `missingValue` 缺省 0 解释——proto3 零值省略是合法全零序列不是缺数据；"gap" 显式断线）。序列→行折叠是纯函数（`buildMetricRows`，可单测）。
-5. **图例带末值**（每序列最后一个非空值加粗在图例行）；量纲格式化（bytes/percent）经 `formatValue` 注入——块不认单位词表。
-
-### 6.2 共用 / 特化判据（成文规则）
-
-一个组件进 registry，当且仅当：
-1. **实体无关**（无业务名词/枚举/文案——文案走 messages 通道）；
-2. 只依赖绑定输出 + 值块 + shadcn 基元（vendored，上游原样）；
-3. **≥2 个消费者，或核心绑定的参照实现**（DataTable↔Query、LogViewer↔Subscription）。
-
-不满足 = 业务特化组件，住消费方 `features/`。**晋升规则**：demo 是永久第二消费者；真实第二消费者出现才升格——拷贝即晋升，无词表冻结、无登记制。
-
-**双 console 实证**：DataTable、分页双模式、列表页骨架、详情页骨架、表单三宿主、确认框、状态徽章、相对时间、四态、复制、secret 揭示 ×8、SectionCard、统计卡+图表、DiffView、JSON 编辑、事件 feed、多步向导、应用外壳、作用域切换器——全部 ≥2 消费者。
-
-### 6.3 页面配方（composition，不是原型）
-
-**页面模式只存在于文档与 demo，不存在于框架类型系统**：
-- 列表页 = `ListPage[ FilterBar × DataTable × Pagination|KeysetPagination × 四态 ](list)`
-- 详情页 = `DetailPage[ hero × Tabs(URL) × DetailGrid|SectionCard ](record)`——**tab 写入语义（实现期裁决，2026-10-24）**：tab 是普通 search 参数（不经 collectionQuerySchema——页面形态不是集合查询）；切 tab = **replace**（页面形态变化不吃历史栈，与谓词/排序同律 §2.1.1）；缺省 tab 不写 URL（"URL + 默认值即真相"同款）；块受控（activeTab/onTabChange），navigate 归页面——块不 import 路由。
-- 新增/编辑 = `Dialog|Sheet|Page[ Form( fields × error × submit ) ](command)`
-- 向导 = `Stepper[ n × Form|等待步骤 ]`；设置页 = `SectionCard × n`
-- 仪表盘 = `StatCard × n + MetricChart × n (queries)`；工作台 = 全屏 `FilterBar × (LogViewer|EventFeed|MetricChart)`
-- events 组合页 = backlog Query 定锚 × Subscription 续订 × EventFeed（含 resync 配方：gapped → resync() → 清缓冲重锚 → 黄条）
-
-FilterBar/Pagination 等是 ListPage 的**兄弟组件**（示例代码未画 filter 槽——块各是独立组件，配方图示的是组合不是内建槽）。所有 page part 都是 ReactNode——**逃生舱是结构性的**：
+#### DataTable
 
 ```tsx
-<ListPage
-  title="Apps"
-  table={<DataTable list={list} columns={appsColumns} getRowId />} {/* 不满意？传自己的表格，只要消费 list */}
-  pagination={<Pagination list={list} />}
-  appendix={<CliEquivalent cmd={`fleetly apps list --project ${projectId}`} />}
+<DataTable
+  rows={rows}
+  columns={columns}
+  getRowId={(row) => row.id}
+  sorting={sort}
+  onSortingChange={setSort}
+  selection={selection}
+  columnVisibility={visibility}
+  onColumnVisibilityChange={setVisibility}
+  onRowClick={openDetail}
 />
 ```
 
-### 6.4 为什么不需要 CustomPage
+- `DataTable` 不认识 `CollectionHandle`；静态数组也能渲染。
+- 排序/过滤/分页状态由调用方给；表内只保留列可见性等瞬态（可受控）。
+- 行选择仍是受控 `RowSelection`；批量动作编排归页面。
 
-`CustomPage`/`<CustomRoutes>` 的存在前提是**框架拥有页面类型系统**。@lynxland/uikit 不拥有路由——**TanStack Router 文件路由就是全部页面**，自定义内容页是缺省状态。承接机制：① `Page` 外壳块服务所有页面；② 横切关注点与页面类型正交（导航 = navSections prop、错误边界 = 每路由、权限 = beforeLoad + useCan、Suspense = 根路由）。
+#### FilterBar
 
----
-
-## 7. 双 Console 覆盖核对（draft-2 修正后）
-
-### 7.1 覆盖矩阵（摘要；修正处以 ★ 标注）
-
-| 交互形状（出处）                                  | 落点                                                                     | 判定                  |
-| ------------------------------------------------- | ------------------------------------------------------------------------ | --------------------- |
-| 整取+客户端过滤分页（fleetly 全站）               | CollectionQuery + clientCollection（伪造游标 + per-resource limit 常量） | ✓                     |
-| keyset 无 total + 换向回首页（torchwood 全站）    | cursor window + KeysetPagination + 写入契约                              | ✓                     |
-| ★ leaderboards"token 游标+附带 total"             | cursor + total 并存；prev 走历史（advance 返回 null）                    | ✓（修正定性）         |
-| 服务端过滤（fleetly audit；torchwood 白名单 DSL） | predicate 服务端求值，方言编解码在适配器                                 | ✓                     |
-| 详情/外键                                         | record / batch（失效矩阵覆盖 batch 键）                                  | ✓                     |
-| fan-out 聚合（fleetly 部署流/spec 反引索引）      | N 查询 + merge 组合                                                      | ✓                     |
-| 轮询（两 console 多处）                           | refetchInterval                                                          | ✓                     |
-| 时序/图表/单值统计                                | 时序=collection（时间窗谓词）；单值=useQuery+select                      | ✓（补推导）           |
-| 具名动词（两 console 大量）                       | Command 动词集（泛型逐键推断）                                           | ✓                     |
-| 多请求编排（quickstart/variables diff 链）        | 消费方组合 + fetchQuery fresh-read + Transport 命令式消费                | ✓                     |
-| 表单+错误（两 console 均 message-only 后端）      | CommandResult.rejected（code + fieldErrors 可选）→ onSubmitAsync 返回    | ✓                     |
-| OCC（torchwood documents）                        | 输入带 version + conflict 分支（迁移先验证服务端判别）                   | ✓                     |
-| 一次性 secret（两 console ×8）                    | ok 载荷 + SecretReveal                                                   | ✓                     |
-| tar 裸上传 / FormData 单片                        | raw body 命令；Blob 响应走 raw-response 逃生口                           | ✓                     |
-| 日志 NDJSON（fleetly）                            | Subscription + ndjson transport                                          | ✓                     |
-| events SSE 票据 + 410 断档（fleetly）             | Query 锚 + Subscription + FrameSource closeReason + resync 配方          | ✓（补终态分诊后可写） |
-| wait 流退避→轮询兜底（fleetly）                   | stalled 状态 + 消费方切轮询查询 + 帧优先合并                             | ✓（修正机制）         |
-| realtime WS refresh→重订（torchwood）             | Transport.beforeReconnect 钩子 + restart                                 | ✓（补钩子后可写）     |
-| 401 闭环（bearer 清跳 / cookie 单飞刷新）         | 缓 1 管线次序 + 免死 + 断路器 + 三通道统一                               | ✓（修正管线）         |
-| protojson 方言（两 console）                      | Effect Schema transform（int64 双策略 + 编码面纪律）                     | ✓                     |
-| 项目作用域（两 console 双通道）                   | scoped 约定 + 双通道同步配方（写方向/synced 守卫/storage 桥/防乒乓）     | ✓（补配方）           |
-
-### 7.2 核对修正记录（累计 8 条 + 审查新增）
-
-原 8 条保留（具名动词/message-first/砍 undo/gapped/scope 约定/游标进 URL/raw body/fan-out 组合）。审查新增：⑨ leaderboards 定性修正；⑩ wait 流降级改 stalled+组合；⑪ 401 管线次序成文；⑫ 终态分诊归 transport（closeReason）；⑬ 双通道作用域配方成文；⑭ int64 双策略。
-
-### 7.3 消费方自持清单
-
-见 §3 末尾。
-
----
-
-## 8. 竞品交叉审核（refine / react-admin / shadcn-admin-kit；draft-2 修正）
-
-**超越（收敛为五点，措辞经对竞品 v5 实测校准）**：
-1. **全链路类型安全**——资源寻址（branded ResourceName vs 竞品 string）、谓词（类型化 Predicate vs 松散 CrudFilters/filters）、URL（typed search + Standard Schema vs 弱类型）。注明：react-admin v5"Stricter TypeScript"、refine v5"更一致的类型化 hook 接口"已收窄差距——超越集中在**资源寻址+谓词+URL 三处**，非全面。
-2. **流式帧消费（代差）**——竞品 live 契约是 pub/sub 事件（refine auto=失效重取、**manual=事件回调——消费方可自建缓冲**；ra-realtime=EE 付费重取模型）；@lynxland/uikit 的契约原生携带**游标定位/backlog→follow/断档重同步/暂停/退避转轮询/环形缓冲**——这些机制在竞品中须消费方全部自建。结论（代差）保留，"字面上无法表达"的过度断言删除。
-3. **分页方言的类型化 + URL 化**——结构类型 QueryWindow vs 模式枚举/字符串游标（refine 有 cursor 约定、ra 有 getPaginationCursor+pageInfo——表达力存在，差距在**类型化与 URL 历史**）。
-4. **具名动词命令 + 声明式失效**——refine `useCustomMutation` 文档自认"不失效查询"（消费方手接 useInvalidate）；react-admin 自定义动词=裸 useMutation+手动 queryClient——@lynxland/uikit 的 invalidates 声明反而更硬。
-5. **Subscription/Command 的领域契约**（失败/结果两分、OCC、reveal、gapped）与 **TanStack Router/Form 全栈**。
-
-**持平**：CRUD 页面三件套、数据契约、认证/权限、引用**读侧**（写侧见缺失）、无头+皮肤分离、registry 源码分发、链接预取（Router preload 等价）、**Agent 文档**（kit 已自带 SKILL.md——跟进持平而非首创）。
-
-**缺失三类处置**：
-- **A 类（补齐，进计划）**：ReferenceSelect、usePreference（含 SavedQueriesList 配方块后排）、mockResource/mockTransport、**useCollectionInfinite（升格：双竞品一等 + fleetly 消费）**
-- **B 类（配方化）**：实时失效=invalidateOnFrame；导出 CSV=rows+unparse 配方；clone=useRecord+create 配方；Inferencer→脚手架 devtool（kit 的 guessers 对应物，open-code 哲学，后排）；向导=Stepper；translatable 字段=自定义字段块；日历/看板/树=自定义块等第二消费者（**注：react-admin 树组件是 EE 付费——我们的处置反而占优**）
-- **C 类（持证拒签）**：**undo/乐观更新（明码标价：ra/kit 默认 undoable，@lynxland/uikit 默认同步等待——重启条件：真实消费者需求，作为命令时机策略加回）**、SSR/元框架、后端适配器生态（kit 50+ providers、ra 同）、完整 i18n 语言包、provider 动物园/多租户 EE
-
-**shadcn-admin-kit 专门对照（诚实版）**：kit v2.0（2026-09）= ra-core + shadcn/Base UI + React Router v7 + RHF + Zod，98+ 组件、guessers、saved-queries、undoable 默认、自带 SKILL.md、EE realtime/locks/soft-delete。@lynxland/uikit 真实差异化收敛为上述五点超越；kit 优势如实：组件数量（98+ vs 首批 ~25）、十年数据层打磨、50+ data providers、undo/export/guessers 开箱。**诚实提醒**：react-admin 十年、refine 六年，npm 周下载 core 各 ~16 万/~9 万（ra-core ~12 万）；@lynxland/uikit 成熟度只能靠垂直切片+双 console 迁移逐步挣得。
-
----
-
-## 9. 包结构与分发
-
-```
-ui/                              # @lynxland/uikit（pnpm monorepo + catalog 单源版本）
-├── packages/core                # @lynxland/uikit-core
-│   ├── src/kernel/              # 契约+类型+查询/游标代数（零依赖，零 react import）
-│   ├── src/schema/              # Effect Schema 工厂（依赖 effect ~4.0；公开面零 effect/schema 泄漏）
-│   ├── src/adapters/            # http 管线(Effect 内部+runApi+401)/订阅引擎(零 React)/
-│   │                            # evaluateQuery/clientCollection/transport/scoped/mock
-│   └── src/react/               # 绑定 hooks + queryOptions 工厂（peer: TanStack 系；禁 import effect）
-│   exports: ./kernel ./schema ./adapters ./react（+root 转发 ./react）
-├── registry/{values,query,command,subscription,shell}/   # blocks 源 + registry.json 构建
-├── apps/demo                    # Vite + TanStack Router + shadcn(Base UI) + Tailwind v4 + mockResource
-└── docs/                        # design.md / AGENTS.md / SKILL.md / llms.txt
+```tsx
+<FilterBar
+  fields={filterFields}
+  value={state.filters ?? []}
+  onChange={(filters) => setState({ ...state, filters })}
+  text={{ value: state.q ?? "", onChange: (q) => setState({ ...state, q }) }}
+/>
 ```
 
-- **http 管线 API（定案，关闭 Agent 可用性 P0）**：
+- `FilterBar` 不读 `list`；没有本地 `Draft` 镜像。
+- 输入文本可以有一个瞬态 draft，但必须在 `value` 变化时同步（或使用
+  `useDeferredValue`/受控输入），不得只在挂载时初始化。
+- `FilterField` 是唯一过滤声明：
 
 ```ts
-// /adapters —— 适配器作者的全部入口
-createHttp({
-  baseUrl?: string;                       // per-resource 亦可（well-known 裸端点/免鉴权出口）
-  onUnauthorized?: () => void | Promise<void>;  // 401 handler 注册点（工厂参数，非全局 provider）
-}): {
-  get<T>(path, { params?, schema?, raw?, signal? }): Promise<T>;   // schema: Effect Schema（可省=不解码）
-  post/put/del/sendRaw(...);                                        // raw=true → Blob 逃生口
-  run: typeof runApi;                                               // 唯一边界
+export interface FilterField {
+  field: string;
+  label?: string;
+  kind: "text" | "exact" | "enum" | "datetime";
+  op?: Operator;
+  options?: readonly { value: string; label: string }[];
+  as?: "input" | "select" | "tabs" | "range" | "presets";
+  presets?: readonly DatetimePreset[];
 }
 ```
 
-- **版本**：core 走 changesets + semver；**hooks 返回形状一经发布视为协议级稳定**（refine v4→v5 教训）；effect 锁 `~4.0`。
-- **技术栈锁定**：React 19 / TS strict / pnpm / effect ~4.0 / @tanstack/react-router ^1.170 / react-query ^5.104 / react-table ^9 / react-form ^1（v2 alpha 监测条款）/ shadcn CLI v4 + Base UI 方言 + Tailwind v4 / vitest + Playwright / biome。
-
----
-
-## 10. Agent 文档方案
-
-- **SKILL.md**（TanStack Intent 格式，随包发布）：分两册——页面作者册（绑定 + 块 + 配方 + **反模式清单** + **幻觉诱饵对照表**）与适配器作者册（契约 + Effect 缝 + protojson 配方 + 401 管线）。
-- **llms.txt**：库地图 + 概念词汇表 + 指向 SKILL.md。
-- **AGENTS.md**（仓库根）：贡献/开发流程、质量门、layer-check、决策日志指针。
-- demo 即活文档（每个配方一个可运行页面）。
-- 反模式守卫测试：禁裸 `window.confirm`、禁手拼分页、禁绕过绑定直连 fetch、禁 useState 存列表状态、禁渲染期 navigate 等。
-
----
-
-## 11. 质量门
-
-1. `layer-check`：kernel 零依赖零 react import；单向依赖；**react 目录禁 import effect（目录级）**；/schema 公开面零 effect/schema 泄漏（声明扫描）。
-2. vitest 单测：kernel 纯函数全覆盖（编解码往返、游标代数含 advance-prev 语义、错误归一矩阵、**失效矩阵含跨资源/scope 交运算/batch 键**、isRetryable、mockResource 契约）。
-3. Playwright e2e：垂直切片端到端（URL 可分享/前进后退/双方言切换/四态/keepPreviousData）+ **a11y（axe + 键盘导航用例，DataTable/LogViewer 重点）**。
-4. `tsc --noEmit` strict + publint/attw。
-5. **bundle 预算**：/adapters 入口 gzip ≤ 35 kB；effect 漂移矩阵 CI。
-6. **不引入**：词表冻结、一致性棘轮、截图基线类重治理。
-7. **size-check 机械门**（2026-10-24 起，挂 `pnpm check`）：scripts/size-check.mjs——rolldown 打包 /adapters 入口（ESM+minify，peer 依赖外置、effect 计入）→ zlib gzip 计量，超 35 kB 非零退出。基线 20.4 kB。
-
----
-
-## 12. 迁移路线（双 console）
-
-**fleetly console**（TanStack Router 同栈，最顺）：
-1. 底座接入：registry add + core 安装 + styles.css token 映射
-2. 数据层：REST+protojson → Resource 适配器族（12 上下文分批；int64="string"）+ clientCollection + scoped(projectId) + useCan(platform_admin fail-closed，identity 走 loader)
-3. 列表族练手 → 详情族（app 10 tab：URL tabs 修正 useState 不一致）→ 表单族（Dialog/DeploySheet——五源+hook 切换命令、specEdited 重播按 §5.4）
-4. events/logs/wait → Subscription 线 + transport 适配器（票据/base64/终态分诊在此；wait 流=stalled+轮询组合）
-5. overview/components → StatCard/MetricChart；terminal 自持收尾（保持一份实现，修掉现存两份分叉）
-
-**torchwood console**（react-router-dom → TanStack Router 一并迁移）：
-1. 路由迁移 + AppShell/Page 骨架
-2. keyset 资源族 + 白名单 DSL predicate 适配器 + gateway 序列化 + 双通道作用域配方
-3. 表单族（message-first 错误盒；OCC 先验证服务端判别再开 conflict 分支）
-4. realtime ListenPanel → useSubscription（beforeReconnect=refresh→重订；restart=手动重连）
-5. analytics → MetricChart 配方
-
-**执行方式**：每批 = 子代理实现 + 质量门 + 行为等价验收。
-
-### 12.1 fleetly 试点切片：实现期裁决（2026-10-24，垂直切片 = apps 列表页）
-
-按上节 fleetly 路线 1–4 步做的可验收切片（console 仓内），裁决先于实现记录如下：
-
-1. **分发 = tarball vendored**：@lynxland/ui-kit 未发布，试点经 `pnpm pack` 产 tarball 落消费方仓内 `console/vendor/`，`file:` 协议安装。否决 link/相对路径目录依赖——fleetly 的 `console:verify` 零漂移门禁在 CI 跑 install+build+test，相对路径在无 @lynxland/ui checkout 的环境必炸；tarball 进仓与该仓 dist 提交文化一致。代价：版本升级 = 重新 pack+commit 双仓手工同步（devtool 痛点 #1）。
-2. **int64 = "string"**：fleetly 生成链（protojson→swagger→openapi-typescript）已把 int64/uint64 钉死为 string，§5.2 双策略取 string 侧，无新决策空间。
-3. **URL 兼容 = 纯增量**：fleetly console 列表页现状**零 URL 参数**（过滤/分页全在 useState）——`q/page/size/sort` 是新键，无存量参数需要兼容解码或 redirect；§2.1.1 键名定案与存量 URL 的边界在本仓 = 空集。既有 `?tab=` 等参数不受影响。
-4. **token 方言 = 类级重写（拷贝适配）**：registry 块说 demo 的自研 token 方言（`text-muted/bg-panel/border-line/text-fg`…），消费方是 shadcn 全量 token。Tailwind v4 里 `--color-muted` 已被消费方 `bg-muted` 占用——**token 覆盖不可行，只能类名重写**（映射：`text-muted→text-muted-foreground`、`bg-panel→bg-card`、`bg-panel-2→bg-muted/50`、`border-line→border-border`、`divide-line→divide-border`、`text-fg→text-foreground`、`text-err→text-[var(--status-danger)]`）。这是拷贝制的机械适配步骤，映射表是 devtool 的第一个确定性需求。
-5. **基元方言缺口本地补**：块基于 demo 基元（Base UI 方言）；消费方 Radix 方言下 Button/Input/Card/Skeleton 名字兼容可直接用，唯一 compound 不匹配是 Select（demo=原生 select 包装、console=Radix compound）——在消费方 `components/fleet/ui/` 落一个原生 select 桥供块 import，不改块源。
-6. **四态文案自持**：块内 ErrorState 是 kind 分支文案（诚实、分状态），消费方另有 describeError 单源契约——拷贝制下消费方拥有副本可自持，试点保持块原样；四态节点的 override 槽（自定义 error/empty 节点）列为块 API 后续议题。
-7. **消费方守卫面天然不咬**：console 的反模式守卫（console.ui.antipattern.test.ts）扫描根为 domain/lib/features/hooks/routes/pages——`components/fleet/**` 与 `components/ui/**` 同为 vendored 层在面外；rule ⑦ 的 `@/components/ui` 精确匹配不咬 `@/components/ui/button` 子路径。无豁免改动。
-
-**痛点清单（devtool 需求雏形，实施后终版）**：
-① tarball 双仓手工同步：改 kit → pack → 拷 vendor → 删 store 目录重装 → 清 vite 缓存重启 dev（回路约 1 分钟，vite 不感知 file: tarball 内容变更——须 rm node_modules/.vite）；
-② token 方言类名映射表人工执行（§12.1-4，5 个块约 10 处类名）；
-③ 基元方言差异人工判别（Select compound 不匹配需本地桥；Button/Input/Card/Skeleton 名字兼容属运气）；
-④ `@/lib/utils` cn 别名 shim 需手工创建（消费方用 `cn` npm 包）；
-⑤ routeTree.gen.ts 加 validateSearch 后须重跑 `tsr generate` 才过 typecheck；
-⑥ 块从 `@tanstack/table-core` 导入 RowData——消费方只装了 react-table，需改主入口导入（registry 上游可直接修）；
-⑦ 块自带页壳（mx-auto max-w-5xl p-6）与页内 header 同消费方"壳/页头单源"架构法冲突——拷贝需结构剥离（上游改进项：块 shell-agnostic 化）；
-⑧ kit 发布 .ts 源码 = 消费方 noUnusedLocals/noUnusedParameters 严格度穿透检查 kit 源（见下 kit 修复 #1）。
-
-**试点挖出的 kit 真 bug（当批已修 + 补测）**：
-1. `CommandDescriptor<Input, Payload, ID>` 的 ID 类型参数体内未使用——消费方严格 flags 下 TS6133 直接阻断安装（demo 自身 tsconfig 较松未暴露）。修复：`__id?: ID` 类型线程锚（运行时无形状）。
-2. **`from` 契约文档错误 + navigate 语义分裂**：文档写 `Route.fullPath`，但 TanStack Router 的 `useSearch({from})` 按**路由 id** 匹配（pathless 布局 `_shell` 进 id 不进 path），`navigate({to:"."})` 又把 from 当**路径模板**解析——demo 顶层路由 id==path 掩盖了两者分裂；fleetly 嵌套+带参+pathless 路由下，fullPath 让 useSearch 炸 invariant、Route.id 让 navigate 产出 `/_shell/...` 假路径。修复：契约改为 **`Route.id`**（useSearch 用），navigate 去掉 from（`.` 对当前 match 真实路径解析，全形态正确）。
-3. **`patch({predicate: null})` 清除残留**：补丁不产 `q: undefined` 键，函数式 search `{...prev, ...patch}` 展开时旧 q 存活——FilterBar Clear 后 URL 残留 `?q=`。修复：清除时显式 `q/filter = undefined` + 单测锁行为（84 单测）。
-
-**行为对照验收（console 无 e2e 基建，stub API + 浏览器实测清单，2026-10-24 全过）**：
-① 列表渲染：25 apps / 首页 20 行 / 页头描述带项目名 ✓；② 快筛 `q=web-1` 进 URL、命中 10 行（web-10..19，name/id 字段集与旧页 fieldsOf 等价）✓；③ Clear 清 q 回 25 行 ✓；④ Next → `?size=20&page=2` push、Showing 21–25、后退回第 1 页（历史=分页栈）✓；⑤ 表头排序 asc/desc 进 URL、行序正确（web-01 ↔ web-25）✓；⑥ 深链 `q+sort+page+size` 重载全还原 ✓；⑦ 过滤空态与源空态两套文案 ✓；⑧ 行点击进 app 详情、后退回列表 ✓；⑨ 错误态（分状态诚实文案 + Retry 一等按钮；stub 停机→恢复实测）✓；⑩ 视觉：token 映射后与 console 暗色主题融合（截图核验：标题/表格/徽章/等宽 id/分页条无对比度问题）。**门禁**：console 153 测试（+6 新：protojson 收敛/空 scope/Bearer 头/错误信封/编解码往返/清除补丁）、tsc、build（dist 再生成）、console:verify 零漂移口径全绿。**新增 URL 能力（行为增量，非等价破坏）**：过滤/分页/排序/页大小全部可分享、可前进后退——旧页这四者全是 useState 本地态。
-
-**§12 路线第 5 步补记：metrics 页对照直迁（2026-10-24 完成）**：MetricChart 块拷入 console（该块零 kit import——recharts + shadcn chart 基元 + cn，token 映射同 §12.1-4 表）；`features/metrics/metric-chart.tsx` 重写为**页面投影 + 同名薄壳**——`toMetricSeries`（key=`s{下标}`、label 经 seriesIdentity 按全集频次判别同名副本）+ `serverCapOf`（truncated/series_total → 块 serverCap props），**seriesIdentity 留 console 侧**（§6.1 裁决兑现：base/replica 是业务词汇）；三个调用点（工作台/app metrics tab/databases metrics）props 零改动——投影薄壳是 v1 形 props 与块 props 之间的诚实边界。旧 console 的 10 条数据语义测试锚（零值缺省/时间轴对齐/脏点/s{index} 唯一/身份判别/活跃排序/截断披露）完整迁移到 `toMetricSeries ∘ buildMetricRows` 真实执行路径——**vendored 块的单测覆盖家在消费方**（registry 块不进 ui-kit 包，@lynxland/ui 侧只有 e2e 覆盖），此约定成文。行为差异记录：图内重复的 ChartLegend（旧实现渲染了两份图例）随迁移消去，"+N more" 文案由业务句（"stopped replicas…queryable in the workbench"）改为块的通用句——实体文案归页面/消费方的边界在此反向生效（块不认业务词；消费方如需业务句可自持薄壳覆写，本批接受通用句）。浏览器实测（stub 15 序列 fixture）：活跃窗排序/双副本判别尾/全零序列 0% 末值（W-B1 锚）/10 条渲染上限/+N more/服务端截断披露全部呈现。
-
-**分发形态演进（2026-10-24，npm 首发后）**：裁决 1 的 vendored tarball 是未发布期的过渡形态——@lynxland/ui-kit 0.1.1 公开发布后，console 已切 registry 依赖 `^0.1.1`（vendor/ 目录删除，CI install 不再依赖双仓同步，痛点 #1 随之消解）。发版纪律成文：**必须 `pnpm publish`**——`npm publish` 不解析 pnpm `catalog:` 协议，首发 0.1.0 依赖泄漏 `"effect": "catalog:default"` 不可安装（已 deprecate，净房 install 实证 EUNSUPPORTEDPROTOCOL）；publint + 净房 `npm install` 冒烟是发版门。可见性裁决：组织无付费计划，`publishConfig.access: public`（源码分发模型下 npm 包即源码公开，接受）。
-
-### 12.2 torchwood 批 A：路由换轨 + keyset 切片——实现期裁决（2026-10-24，取证先行）
-
-torchwood console 取证要点（裁决依据）：react-router-dom **v7** 集中式路由表（App.tsx 60+ 路由，React.lazy + RequireAuth/RequireRole 组件守卫 + RouteErrorBoundary key=pathname 技巧）；axios 管线（HttpOnly cookie 会话 + 401 单飞刷新 + `expired=1` 断路器 + **X-Torchwood-Project header 全局注入**（localStorage 单源）+ 全局错误 toast）；keyset 契约 = `Page<T>{rows, nextPageToken}` 空页停 token、换向回第一页（游标与方向耦合）、gateway 枚举名 `SORT_ORDER_ASC/DESC`、repeated 参数需 `key=a&key=b` 串行化；**token 栈在 useState（useServerPaging）——游标不进 URL，深链中栈不可用**（§2.1.1 已成文的边界即此现状）；Tailwind v3 + shadcn classic token（`text-muted-foreground/bg-card/border-border` 全有——token 映射对 torchwood 近恒等）；测试 74 条（vitest + testing-library，10 文件用 MemoryRouter）；无 e2e；dist 不进 git（仅 .gitkeep）。
-
-1. **路由迁移 = 一次性全量换轨 + 过渡兼容层**：TanStack Router **code-based 集中路由表**（src/router.ts 镜像现 App.tsx 表——路由路径形态零变化、lazy 经 `route.lazy()`），不做 file-based 改造（60+ 页文件搬家是纯搬运，收益归后续批）。页面层经 `src/router/compat.tsx` 过渡兼容层（Link/NavLink/useNavigate/useParams/useSearchParams/Outlet/Navigate/useLocation 的 TanStack 薄映射），页面文件只改 import 行（react-router-dom → @/router/compat）——机械可审、低风险；**react-router-dom 依赖移除 + eslint no-restricted-imports 禁回**（守卫执法）。后续批次随各页 @lynxland/ui 化逐页退 compat（页内改 Route.useParams/useSearch 原生形态），compat 层清空即退役——过渡层有始有终，不是永久拐杖。
-2. **守卫与错误边界映射**：RequireAuth/RequireRole 组件包裹 → TanStack `beforeLoad`（auth context + role 判定 + `throw redirect`）；RouteErrorBoundary 的 key=pathname 重置技巧 → TanStack 原生每路由 `errorComponent`（消费方 ErrorBoundary 组件保留，壳换挂法）。G8-1 路由级权限语义不变。
-3. **数据层切片（audit-logs 先行）**：适配器**复用 axios 管线**（拦截器栈是 torchwood 资产：cookie 刷新/断路器/scope header/toast——kit createHttp 的 onUnauthorized 闭环暂不接入，**接入是后续收敛批**，记挂账）；collection 适配 = `CollectionQuery.window.cursor → page_token`、`order.dir → SORT_ORDER_*`、`predicate → 白名单过滤参数`（action/status/actor_id/resource_id/created_after/created_before/include_platform/all_projects——§2.1.1 `filter=field:op:value` 与存量无冲突：该页现状过滤全在 useState 不进 URL）；`Page<T> → Segment{rows, nextCursor}`（next_page_token 缺席 = 到底；meta.total_count 存在但 keyset 语义不显示——leaderboards 型 total 并存的另一个实证，KeysetPagination 不吃它）。**游标进 URL 是新能力**（现状 token 栈组件态）。
-4. **int64/version = number**（§5.2 number 侧——version 比较是 torchwood 动机，本切片无 version 面）。
-5. **分发 = npm ^0.1.1**（已发布；pnpm 11.20 同样有 minimumReleaseAge 冷却，需 workspace exclude）。
-6. **作用域不接 scoped()**：X-Torchwood-Project header 是 torchwood 作用域单源（axios 拦截器全局注入 + useProjectScopeSync 双通道防乒乓），试点切片保持 header 单源——kit `scoped()` 的 ctx 注入随表单族批次评估（双头作用域是乒乓源）。
-7. **切片页面 = audit-logs**（useServerPaging 注释自指的"先例页"：七过滤 + 换向 + 页大小 + keyset）：fleet 块拷贝（ListPage/DataTable/KeysetPagination/states——token 近恒等映射，Select 复用 fleetly 同款原生 select 桥）；过滤 UI 保留页面自有形态（datetime-local/复选不在 FilterBar 面），谓词经 `filter=` 进 URL。
-
-**批 A 不做（挂账后续批）**：表单族/OCC（B 批）、ListenPanel → useSubscription（C 批）、analytics → MetricChart（D 批）、kit http 管线收敛、file-based 路由改造、compat 全退。
-
-**批 A 实现期偏离回写（2026-10-24 落地，两批提交：路由换轨 + keyset 切片；门禁 90/90 绿 + 浏览器对照通过）**：
-
-- **裁决 2 修订——守卫保留组件形态**：auth 是 React context（AuthProvider + useQuery），`beforeLoad` 无 React 上下文可用；RequireAuth/RequireRole 经 `guarded()/roleGuarded()` 工厂挂 `component`，错误兜底用原生 `errorComponent`（RouteErrorBoundary 组件保留、壳换挂法）。beforeLoad 化随 compat 退场批次做。lazy 同理保留 React.lazy + 根级 Suspense（未用 route.lazy()——裁决 1 的实现修订）。
-- **裁决 3 修订——Segment.total 显示而非丢弃**：audit-logs 网关附带 total_count；块侧按"有则显示总数、无则仅本页行数"降级（其余 torchwood 列表端点无 total）。比"一律不显示"更贴近存量页语义（旧页显示 共 N 条）。
-- **裁决 7 修订——Select 保留 radix**：torchwood token 近恒等（text-muted-foreground 等全有），KeysetPagination 的页大小切换直接用本仓 radix Select（未拷 fleetly 原生 select 桥）；ListPage 拷贝去页头（fleetly 先例——页头归 PageHeader）。
-- **keyset 适配落地形态**（src/fleet/auditLogs.ts）：axios 失败在消费方适配器收敛为 ApiError 封闭集（fleet/errors.ts 的 toApiError——拦截器资产保留，kit createHttp 后续收敛批接入）；scope 三态经伪字段 `filter=scope:eq:…` 表达、适配器展开布尔参数；datetime 过滤 URL 存**绝对时刻**（页面边界按管理员时区做墙钟↔绝对换算，跨时区链接同窗）；schema **不设 defaultOrder**——排序三态 none/asc/desc 要能落回服务端默认序，defaultOrder 会把"无排序"钉死在 desc。
-- **TanStack 方言实测**（compat 层与测试已消化）：splat 是 `/$` 不是 `/*`（TestRouter 带 normalizeTestPath 双方言归一）；RouterProvider 首提交异步——jsdom 测试渲染后需 `await act(async () => {})` 冲刷；useOutletContext/useParams 非其导出——前者经 React context 自实现，后者经 useRouterState 合并 matches。
-- **URL 数组方言**：TanStack 默认序列化把数组值 JSON 编码（`filter=%5B%22action%3Aeq%3AX%22%5D`）——与默认解析往返自洽，消费方断言应读解析后的 search 对象而非原始 query 串。
-
-### 12.3 torchwood 批 B：命令族/表单族——api-keys 切片裁决（2026-10-25，取证先行）
-
-取证要点：torchwood console **无表单库**（全手写 useState 受控表单）；命令流 = useMutation + queryClient.invalidateQueries(["api-keys", …]) + sonner toast（axios 拦截器全局错误 toast，`__skipToast` 可豁免）；api-keys 三页 = 列表（行删/批量删/enabled 过滤）+ 新建（name + scope 词表勾选/通配/手输 + **secret 一次性显示**）+ 详情（编辑对话框 diff 提交 + 轮换双 Key 引导）；**无 version 面**。OCC 真实面在 databases documents（version 必填）与 runtime-vars（etag）。
-
-1. **表单栈 = 引入 TanStack Form**（torchwood 首个表单库，kit peer ≥1.30）：新表单走 useCommandForm/裸 TanStack Form + Form/Fields 块；存量 useState 表单并存，逐页换轨（与批 A compat 层同节奏——有始有终）。
-2. **命令资源化**（api-keys 首个 commands 资源）：`create/update/remove` 三命令挂 defineResource；结果两分映射 = HTTP 400→`rejected{code,message}`（gateway 错误体 {error:{code,message}}；**fieldErrors 形状未实证，先不映射**——挂账 B2）、409→`conflict`、其余经批 A 的 toApiError 收敛缝 throw ApiError；delete 已删→幂等 ok（treatAs not-found）。
-3. **toast 单源 = onSettled**：命令调用一律 `__skipToast: true`（拦截器全局 toast 让位）——ok → toast.success（消费方文案）；结果分支（rejected/conflict）→ Form 块结果盒（message-first，不 toast）；失败（ApiError）→ toast.error(describeApiError)。双 toast 是接入反模式，裁决在先。
-4. **失效桥接（过渡期双轨）**：kit invalidationPredicate 有 isKindedQueryKey 守卫（只失效 "collection/record/batch" 前缀键）——存量 `["api-keys", …]` 键在 onSettled 手动 invalidate（页面知道两个世界，桥在页面）。api-keys **列表骨架不动**（ResourceListPage + useServerPaging + 页内搜索/批量选择）：kit DataTable 行选择尚无（v9 atoms 挂账），列表换轨等选择支持。
-5. **reveal 概念正名**：create 的 secret 一次性显示 = useCommandForm.reveal（ok payload、卸载即弃、不进 Query 缓存）——API key secret 是 reveal 的原生案例（kit §5.4 预言兑现）。
-6. **proto3 optional diff 语义归 descriptor**：update 表单值 = 展示形（含 datetime-local），descriptor 工厂闭包原实体快照（`editApiKeyDescriptor(key)`），run 内做字段 diff 只传变更；tz 换算在**字段边界**（字段值存 ISO，input 渲染/写入时按管理员时区墙钟↔绝对换算）——descriptor 无时区依赖，URL/表单值可分享。
-7. **块拷贝范围 = Form/TextField/SelectField**（token 映射同批 A 表）；**ConfirmDialog/DeleteButton 不拷**：torchwood 有 radix confirm 既有约定（RowDeleteButton/DeleteButton/BulkDeleteButton），命令接线在 onConfirm，确认壳留存量——块的 minimal overlay 形态是 demo 方言。
-8. **批量删除与轮换保持直调**：批量 = N 命令聚合（Promise.allSettled 汇总文案），非 useCommand 面；轮换 = useCommand×2（create + expireOld），双 Key 引导 UI 不变。
-9. **OCC 挂账 B2**：本切片无 version 面；databases documents（version 必填）或 runtime-vars（etag）做 B2 切片时一并裁决 fieldErrors 形状与 conflict 分支的真实路径。
-
-**批 B 不做（挂账）**：列表骨架 fleet 化（等行选择）、ListenPanel → useSubscription（C 批）、analytics → MetricChart（D 批）、kit http 管线收敛、compat 逐页退场、OCC（B2）。
-
-**批 B 实现期回写（2026-10-25 落地，门禁 105/105 + 浏览器对照通过）**：
-
-- **Resource.commands 可选类型面**：消费方按 demo 先例 `commands!` + 模块级提升句柄（createApiKeyCommand/removeApiKeyCommand）；treatAs 字面量需 `as const`（status: "ok" 否则推断 string）。
-- **TanStack Form 方言三则**：① required 校验器需同时挂 onChange（即时反馈）+ onSubmit（兜住"从未输入直接提交"），双注册会在 meta.errors 产生重复条目——FieldErrors 渲染去重；② 跨字段联动（wildcard 禁用词表勾选）必须 form.Subscribe——目标字段子树独立订阅，直读 form.state.values 在对方翻转时不重渲染；③ FormPageWrapper 类"onSubmit 形外壳 + 自渲染 footer"与 Form 内芯互斥（内芯持有 submit），整页表单换壳不换芯。
-- **radix Dialog 退出动画残留**：关闭后 data-state=closed 的 Presence 可长期滞留 DOM（等 exit animationend）——既有壳行为非切片引入，elementFromPoint 证不挡交互；jsdom 断言用 queryByRole 即可（radix 在 jsdom 立即卸载）。
-- **TanStack 测试方言补一条（切片复核时发现）**：命令 onSettled 内 `navigate` 的目标路由未注册进 TestRouter harness 时，not-found rejection 的落点随并行时序漂移——单文件稳定、全套 4 轮 1 次失败，每轮均有 notFoundError stderr 佐证；harness 须注册导航目标路由（torchwood bf34dc99 修复，修后 stderr 归零、全套 2 轮 + 单文件 3 轮 105/105）。
-- **浏览器实证**：新建 reveal 一次性 secret、编辑 diff（仅传 name）+ 桥接失效刷新、删除后存量列表实时更新（手动桥生效）。
-
-### 12.4 torchwood 批 C：订阅族——ListenPanel 切片裁决（2026-10-25，取证先行）
-
-取证要点：torchwood `/v1/realtime` 是**握手式 WebSocket**（非 fetch 流）——cookie 鉴权（HttpOnly TORCHWOOD_session_console，无 access_token 面），open 后 `hello{project_id}` → `hello_ok{connection_id}` → `subscribe{id:"c1", channel}`，服务端 30s ping/客户端 pong，事件帧 `event{channel, payload}`；断线（15m 到期 close 1008 token_expired 或任意 onclose）→ 先 `/v1/console/auth` refresh 续 cookie → 重开重订（**不补历史**），refresh 失败 → disconnected + 「已断开，点击重连」手动重连；现状**无退避重试、无游标/续订语义、无服务端终态**（流永续）。ListenPanel = CollectionLayout 的 listen tab，Outlet context 给 dbId/collId，事件表 100 条封顶。kit 侧对照：`Transport.beforeReconnect` 与 `SubscriptionHandle.restart` 的注释**明写 torchwood realtime 是预定落点**（kernel types.ts「先 refresh 再重订」/ 引擎「torchwood 手动重连」）——映射是契约设计时预对的。
-
-1. **transport = 消费方自建薄 wsTransport**（非 ndjson/sse 复用）：握手协议与双向 ping/pong 无法落 fetch 流族，正中 kernel「帧方言归消费方适配器」的分工。分层对齐批 A：`api/realtime.ts` 收敛为纯协议件（URL、ListenWebSocket 注入口、帧构造/解析），kit 面 `Transport<EventFrame>` + descriptor 落 `src/fleet/realtime.ts`；现 `startCollectionListener`（自带重连环）被引擎整体取代——删除，重连/退避/refresh 编排一律归引擎，消费方不再手写监听状态机。
-2. **重连语义映射**：一切非用户 onclose → 迭代器抛 `{kind:"network"}`（可重试中断）→ 引擎退避 → `beforeReconnect = refreshSession` → 重开重订；退避预算耗尽 → stalled。close 1008 token_expired **不映射 auth 终态**——首遇即终态会杀死 15m 正常续期路径（refresh 只活在 beforeReconnect，终态分诊先于它）。refresh 失败不阻断重订（引擎既定语义）：死会话多跑 ≤N 轮退避后 stalled，UX 等价（同落「已断开+手动重连」），多付出有界探测；顺带换来瞬时 refresh 抖动不杀监听。手动重连 = `sub.restart()`（先开后刷，会话已死时多一拍退避）——kit 注释预定语义，接受。
-3. **退避与缓冲**：`backoffMs = [500,1000,2000,4000]`（试听面板量级，~7.5s 到 stalled）；`buffer = 100`（= 现 MAX_EVENTS，环形缓冲丢最旧即现状 slice 语义）。
-4. **descriptor = 裸 SubscriptionDescriptor**（demo eventsStream 同款先例，不挂 Resource——collections 资源化不在本批）：`params={dbId, collId}`、`scope={projectId}`（hello 的 project 绑定就是作用域概念本体）、policy 声明在 descriptor（运行时判别）；`cursor: null`（活尾即开）、无 getCursor（无续订语义，重连即活尾重订）。projectId 未就绪（null）→ open 返回待命迭代器（首 next() 挂起至 abort），状态停留「连接中」——对齐现状 `if (!projectId) return` 的守卫。
-5. **帧方言**：`ListenEvent → EventFrame{channel, payload, at, seq}`——`at`=到达时刻（transport 内 new Date()，同现状）；`seq`=transport 闭包内**跨重连单调递增**的到达序（transport 实例跨引擎重试复用），作 EventFeed 的 getKey——无 backlog 不补历史，去重即到达恒等。
-6. **块拷贝 = EventFeed 单块**（LogViewer 不拷——日志族是 fleetly 面，torchwood 试听是事件面）：token 映射同批 A 表 + **warn→amber 系**（torchwood 无 warn token，`border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400` 是仓库既有 warn 惯例）；demo Badge `tone` → shadcn `variant`+className（ok→default、err→destructive、warn→secondary+amber 字色）；**文案中文化**（批 B form.tsx 先例，vendored 头注明差异）。页面投影：render 槽 = 时间（formatTimeOnly+管理员时区）+ 事件名（payload.event）+ payload 摘要（120 字截断）；stalled 黄条的 resyncAction 槽 = 「已断开，点击重连」按钮（onClick=sub.restart）。
-7. **UI 形变接受**（批 A audit-logs 整页换 DataTable 同款先例）：Table 三列 → EventFeed 列表行；页级小页头（Radio 图标+「实时事件」+状态徽章）让位块自带页头（状态徽章+计数）；状态文案映射 live=已连接 / reconnecting=连接中… / stalled=已断开。**live 语义偏差知情接受**：引擎 live = open() 返回即置（ndjson 同款——迭代已启动≠握手完成），WS 握手窗口徽章短暂超前、黑洞网络下 live 持续到 TCP 超时——连接失败随即回 reconnecting/退避。暂停能力（块自带 paused 指示灯）本批不接页面按钮——现状无此交互，保持等价。
-8. **测试换轨**：MockWebSocket harness（stubGlobal）+ vi.mock api/auth 保留；行为锚三条不丢：① hello 绑 project_id（无 access_token）→ hello_ok 后订阅频道 → 事件呈现 → ping/pong；② close 1008 → refreshSession 调用 → 新 WS 重 hello+重订；③ refresh 持续失败 → 多轮退避后 stalled「已断开」→ 点击重连 → restart → 恢复。**真实计时器**（Effect sleep 与 vitest fake timers 不友好），首档 500ms 在 waitFor 预算内。stub 扩手写 RFC6455 最小 ws 服务端（`/v1/realtime` 握手+事件推送+1008 关闭控制端点）供浏览器对照。
-
-**批 C 不做（挂账）**：fleetly 订阅族（events/logs/wait 票据方言是另一套取证）、暂停/恢复交互接入（块能力已在）、analytics → MetricChart（D 批）、列表骨架 fleet 化、kit http 管线收敛、compat 逐页退场、OCC（B2）。
-
-**批 C 实现期回写（2026-10-25 落地，门禁 105/105 + 浏览器对照通过）**：
-
-- **closeReason 恒 "transport" 落成常量属性**：本方言无服务端终态（流永续，一切收流皆中断）——transport 的 closeReason 不再需要 let+getter 形态（ndjson/sse 因 isEnded/endEvent 会改写才用 getter），eslint prefer-const 顺水推舟。消费方 transport 的两种写法（恒值/可变）自此有对照样例。
-- **待命迭代器的 TS 方言**：projectId null 的"待命至 abort"分支 await 一个只 reject 的 Promise——TS 不因此收窄 null，需在 await 后补不可达 `return` 满足控制流分析（运行时死码）。
-- **vitest 计时方言**：stalled 全路径要走完 4 档真实退避（250+500+1000+2000=3.75s，Effect sleep 与 fake timers 不友好只能真实计时）——`it(name, { timeout: 20000 }, fn)` 选项形态（describe 第三参超时在 vitest 4 不可用）；测试驱动"死会话"循环 = 每个新 MockWebSocket 实例到达后手动 serverClose（mock 不会自行关闭，真实服务端才会）。
-- **引擎 refresh 语义实证**：refresh 按重试次数调用（每档退避后一次，beforeReconnect 落点），非按 close 次数——4 档退避 = 4 次 refresh + 5 个连接后 stalled；restart 立即重开不先 refresh（会话已死时多一拍退避再进 refresh 路径）。
-- **浏览器对照（stub 手写 RFC6455 最小服务端**：握手 sha1+掩码帧解析+close 帧状态码；控制端点 /stub/ws/{state,emit,expire}；vite 代理 `/v1` 需对象形态 + `ws: true` 才代理 WebSocket）：① hello 绑 proj-1 + 订阅 databases.app.collections.posts（服务端 state 佐证）；② 两条事件到达——最新在上、到达时刻按管理员时区（Asia/Shanghai）渲染、payload 120 字摘要；③ /stub/ws/expire（1008 token_expired）→ conn-2 重订 + 徽章回「已连接」+ 旧缓冲保留（不补历史）+ 新事件续达（3 条）；④ 视觉：浅色主题下徽章 default/行三段式/无溢出，amber 系未触发路径由 stalled 单测覆盖。StrictMode 双挂载幂等由服务端单连接佐证（首引擎 stop 干净）。
-- **EventFeed 本地扩展 emptyText**：空态业务句（「对该集合执行写操作后…」）归页面——块加 emptyText 槽而非把业务词写进块（边界正向改进，上游候选）。
-
-### 12.5 torchwood 批 B2：OCC——documents 切片裁决（2026-10-25，取证先行）
-
-取证要点：**OCC 真身 = documents version**（update/delete 必填 CAS，缺省→FailedPrecondition/DOCUMENT.VERSION_REQUIRED、显式 0→InvalidArgument/DOCUMENT.VERSION_INVALID、不匹配→FailedPrecondition/DOCUMENT.VERSION_CONFLICT；冲突时服务端在 gRPC status 的 ErrorInfo metadata 附 current_version 供免读回合并重试）。**runtime-vars 无 OCC 面**（UpdateRuntimeVarRequest 无版本前件——LWW 设计；etag 是 client SDK 读路径轮询 token "{epoch}:{revision}"（D2/D4/D10），console 仅展示）——§12.3 挂账"runtime-vars etag"以此取证关闭。**通道方言**：grpc-gateway 把 FailedPrecondition 映射 **HTTP 400**（非 409——409 是 AlreadyExists（自选 document_id 撞重复键）/Aborted（幂等键进行中））；HTTP 错误体 = `{error:{type, code: gRPC code 字符串, message, error_id, error_code: 枚举}}`——**ErrorInfo/BadRequest details（域码 reason、current_version、field_violations）在 HTTP 面被 errorBodyBuilder 丢弃**（Build 只透传 code/message/errorID，sharedv1.Error 无 details 字段）；message 格式恒为 `"DOMAIN.CODE: 文案[; field: description]"`——**域码判别的唯一可靠面 = message 前缀**。kit 侧：useCommand 结果两分（result/failure 通道）；useCommandForm.onSubmit 把 rejected.fieldErrors 回填 TanStack Form fields（v1 文档化路径）。
-
-1. **切片 = documents 单页族**（detail 编辑/删除 + new 创建 + 列表行删除的命令化）；runtime-vars 不动。列表骨架/批量操作留存量（批 B 裁决 4/8 同款——批量=N 命令聚合直调，不在本批）。
-2. **结果两分映射（documents 版）**：`400 + message 前缀 DOCUMENT.VERSION_CONFLICT → conflict`——**OCC 冲突才是 kit conflict 分支的 torchwood 真身（HTTP 409 反而不是：那是重复键/幂等进行中）**，conflict 文案 = 域码中文映射（"文档已被其他修改抢先提交（版本不匹配）……"）；400 其他 → rejected{code=域码前缀（机器判别面）, message=域码中文或网关原文}；409 → conflict（重复键中文）；其余 throw toApiError。域码中文映射表落 fleet/documents.ts（消费方文案权，批 B describeApiError 同层）。
-3. **version 前置守卫 = 客户端 rejected 而非 throw**：version 缺失/≤0 → rejected{code: "DOCUMENT.VERSION_REQUIRED", message: 中文}——已知分支不占失败通道（现状 mutationFn throw Error 的换轨形态）。
-4. **current_version 对 console 不可达 → conflict UX = 提示 +「刷新重载」**（invalidate 详情存量键 → refetch → 草稿按服务端态重建）。服务端 HTTP 面不透传 status details 是上游缺口（torchwood 仓 errorBodyBuilder），本批不改服务端——挂账上游（console 侧已按 message 前缀工作，details 透传后可升级为"取 current_version 一键合并重试"）。
-5. **fieldErrors 形状实证关闭（§12.3 挂账）**：服务端 HTTP 面无字段级机器载荷（violations 只在 message 文本内嵌 `; field: description`，不作解析面）——**服务端 fieldErrors 无数据源，不映射**；**首个真实 fieldErrors 来源 = 客户端提交收敛**（buildDocumentData 的 required 缺失/JSON 无效、increment 非整数——批 B"表单值=展示形，run 内收敛为提交形"同款落 descriptor.run）→ rejected{message, fieldErrors: {attrKey: 文案}}。
-6. **表单栈不换**：documents 表单是集合 schema 动态驱动（attributes 元数据 + JsonEditor string 值 + increments 增量区），TanStack Form 换轨是独立批（挂账）；本批 = useCommand + 既有 useState 壳，结果盒为页面局部组件（message-first + fieldErrors 经 DocumentFormFields 的 errors 槽渲染字段级红字）。api-keys 的静态字段表单（批 B）与 documents 的动态 schema 表单自此成为两种形态的对照样例。
-7. **treatAs 面**：delete 404 → treatAs not-found → ok 幂等（批 B 先例）；update 404 → throw（失败通道——update 404 语义 = 文档已被删，幂等 ok 不诚实）。
-8. **无表单容器命令的 toast 细化**：批 B"结果分支不 toast"裁决的适用面 = 表单结果盒场景；删除（页头按钮/列表行）无结果盒容器——rejected/conflict 不 toast 即丢失，裁决为 toast.error(域码中文)；failure 仍 toast.error(describeApiError)；ok 仍 toast.success。失效桥：存量 `["documents", dbId, collId]` 前缀 onSettled 手动 invalidate（批 B 同款）；不建 Resource（无 kit 查询面——裸 descriptor 工厂闭包路径参数，批 B editApiKeyDescriptor 先例）。
-9. **api/databases.ts 写函数加 config 透传**（ApiRequestConfig.__skipToast 通道——命令调用一律豁免全局错误 toast，批 B apiKeys 同款）。
-
-**批 B2 实现期回写（2026-10-25 落地，门禁 121/121 + 浏览器对照通过）**：
-
-- **remove 命令结果透传 bug（映射矩阵单测首跑抓获）**：run 内 `await runDocumentCommand(...)` 把返回值丢弃——OCC 冲突被吞成 ok。修法：`outcome.status === "ok" ? ok : outcome` 透传。void 载荷命令的 ok 映射习惯 = `CommandResult<null>` + `payload: null`（批 B 同款）。
-- **treatAs 分工实证**：映射层 404 一律 `throw toApiError(err)`（not-found ApiError）——幂等与否归 descriptor.treatAs（kernel runCommand 只拦截 ApiError；抛原始 axios 错误会绕过 treatAs 直达失败通道）。这正式坐实 treatAs 是"命令作者裁决"层而非"适配器裁决"层。
-- **vitest 方言一条：mockResolvedValue 不清调用计数**——页面测试 beforeEach 必须 `mockReset()` 后再设实现（否则 toHaveBeenCalledWith/次数断言跨测试累计漂移，本批三个测试同时"离奇"失败皆此）。
-- **浏览器实证**（stub documents 端点 version-CAS + /stub/doc-bump 模拟外部写者）：① 保存 ok → 只读重建 + 时间戳刷新；② 外部 bump 后以陈旧 version 保存 → 冲突盒（域码中文）+「刷新重载」→ fetchQuery fresh-read 草稿按服务端态重建、结果盒清空、保持编辑态；③ 重载基底上合并改名重存 → 成功回只读。**IAB 新坑：空值输入不可达**——`fill("")` 与 Backspace 均不改变受控输入值（非空 fill 正常）——required 空值路径以 jsdom 断言为准（fireEvent.change 真实事件语义覆盖且绿）。
-- **stub 方言**：中文 query 参数必须 `--data-urlencode`（裸 UTF-8 query 使 stub 的 `new URL()` 抛错 → node http 400 空响应，初判"端点失灵"实为编码问题）。
-- **Form 块第二处本地扩展 resultAction**：结果盒动作槽（冲突「刷新重载」）——与 emptyText 同模式记 vendored 头（上游候选）。页面侧 buildDocumentData/parseFieldValue 随提交收敛迁入 fleet/documents.ts（页面不再持协议知识）。
-
-### 12.6 torchwood 批 D：analytics → MetricChart 配方裁决（2026-10-25，取证先行）
-
-取证要点：torchwood analytics 三处图表全是手拼 recharts + **硬编码 hex 色**（#2563eb 蓝/#16a34a 绿/#e5e7eb 网格——浅色专属，无主题变量）；两处趋势折线（概览页 + 事件详情页）同构：2 序列（total 事件数/uv 活跃用户）、UTC 桶预格式化字符串做 x 轴、h-64；事件详情另有维度拆解 **BarChart（分类柱状，非时序）**；UserActivityPage 无图。依赖缺口：无 shadcn chart 基元（components/ui/chart.tsx）、无 `--chart-1..5` CSS 变量（index.css 无 .dark 段——暗色主题本身缺位）；recharts 3.10.1 已在。fleetly 直迁范式（§12.1 补记）：MetricChart 块（零 kit import）+ 页面投影薄壳 toMetricSeries + serverCapOf。
-
-1. **切片 = 两处趋势折线换 MetricChart**（概览页 + 事件详情页）；**维度拆解 BarChart 留存**——MetricChart 是时序多序列折线，分类柱状不在其面（块不越面），但其硬编码色顺带换 `var(--chart-1)`/主题网格色（暗色可用性一次性修正，结构不动）；**KpiCard → StatCard 挂账**（tone 的 ok/warn 色无 token + KPI 不是图表族——等列表骨架批或第二消费者再裁）；UserActivityPage 不涉及。
-2. **依赖缺口补齐**：shadcn chart 基元拷入 `components/ui/chart.tsx`（fleetly 同款 372 行，`cn` import 改 `@/lib/utils`——基元层非 fleet 块）；index.css `:root` 补 `--chart-1..5`（shadcn 默认色板；torchwood 无 .dark 段，暗色主题挂账不在本批）。
-3. **投影层 = `routes/analytics/metricChart.tsx` 页面侧薄壳**（fleetly features/metrics/metric-chart.tsx 同位法——analytics 是页面域，不进 fleet/）：`toTrendSeries(points): MetricSeries[]`——固定 2 序列、key 用语义名 total/uv（跨刷新稳定，非 fleetly 的 s{index}——那是动态序列列表的方言，固定序列直接语义名）、`t = Date.parse(bucket)`（UTC 毫秒，数值时间轴）、`v = num()`（int64 string 收敛）；`formatTick` = UTC 桶方言（复用 formatBucket——HOUR `mm-dd hh:00`/DAY `mm-dd`，页面吸收）；`formatValue` = toLocaleString。**timeseriesRows 退役**（预格式化 label 轴是旧方言；其测试锚随删，formatBucket 锚保留）。
-4. **全零窗口的业务空态保留页面级**：现页面"全零 → 业务空态文案（没人上报）"是业务口径判断，保留在页面外层 if；块哲学"全零=合法序列照画"不冲突——页面判"有上报"，块判"有样本"，两层各司其职。
-5. **块拷贝 = metric-chart.tsx**（vendored @0.1.1）：token 映射同批 A 表（border-line→border-border、text-muted→text-muted-foreground、text-fg→text-foreground）；文案中文化（窗口内无样本 / +N 条序列未显示 / 服务端截断披露句）；serverCap 面保留（本页无截断面不传——analytics timeseries 无该方言）。
-6. **测试锚**（vendored 块单测覆盖家在消费方，§12.1 约定）：toTrendSeries 投影锚新增（bucket→t 解析、total/unique_users 的 string→num 收敛、两序列 key/label、空 points→空序列）；shared.test.ts 的 timeseriesRows 锚随退役删除；buildMetricRows 的序列治理锚（排序/上限/零值缺省）由块源拷贝自带语义，消费方不重复锁（fleetly 先例锁的是投影层）。
-7. **stub 扩 analytics 端点**（浏览器对照）：/v1/server/analytics/overview + /timeseries（多桶 fixture，HOUR 桶 UTC 对齐）。
-
-**批 D 实现期回写（2026-10-25 落地，门禁 123/123 + 浏览器对照通过）**：
-
-- **react-refresh 约束拆出两份纯函数文件**：torchwood eslint 只许组件文件导出组件——`buildMetricRows` 从块拆至 `components/fleet/values/metric-rows.ts`（vendored 头注明拆分，语义与上游一致）；投影 `toTrendSeries` 并入 `routes/analytics/shared.ts`（与 formatBucket 同居——投影与刻度方言本是一对，react-refresh 约束反促成更诚实的归属）。投影锚落 shared.test.ts（替补 timeseriesRows 退役锚的原位）。
-- **chart 色变量方言**：torchwood token 体系是 HSL 三元组（tailwind.config 包 hsl()），但块经 `var(--chart-N)` 直用 presentation attribute——**三元组形态无效，须落完整色值**（`--chart-1: hsl(221 83% 53%)`）。chart-1/2 沿用旧图 hex（#2563eb/#16a34a）保视觉连续（蓝=事件数、绿=活跃用户）；presentation attribute 上的 var() 在现代 Chromium 走得通（SVG2 presentation attribute 按 CSS 声明解析）——线图实渲染佐证。
-- **`AnalyticsTimeseriesPoint.unique_users` 改可选**：protojson 零值省略方言——全零 UV 桶运行时缺席该键（服务端 proto3 标量零值不序列化），类型面如实化（投影层 num 收敛 0，stub fixture 专门造了一个缺席桶做对照锚）。
-- **浏览器实证**：DAY 视图双线渲染 + UTC 日刻度（10-19…10-25）+ y 轴整数千分位；HOUR 视图小时刻度（10-24 04:00…）+ raw 口径徽标 + uv 缺席桶收敛；事件详情趋势同构；视觉核验（蓝线峰值=字符串桶 "480" 收敛、主题协调、无重叠）。**stub 方言两条**：granularity 参数是枚举全名 `ANALYTICS_GRANULARITY_{HOUR,DAY}`（裸 "HOUR" 比对踩坑——初判"页面没重取"实为 stub 分支错）；**react-query 缓存会让错误响应粘住同 key**——修 stub 后须整页重载而非点选重试。
-- **存量缺陷观察（非本批引入，挂账）**：维度拆解 BarChart 的柱体序列在浏览器不渲染（SVG 有轴/网格无 recharts-bar 组）——二分验证与色改动无关（hex 色同样 0 path，换轨前后一致；拆解表格数据正常呈现，UX 可用）。挂账排查 recharts 3.10 + React 19 的 vertical Bar，或后续批统一换 shadcn chart 容器承载。
-- **环境坑**：后台 `pnpm dev` 的 wrapper 进程会被会话收割（SIGTERM 143，vite 子进程连带死）——dev server 须以 harness 后台任务形态跑；stub（纯 node）不受影响。
-
-### 12.7 devtool 实现——拷贝制适配的机械化（2026-10-25，裁决先行）
-
-§12.1 痛点清单实施终版。取证要点：registry 源 token 词表 18 形（text-muted ×45、border-line ×17、text-fg/text-err ×9、bg-panel ×9、bg-panel-2 ×7、warn/ok/accent 系 ×18、bg-line ×1…）；双 console 实证映射表已散落在各 vendored 头（fleetly §12.1-4 与 torchwood 批 A–D 头注释）——**devtool 第一步是把散落的实证映射表收拢为仓内单源**。registry-build 三态瑕疵：`@lynxland/ui-kit@workspace:*`（root devDeps 解析值）与模板 `@^0.1` 混入同列表 + `recharts@catalog:default`（pnpm catalog 协议泄漏——npm publish 0.1.0 事故同类）。
-
-1. **形态 = 仓内 CLI `scripts/devtool.mjs`**（零依赖 node 脚本，与 layer-check/registry-build/size-check 同文化）；**不做独立 npm 包**——消费方是本地双 console，open-code 源码可见即文档，包分发的版本管理成本 > 收益（tarball 痛点 #1 的教训反向适用：工具本身不分发，跟着 checkout 走）。
-2. **命令面 v1 = `list` / `profiles` / `copy`**；`diff`（上游块变更 vs 消费方副本的升级同步提示）挂账 v2——拷贝制核心循环是"拷贝 → 手工适配"，自动 diff 需先证明手工适配可稳定叠加。
-3. **profile = `scripts/profiles/<name>.json`**：`tokenMap`（类名→类名）+ `cnImport`（规范化目标）+ 可选 note。fleetly/torchwood 两条从两 console 实证 vendored 头提取落仓（差异实证：text-err 与 bg-panel-2 双 console 不同目标；warn/ok/accent 系**不设默认映射**——那是每块语境判断（torchwood amber/emerald、fleetly status vars），工具以警告面呈现而非假装可机械）。
-4. **token 引擎 = 词边界类名重写**：`(?<![\w-])token(?![\w-])`——`text-muted` 不得误伤 `text-muted-foreground`（连字符是 token 内部字符，边界须含它）。替换后面源再扫一遍源词表：仍出现的 = 未映射警告（列 token + 出现处）。registry 源不含 `-foreground` 形（demo 方言独占词表），无反向污染。
-5. **cn import 规范化 = `@/lib/utils`**：块源恒 `@/lib/utils`，fleetly 走已建 shim（src/lib/utils.ts 转发 cn npm——两世界单源）；torchwood 原生同路径。存量 fleetly 3 文件直 `import { cn } from "cn"` 是 shim 前形态，不回改（copy 默认不覆盖已存在文件）。
-6. **vendored 头生成**：既有格式自动化——`// vendored from @lynxland/uikit registry/<family>/<file> @<kitVersion>（<日期> <note>）` + 适配清单（tokenMap 已应用/cn 规范化）+ 手工步骤提示区（未映射 token、检测到的 `tone=`（Badge 方言面）、`@/components/ui/chart`（需随批拷基元））。kitVersion 从 packages/core/package.json 读。
-7. **判断题不自动化**：Badge tone→variant、文案中文化、结构剥离（页壳）、Select 桥——工具把机械面吃掉、把判断题显式列出来（警告即交接单）。痛点 ⑤（tsr generate）⑥（table-core 主入口——上游可直接修，另行处理）⑦（shell-agnostic 化）⑧（严格度穿透——已修）不在本工具面。
-8. **registry-build 瑕疵修复（三态）**：`blockDependencies` 排除 `@lynxland/ui-kit`（core 依赖单源 = 硬编码 semver）；`catalog:` 协议解析——读 pnpm-workspace.yaml catalogs 还原真 semver（recharts ^3.10.1）；解析不到硬错（协议泄漏必须在构建期爆，不能流到 registry.json）。
-9. **测试 = `node --test scripts/devtool.test.mjs`**（scripts 层非 workspace 包，无 vitest 面；node 24 内建 runner 零配置）：token 引擎矩阵（边界/误伤/未映射警告）、头生成、依赖提示、profile 完备性（两 profile 对源词表的覆盖面 = 警告面断言）、registry-build 依赖收敛。`pnpm check` 链入 `test:devtool`。
-
-**devtool 实现期回写（2026-10-25 落地，`pnpm check` 全绿 + 真实块干跑对照通过）**：
-
-- **生成头与手工版逐条对应**（干跑 event-feed 对照明证）：工具产出的头 = 机械区（token 映射清单 + cn 规范化）自动化 + 手工区（未映射 warn 系 ×N、Badge tone= 检测）逐条列出——正是批 A–D 各 vendored 头里人写的那两段。工具没有发明新格式，它把既有实践单源化。
-- **词边界方言两处坑（测试矩阵锁住）**：① 连字符是 token 内部字符——`(?<![\w-])…(?![\w-])` 否则 `text-muted` 误伤 `text-muted-foreground`（词边界 `\b` 因 `-` 属非词字符而失效）；② 映射目标（如 torchwood 的 `bg-muted`）不得误报未映射——**未映射扫描用源词表枚举正则而非生成式模式**（`(text|bg|…)-(muted|…)` 生成式会把合法目标 `bg-muted` 当方言）。
-- **头注释是映射文档不是代码**：端到端断言"输出不含源 token"须切代码体（首个 import 起）——头里 `text-muted→text-muted-foreground` 是合法的文档性出现。
-- **copy 默认拒绝覆盖**（--force 例外）：拷贝制的核心循环是"拷贝→手工适配"，重拷会静默抹掉手工层——升级同步走 diff（v2 挂账）而非盲覆盖。
-- **registry-build 修复实证**：依赖面收敛为 `@lynxland/ui-kit@^0.1` + `recharts@^3.10.1` 两项（此前 workspace:\* 与 catalog:default 混入）；catalog 解析不到时构建期硬错（协议泄漏不过夜）。
-- 痛点对照收束：②（token 映射表）✓ 工具化；③（基元方言）→ 检测提示（chart 基元/tone=）；④（cn shim）→ profile cnImport 规范化；①（tarball 同步）已被 npm 发版消解；⑤⑥⑦⑧ 维持原处置（上游可修/已修/判断题）。
-
-### 12.8 torchwood 可用性收口——BarChart 根因 + 全站扫查 + 合入 main（2026-10-25）
-
-目标"新 console 尽快可用"的收口批：修已知的用户可见缺陷 → 全站烟雾 → 合 main。
-
-- **BarChart 根因链（D 批挂账的存量缺陷收口）**：维度拆解柱体不渲染 = **recharts 3.10 Bar 入场动画管线在嵌入式 WebView 卡死**——`.recharts-bar-rectangle` 组挂载但 `Rectangle` 因动画未完成永不产出 path（源码定位：Rectangle 的 x/y/w/h 全 NaN/0 防御性返 null；动画态几何未就绪）。多变体二分实证：margin/网格/刻度/radius/Tooltip/容器（ResponsiveContainer 与 shadcn ChartContainer）/数据（真实与静态）逐一排除，**`isAnimationActive={false}` 是唯一决定变量**（关动画后两种数据均正常出柱）。修法与 MetricChart 块自身约定一致（动画/圆点全局关——上游设计"轮询刷新不闪烁"在此意外避坑）。**方法论教训两条**：① HMR 会僵死（编辑不触发更新、lazy chunk 供旧码）——二分实验中途须整页重载/重启 dev server，否则结论被陈旧 bundle 污染（本批一度"修复无效"实为测到旧码）；② vite dev 的 SPA base 下 `/console`（无尾斜杠）落 base 提示页——烟雾扫查的"空白页"先辨工件再定罪。
-- **全站烟雾扫查**：stub 补 13 个列表端点（各区 api 模块的响应键空集）+ 未知 GET 兜底回 `{}`；浏览器逐区导航 17 页（Dashboard/api-keys/databases/storage/functions/webhooks/runtime-vars/analytics/users/groups/orders/assets/subscriptions/leaderboards/projects/admins/audit-logs）——全部渲染无空白无错误边界（Dashboard 首扫 0 是 /console 无斜杠工件 + 冷编译 900ms 不够，加长等待/带斜杠后全过）。
-- **合入**：torchwood PR #2（feat/console-tanstack-migration → main，30 commits = 批 A–D + B2 + 修复），CI 双绿（Frontend lint+build 1m9s / Backend lint+test+build 8m29s），merge commit `117e4dce`。**新 console 自此在 main 可用**（部署走既有 CI 镜像 + 部署机手动 Redeploy 流程）。存量挂账不阻塞：compat 逐页退场、列表骨架 fleet 化、documents 表单换轨、服务端错误体 details 透传。
-
-### 12.9 torchwood 全量 ui-kit 收尾——总体裁决（2026-10-25，"全部完成"批）
-
-目标：剩余 16 域全部上 kit 绑定，compat 退役，console 全程可用。分支 feat/console-uikit-completion（自 main 117e4dce 拉）。取证定量：legacy 列表栈（ResourceListPage + useServerPaging）16 页，数据面统一 Page<T>{rows, nextPageToken} 方言（与批 A audit-logs 同构）；compat 导入面 31 文件（Link 17/useParams 16/useNavigate 12/useLocation 5/Outlet 4/NavLink 4/useSearchParams 3/Navigate 2/useOutletContext 1 + TestRouter）；手写表单域 runtime-vars/webhooks/projects settings/databases collections/subscriptions/admins。
-
-1. **阶段顺序 = 风险从低到高**：① 列表族 fleet 化（16 域，行为等价 + URL 分页增量）→ ② 写路径命令化 + 表单族 → ③ Dashboard/杂项 → ④ compat 残余清空 → ⑤ kit http 收敛。每阶段门禁全绿再进。
-2. **列表族范式（批 A playbook 复用，行为等价基线）**：每域 fleet/<domain>.ts = collectionQuerySchema（defaultSize 沿用现页大小）+ defineResource（collection 适配器：Page<T>→Segment，谓词白名单 = 该域真实服务端过滤参数）+ 路由 validateSearch + 页面 useCollection{from: Route 路径, scope:{projectId}} + ListPage/DataTable/KeysetPagination。**页内当前页搜索保持本地态**（legacy 即此语义，不假装服务端化）；既有服务端过滤（如 api-keys enabled）进 URL 谓词。游标/页大小进 URL = 行为增量（批 A 同款）。
-3. **DataTable 行选择 = 受控扩展**（vendored 副本本地扩展，上游候选）：`selection?: { selectedIds: ReadonlySet<string>; onToggle(id); onToggleAll(visibleIds); isRowSelectable? }`——选择态归页面（批量动作是业务编排），块只渲染复选列并上报。api-keys 列表先行样板（行删/批量删/enabled 过滤全接线），随后并行铺开。
-4. **写路径与表单**：一切写经 useCommand（结果两分 + __skipToast + 失效桥接——B2 映射层复用/复制）；静态字段表单上 useCommandForm（TanStack Form），动态 schema 表单（documents 已决）保留 useState 壳 + useCommand。fieldErrors 依 B2 范式按域收敛进 descriptor。
-5. **compat 退场 = 随页自然退役 + 末班清残**：页面 fleet 化时该页 compat import 自然消亡（useCollection 页不再用 useSearchParams/useNavigate 形态）；阶段 ④ 处理残余共享件（Layout NavLink/PageHeader 等换 TanStack 原生 import + router 类型注册），TestRouter 迁独立测试件，compat.tsx 删除。
-6. **http 收敛（阶段 ⑤）**：kit createHttp 的 onUnauthorized 闭环与 torchwood axios 拦截器资产合并评估——若收益不抵风险（拦截器栈是稳定资产），裁决"保留 axios 管线为 torchwood 方言、kit http 收敛关闭"亦是合法终态，以实证定。
-7. **验收**：每域门禁（tsc/vitest/eslint/build）+ 抽页浏览器对照；终验收 = 全站扫查 + PR 合 main。测试锚：每域列表换轨保底 2 条（URL 游标往返 + 空态/错误态），写路径按 B2 矩阵。
-
-**§12.9 阶段回写（进行中，2026-10-25）**：
-
-- **阶段 1 落地**（820db9e6，143/143 绿 + 浏览器 9 页抽页）：16 域 + analytics 事件字典全部 useCollection 化。四组并行子代理 + router.tsx 集中接线（16 条 validateSearch）的协作形态成立——关键在 router 接线归主会话单点、代理按变量名报路由定位（行号在并行下必漂）。**DataTable 行选择受控面**（选择态归页面）+ **行点击挡交互元素冒泡**（操作按钮误触行导航——样板期实测抓获，块级语义修正）。**useInfiniteQuery 加载更多 → keyset 分页**（analytics 事件字典）：事件字典量级小，行为等价（百条内单页即全量）。**account 偏好用例 15s 定向去抖**：radix Select 重交互在满载并行下贴 5s 默认线（三组独立取证：单跑恒绿、干净 HEAD 满载复现）——并行度上升是既成事实，定向放宽优于全局加时。
-- **阶段 2 落地**（66287264，157/157 绿）：三组并行（E storage/functions/webhooks/leaderboards、F admins/groups/users/account、G runtime-vars/subscriptions/databases 建删）+ 主会话（projects settings 七写路径 + Dashboard collectionQueryOptions 资源化）。**范式收敛点**：runCommandMapped 逐文件复制（不共享——各域错误体微差留给域内，避免共享工具的虚假抽象）；提交形收敛一律进 run（五类型 oneof/ID 派生/grace_days/maxUses/scopes 多行文本——apiKeys mergeScopes 先例的批量复制）；子资源/动作类不挂集合（裸 descriptor + invalidates 声明）。**runtime-vars 取证兑现**：UpdateVarSet 无写前件（LWW）——无 OCC 守卫，§12.5 结论在写路径落地时直接适用。
-- **阶段 5 裁决（http 收敛关闭）**：取证 torchwood axios client.ts（132 行）四件资产 = X-Torchwood-Project 头注入（localStorage 单源）/401 单飞刷新+重试+expired=1 重定向/全局错误 toast（__skipToast 豁免）/cookie 会话；kit createHttp 的可收敛面（401 闭环语义 + ApiError 映射）已在全部 fleet 适配器经 toApiError 边界收敛达成，而四件资产全是消费方政策（kit 无对应面）。**裁决：管线本体不统一——axios 是 torchwood 的稳定方言资产，"收敛"的真实含义（类型化 ApiError 边界）已完成**。挂账关闭。
-
-**§12.9 终回写（2026-10-25 全量完成，PR torchwood#3）**：
-
-- **阶段 2 收尾（48e6b670）**：残留 17 处 useMutation 清零（webhooks redeliver/functions 触发器+客户端策略/资产建改删/订单退款履约/集合 schema 编辑器六动词/建项目）。归属判断先例固化：**实体 PATCH 挂 resource commands（client_policy 是 function 实体字段、refund/fulfill 是订单状态机）；子资源/动作类裸 descriptor（触发器三动词/轮换/redeliver）**。终态 useMutation 仅剩 leaderboards 条目 lookup（GET 读检索伪装 mutation——刻意保留并成文）。
-- **阶段 4 compat 退役（ab3b59ef，51 文件）**：模板串 Link/navigate → `to="$param" params={{…}}` 参数形（路由参数表映射脚本；带 query 的模板 → `search={{…}}` 形）；`useParams({strict:false})` 替合并面；**TanStack v1 无 NavLink/useSearchParams**——前者落 app 级 `router/nav-link.tsx`（激活态链接是 UI 模式非兼容层），后者三消费面分别原生化（Login 旗标读注意 **TanStack 默认解析把 "1" 变数字——String() 归一**；assets owner 读写 useSearch+navigate 函数式；useListParams 整体重写为 search 对象投影）。Outlet context 形态落 `router/outlet-context.{ts,tsx}`（context+hook 居 .ts 过 react-refresh 约束）；TestRouter 迁 `test-utils/`。**测试方言**：LocationProbe 类探针 `pathname + search` 会因 search 对象炸整树（Cannot convert object to primitive）——探针须回拼查询串。
-- **协作形态总结**：本批 8 个子代理（列表四组 + 写路径三组 + 收尾一组）+ 主会话（样板/接线/集成/阶段 3/阶段 4）。**样板先行 + router 集中单点 + 按变量名报路由定位**是并行不冲突的三支柱；每代理域内门禁全绿 + 主会话集成门禁复核，全套测试 124→164（+41 锚）。
-- **验收**：门禁全绿（tsc 0/vitest 164/eslint 0 error/build 过）+ 浏览器全站 22 页扫查全渲染 + 导航抽检（行点击 $id 详情/typed Link/带 query 跳转）全通。**冷启动时序假阴性两次教训**：dev server 刚起时首访页冷编译 >1.1s 窗口——扫查判定前须加长等待或复测。
-- **torchwood ui-kit 改造至此全量完成**：读（useCollection 16 域 + collectionQueryOptions）/写（useCommand 全量 + useCommandForm api-keys/documents）/听（useSubscription）/块（List/DataTable/KeysetPagination/Form/Fields/EventFeed/MetricChart/StatCard/states）四族绑定全覆盖，compat 零残留。遗留存量（非 kit 面）：ResourceListPage 子视图族（assets 用户资产/storage 文件列表/groups 成员——useListParams 原生重写后仍可用，等第二个消费者再裁去留）。
-
-**§12.10 品牌退役：fleet-ui → @lynxland/ui（2026-10-25）**：
-
-- **根包更名**：`fleet-ui` → `@lynxland/ui`（private 根；lockfile 不记录根 importer 名，零感知）。fleet-ui 品牌全量退役，逐面清单：库错误前缀 `@lynxland/ui-kit:`（8 处——报错归属精确到包）；Standard Schema v1 `vendor: "@lynxland/ui-kit"`（vendor=实现方身份标识，不进 URL 线格式，纯类型/诊断面）；kernel 概念名 `isFleetKey`→`isKindedQueryKey`、`FLEET_KINDS`→`QUERY_KINDS`（kernel 零品牌指涉，命名政策兑现）；vendored 头来源标识 `// vendored from @lynxland/ui …`（devtool 与其测试同步）；AppShell brand 缺省 + demo 标题；对照表库自称 fleet → kit（§13/§14/SKILL）。
-- **vendoring target 更名**：`components/fleet/<family>/` → `components/lynx/<family>/`（registry-build 重生成 29 块，devtool copy 落点与测试同步）。选 lynx 不选 ui——避撞消费方 shadcn `components/ui/` 基元目录。
-- **消费方迁移挂账**：torchwood 存量 `components/fleet/**`（16 域块 + `components/fleet/ui/` Select 桥）与 `src/fleet/**`（每域 `fleet/<domain>.ts` 适配器、errors/documents/realtime）需一次性 git mv + import 重写（机械批）；旧 vendored 头注释保留为历史事实不改写。下次 copy 前完成，否则新旧两目录并存。
-- **历史段落保留时序事实**：§12 各阶段回写中的 `components/fleet/`、`src/fleet/`、`fleet 化` 字样记录当时消费方仓实况，不回改——本条即分界线。
-
----
-
-## 13. 集中反模式清单（进 SKILL.md）
-
-1. 禁给 DataTable/块传 url/resource——块不自带数据获取，只消费绑定输出。
-2. 禁 useState 存分页/过滤/排序状态——URL 即真相（竞品训练反射是反的）。
-3. 禁渲染期 navigate——setter 走事件/middleware（§2.1.1 写入契约）。
-4. 禁 try/catch 或 onError 处理 rejected——它是返回值不是异常；失败才走 error 通道。
-5. 禁帧到达就 invalidateQueries 当实时（refine liveMode 反射）——那是 invalidateOnFrame 组合，按需用。
-6. 禁用 Zod 写 search schema（Effect Schema 单源）；禁给块用 Radix 路径（Base UI 方言）。
-7. 禁页面层 catch 401 跳登录——全局闭环已接三通道。
-8. 禁乐观更新/undo 后关窗——C 类拒签项，默认同步等待。
-9. 禁绕过绑定直连 fetch（Resource/http 管线之外）。
-10. 禁造 CustomPage/页面登记机制——自定义页面就是普通文件路由。
-11. 禁把 Resource 当 react-admin 的 `<Resource>`（路由注册）——纯数据契约，路由自己写。
-12. 禁裸 `window.confirm` / 原生 dialog / 手拼分页条（用 ConfirmDialog / Pagination 块）。
-
----
-
-## 14. 幻觉诱饵对照表（进 SKILL.md）
-
-| 危险对（训练数据习惯 → 正确姿势）                                                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| react-admin/refine `<Resource name list create>`（路由注册）→ kit Resource = 纯数据契约，路由自己写                                                  |
-| dataProvider `getList({pagination:{page,perPage},sort,filter})` → CollectionQuery `{predicate, order, window}`                                         |
-| **refine `useSubscription(channel, params, onEvent)`（帧→失效回调）→ kit `useSubscription(descriptor)` 返回帧缓冲+状态机（完全同名不同义——最危险）** |
-| refine useTable/useList（tableProps、pagination.current）→ useCollection 返回 list 句柄（window.size）                                                 |
-| refine useForm（record 加载+保存一体）→ useCommandForm 只管命令提交，initialValues 另配 useRecord                                                      |
-| Zod（validateSearch 训练默认）→ Effect Schema（经 toSearchSchema 包装）                                                                                |
-| Radix 系 shadcn → Base UI 方言                                                                                                                         |
-| react-admin useNotify / notificationProvider → 无内置 toast，onSettled + sonner                                                                        |
-| Relay pageInfo/endCursor → Segment{rows, total?, nextCursor?}                                                                                          |
-
----
-
-## 附录 A：决策日志（十轮迭代 + 审查裁决）
-
-| #   | 裁决                                                                                                  | 依据                         |
-| --- | ----------------------------------------------------------------------------------------------------- | ---------------------------- |
-| 1   | 不借用旧项目概念设计，从零推演                                                                        | 旧项目五死因                 |
-| 2   | 分页降级为 window 字段、客户端求值为派生适配器                                                        | 求值策略非元概念             |
-| 3   | Effect 采纳 L1（缝隙派）                                                                              | 三缝收益 vs 页面零接触边界   |
-| 4   | View 溶解为 CollectionQuery；Source→Resource；Stream→Subscription                                     | 范畴错误修正 + 语域统一      |
-| 5   | 双 console 核对 8 修正                                                                                | 真实消费者证据               |
-| 6   | UI 五族 + 判据 + 配方非原型                                                                           | 双 console 组件收敛实证      |
-| 7   | 无 CustomPage                                                                                         | 框架不拥有页面类型系统       |
-| 8   | 竞品 A 类补齐                                                                                         | 交叉审核                     |
-| 9   | Resource 三原语可选；失败/结果两分；invalidates 声明；绑定原语语域                                    | 概念严格审计四修复           |
-| 10  | 设计文档先行 + 多视角审查 + 交叉审核                                                                  | 本流程                       |
-| 11  | 网络断层=typed failure 非 defect；not-found/forbidden 经 treatAs 裁决                                 | 概念审计×Effect 审查交叉命中 |
-| 12  | 命令/订阅泛型逐键推断；ResourceName branded；getId 可选；订阅允许裸 Transport                         | DX×概念审计交叉命中          |
-| 13  | QueryWindow/ResourceScope 改名；EventFeed 块名豁免记录                                                | 撞名政策自查                 |
-| 14  | search 写入契约（函数式/push-replace 纪律/职责单一归属）；"URL+默认值即真相"                          | Router 三暗规则              |
-| 15  | rejected→onSubmitAsync 返回（弃 setErrorMap）；onSettled+sonner；reveal 不进缓存                      | Form v1/v2 实测              |
-| 16  | 订阅引擎挪 /adapters（react 目录级禁 effect）；FrameSource 终态分诊；stalled 态；beforeReconnect 钩子 | 可实现性×Effect 交叉命中     |
-| 17  | leaderboards 定性修正；advance(window,segment,dir)；int64 双策略；raw-response/FormData 逃生口        | 源码对账                     |
-| 18  | 竞品 §8 重写（乐观更新矛盾/liveMode manual 校正/kit 诚实对照/useCollectionInfinite 升 A 类）          | 竞品审查                     |
-| 19  | effect ~4.0 tilde + 漂移矩阵 + bundle 预算；a11y 质量门                                               | Effect v4 unstable 事实      |
-| 20  | 集中反模式清单 + 幻觉诱饵表                                                                           | Agent 可用性审查             |
-
-## 附录 B：开放问题（draft-2 已全部裁决关闭）
-
-- **Q1 谓词/窗口序列化**：✅ 已定案（§2.1.1：`q` / `filter=field:op:value` 重复键 / `sort=field:dir` / `cursor` / `page` / `size`）。
-- **Q2 load-more**：✅ `useCollectionInfinite`（A 类升格；Segment.nextCursor 与 getNextPageParam 对齐；双向 prev 引擎原生）。
-- **Q3 prev 语义**：✅ advance(window, segment, dir) 返回 null = 不可算（keyset/leaderboards 走浏览器历史；offset 与客户端求值可算）。
-- **Q4 list 句柄**：✅ 块自建表 + list 稳定句柄协议（引用仅随 key/data/状态变；rows 直出缓存享结构共享；setter 全 stable 函数式 navigate）。
-- **Q5 scope 类型化**：✅ `ResourceScope` 松散 Record（不进 Resource 泛型——类型噪音大于收益；branded name 已保失效安全，附录 A#9 的"scope 非框架轴"维持）。
-- **Q6 表单映射**：✅ §5.4（onSubmitAsync 返回制；onSettled；重播；v2 监测）。
-- **Q7 FrameSource**：✅ AsyncIterable + closeReason 终态分诊 + AbortError 区分（§2.3）。
-- **Q8 registry 对齐**：块依赖 `@lynxland/uikit-core` 的 semver range 写进 registry item 的 dependencies（shadcn CLI 原生支持 npm range）。
-- **Q9 messages 通道**：MessagesProvider（context）+ 块级 props 覆盖（props > context > 内置英文缺省）——形状简单，实现期定稿即可，不再是阻塞项。
-- **Q10 mock 能力边界**：mockResource 需支持——延迟/失败注入（测试三态与闭环）、keyset/offset 双方言模拟（demo）、命令结果分支注入（rejected/conflict/ok+reveal）。实现期定稿验收。
-
-## 附录 C：A2/A3 审查与裁决记录（摘要）
-
-六个只读审查视角（概念审计 / React·TanStack DX / 双 Console 可实现性 / 竞品对标 / Agent 可用性 / Effect 集成），合计约 130 条发现（P0×13 / P1×42 / P2×75）。裁决结果：**采纳并修订约 110 条**（含全部 P0），合并/延后约 15 条（多为实现期细节，已并入附录 B 关闭项），拒签约 5 条（例如"EventFeed 改名 FrameFeed"——裁决保留 EventFeed 并修订政策为呈现层豁免记录；"kernel 用 _tag 替 kind"——裁决 kind 站边界、_tag 留缝里）。关键裁决已编入正文并在附录 A #11–#20 记录。交叉验证显著：网络断层通道矛盾（概念×Effect 双命中）、泛型擦除（概念×DX 双命中）、订阅引擎位置（可实现性×Effect 双命中）——独立审查者对同一要害的收敛是发现真实性的强证据。
-
-### 12.10 torchwood 迁移审查驱动批——摩擦量化 → kit 面优化 → 双仓采纳（2026-10-25）
-
-torchwood ui-kit 全量改造（§12.9）收尾后的消费侧审查：三轴并行扫查（fleet/ 适配层重复面 / vendored 块手工层 / kit API 契约摩擦）+ fleetly 交叉验证。摩擦量化结论与六项优化（用户裁决"按顺序 1～6 执行"）的实现期裁决：
-
-**审查量化（裁决依据）**：写路径错误映射层 ~700 行逐字复制（fleet/ 本体 19%）——16 份中 14 份语义全同、**2 份静默漂移**（projects/oauthProviders rejected 丢 code）、仅 documents 有真 OCC 方言：§12.9"逐文件复制因各域微差"的前提实证仅 1/16 成立，复制降级为单源。失效桥 92 处手动 invalidate（fleetly 试点即 23 处——跨消费方成立），根因 = kit `invalidationPredicate` 的 `isFleetKey` 守卫只认自家键形。scope 三层重复 108 处（78 字面量 + 16 enabled + 14 适配器守卫）+ canonicalScope 丢 undefined 的同键污染面。谓词胶水 5 份近似实现 + 三元归一化 ×8。vendored 手工层 ~250 行（盲 --force 重拷 = 4 处编译失败 + 3 处静默回退）。`commands!` ×70、from 魔法串 ×19。
-
-**① 错误映射单源化（torchwood ca2de308）**：gatewayErrorBody/gatewayMessage/runCommandMapped 收敛 fleet/errors.ts 单源（documents OCC 变体挂共享基件）+ skipToast 常量进 api/client——净 -655 行，漂移随修复。
-**①B mapFailure 裁决（拒）**：不为结果两分映射在 CommandDescriptor 上加第二声明面——错误体方言归消费方适配器（§12.9 http 收敛裁决同源），treatAs 已是协议层状态的唯一声明面，再加 mapFailure 绕过 toApiError 收敛缝与失败通道类型 = 概念税。单源共享层已消重，kit 面不加。
-**② legacyKeys 失效桥**：CommandDescriptor/ResourceSpec 声明 `legacyKeys: (scope) => 前缀键[]`，defineResource 注入（descriptor 自带优先，同 `__resource` 模式），`invalidateAfterCommand` 单源编排（kit selector 相交 + legacy 前缀并行）——桥从页面 onSettled 手艺降为声明；torchwood 92 处全数退役（直调批量路径保留 kit 键失效经命令式面复用）。
-**③ ResourceScopeProvider + 未就绪停用**：scope 线程的 Context 单源；**0.2.0 的无条件 context 缺省是缺陷**（平台资源 admins/projects 会被项目 scope 污染 queryKey、失效相交 miss）——0.2.1 修正为**声明采纳**：spec.scope（命令/订阅经注入的 `__scopeKeys`）= 参与 scope 线程的开关；资源声明 scope 键而值未就绪 ⇒ 查询自动停用（enabled 强制 fail-safe，"未就绪空段"污染面关闭）。测试环境镜像：TestRouter 挂 Provider（缺省 {projectId:"p1"} 对齐 useAuth mock 惯例）。demo 活文档页 /scope-provider + e2e（keepPrevious 冻结语义的文档化：停用不清屏、保留上一帧）。
-**④ 谓词纯函数层**：schema/filters 导出 filterLeaves/filterValues/predicateOf/eqFilter——FilterBar 变薄壳；torchwood 5 份 filtersOf 与 8 处三元归一化收敛。
-**⑤ registry 上游回流**：DataTable selection 受控面+行点击挡冒泡+RowData 主入口；KeysetPagination 首页 Prev 禁用（上游 bug：历史 back 离开本页）+ total 降级 + pageSizeOptions/labels 注入（**页大小控件改原生 select——Select 基元方言耦合解除**，fields 先例）；EventFeed emptyText/title/statusLabels/labels；Form resultAction+submittingLabel/cancelLabel；TextField/SelectField required（**实咬：校验器须按文案缓存标识**——每次渲染新建函数让 TanStack Field 判定 validators 变化重置字段状态，提交错误写入即被清）；ListPage 页头可选化（shell-agnostic）；states describeError；MetricChart labels；metric-rows 预拆（registry-build 支持 .ts 伴生多文件块，孤儿伴生构建期硬错）。profiles 补 bg-err/border-err 机械映射。手工层 250→~120 行（纯方言：中文 labels 注入、event-feed tone→variant/amber、eslint-disable、react-refresh 去重导出）。devtool copy 支持 `--dir`（消费方目录布局）与多文件块。
-**⑥ 小件**：defineResource 重载——commands 在 spec 出现 ⇒ 返回类型非可选（torchwood `commands!` 70→0）；`from` 类型化 spike **拒**（Register 不进 useSearch 泛型缺省，kit 上下文与 demo 注册上下文同为 string——保持 `from: string` + 契约文档）；/testing 子出口 renderWithFleet（Query+Router+Scope 三上下文一体接线；TanStack validateSearch 合并方言：schema 外键存活是真实行为非归一遗漏）。
-
-**发版**：0.2.0 + 0.2.1（`pnpm publish --no-git-checks` + publint + 净房冒烟；**npm staged 版本传播延迟**——publish 成功后版本在 registry 元数据可见≠可安装，约 1 分钟窗口，重发得 409 "Cannot publish over previously staged version"）。kit 依赖 CORE_RANGE 升 ^0.2（registry-build 单源）。
-
-**torchwood 采纳三批**（feat/console-uikit-completion；推送时 PR #3 已先行合并，本批经 **PR #4** 合入 main，CI 双绿）：A 样板（api-keys 域：legacyKeys/剥离/句柄挂载）→ B 三组并行铺开（宽前缀 legacyKeys 策略；嵌套 scope 保持显式全量——显式=替换语义；裸 descriptor 不采纳 context；invoke/redeliver 挂资源 + `invalidates: []` 显式保"不失效集合"原义；documents refetch 桥退役走缓存失效，fetchQuery fresh-read 刻意保留）→ C 六块 re-vendor + labels 注入（PAGINATION_ZH 单源 16 页、Form/ListenPanel/metricChart 中文注入）。门禁 165/165（+1 documents 失效行为锚）+ 浏览器对照（Provider 就绪门/labels 分页/total 降级「共 30 条 · 本页 30 条」/游标深链/页大小保游标）全过。
-
-**环境坑**：浏览器对照 stub 的三处方言——projects 端点是 `/v1/server/projects`（非 /v1/console）、列表响应是 protojson 键名（api_keys/audit_logs + meta）、auth 形状 `role:"owner"`（ROLE_* 不识别→平台守卫重定向 Dashboard 表现为"页面打不开"）；9080 端口会残留前会话 stub（空壳）——先辨尸再替换。隐藏窗格下 playwright 点击 actionability 超时（快照可见）——URL 直达/选择类操作替代点击验证。
-
-**残余挂账**：页面级三件套重复（shownList 投影 ×15/选择态 ×7/手绘过滤条 ×6——等第二消费者再裁块化）；域码中文表仍只有 documents 一域；states.tsx/sta-card 未 re-vendor（中文 describe 与 tone 方言留在副本，labels 面已备待用）；devtool diff/升级同步 v2 不变。
-
-**§12.10 余款批（同日续，"继续"指令）**：三件挂账的处置——
-- **states/list-page re-vendor 收尾**：上游 ListPage 增 describeError/errorTitle/retryLabel 透传（states 块 describeError 面的 ListPage 侧接通——错误态渲染在 ListPage 内嵌，states 副本六分支中文 describe 手工层由此退役）；torchwood states 副本纯上游化，list-page 方言层收敛为容器全宽 + 中文缺省三行。
-- **devtool diff v2 落地**（§12.7 挂账关闭）：`diff <family>/<name> | --all [--dir] [--check]`——token 映射与 vendored 头归一后行级 diff（LCS 纯函数 lineDiff/stripVendoredHeader + 测试矩阵），残余即手工层或上游更新；多文件块伴生随主块核对；本地新文件不计漂移。torchwood 真块干跑：9 块核对、6 漂移全部命中已知手工层（metric-chart react-refresh 方言 11 行/stat-card tone 14/data-table·fields eslint-disable 各 1/list-page 13/event-feed 17）、4 块 in-sync——升级同步从纯手工对照变为可机械核对，--check 可挂门禁。实现期自咬：diff hunk 折叠窗口以 end 为锚（从 k 起全量 some 会吞并中间未变更行——测试矩阵抓获）。
-- **页面级三件套（shownList 投影/选择态/手绘过滤条）维持挂账**：fleetly 交叉取证——其列表页用 FilterBar 服务端过滤范式、无行选择、无页内搜索，三件模式在第二消费者不存在；torchwood 侧是"行为等价约束"（legacy 页内搜索/批量选择是存量行为）的产物。为单一消费者的存量行为上 kit/registry 面 = 虚假抽象（§12.9 runCommandMapped 复制裁决的反面教训）——等真正的第二消费者再裁。顺带记录：FilterBar 在 fleetly 侧是活块，④ 的纯函数层已使其可被 torchwood 未来采用（若页内搜索换服务端 q）。
-
-**§12.10 品牌对齐批：@lynxland/ui → @lynxland/uikit，库包迁 @lynxland/uikit-core（2026-10-26）**：目录/包名/仓库名/README 四面一次对齐——
-- **更名面**：根包 `@lynxland/ui` → `@lynxland/uikit`（private 根，零感知）；库包 `@lynxland/ui-kit` → `@lynxland/uikit-core`，目录 `packages/ui-kit` → `packages/core`；GitHub 仓库 `lynxland/ui-kit` → `lynxland/uikit`（平台侧改名由人执行，remote URL 与 package.json repository 字段先就位，改名后旧 URL 自动重定向）。
-- **版本裁决**：npm 新名首发即 **0.3.0**——继承 0.2.x 版本脉络（旧名止于 0.2.1 不再发版；内外皆内部使用，无 deprecate 转址必要）。registry.json 依赖单源与 CORE_RANGE 同步升 `^0.3`。
-- **逐面清单**：imports 全仓（demo/registry/scripts/docs）；错误前缀 `@lynxland/uikit-core:`（transport 1 + options 3 + codec 3）；Standard Schema v1 vendor 字段 ×2；devtool vendored 头来源标识 + kitVersion 读取路径 + 测试断言（**转义斜杠形态 `@lynxland\/ui` 是 sed 盲区**——测试矩阵抓获，三处手工修）；AppShell brand 缺省 + demo 标题；AGENTS/SKILL/llms.txt/README。
-- **testing 出口 Fleet 尾巴清偿**（§12.10 首批退役漏网，本轮"内部使用无破坏顾虑"裁决放行）：`renderWithFleet`/`RenderWithFleetOptions`/`FleetRenderResult` → `renderWithKit`/`RenderWithKitOptions`/`KitRenderResult`（自称 "kit" 与 §13/§14 对照表一致）；kernel 注释与测试描述 "fleet 键" → "kit 键"。torchwood 测试面同步。
-- **README 重写**：从单行占位符重写为双语实文档——英文 `README.md` + 中文 `README_ZH.md`，互链；四面概念表/双通道分发（npm core + 拷贝制块）/快速上手（resource + search schema + useCollection + CommandResult 分支 + 帧）/五族块表/分层不变量/文档指针。
-- **历史记录保真**：本文件既有 §12.x 条目中的旧名（fleet-ui / @lynxland/ui / @lynxland/ui-kit / renderWithFleet）保持原样不改写——历史条目是当时的记录，不是现状的描述；现状以本条与代码为准。
-
-**§12.10 vendoring 落点二改：lynx → kit（2026-10-26，torchwood 消费方迁移批联动）**：品牌对齐批定名 uikit 后，§12.10 首选的 `components/lynx/<family>/` 落点沦为品牌中间态遗物，二改为 `components/kit/<family>/`——kit 词干跨三轮品牌（fleet-ui → ui-kit → uikit）稳定，目录名说角色不绑品牌快照；且避开 `components/uikit` 与消费方 shadcn `components/ui/` 的前缀邻接（首批拒 ui 的同款理由对 uikit 弱化成立）。改动面：devtool copy/diff 缺省基目录（torchwood 仍 `--dir src/components/kit`，src 布局例外）、registry-build target 模板 + registry.json 30 块 target、devtool 测试断言。消费方同步：torchwood 已迁移 `src/fleet → src/kit`、`components/fleet → components/kit`（torchwood 25ea6f32；本地标识符同批去品牌 FleetScopeBinding/FleetListPage 等 → Kit*；vendored 头与「fleet 化」历史字样按惯例保留）；fleetly 迁移时直接落 kit，零特例。
-
-**§12.10 包边界裁决批：core 拆包三清单——现在拆/挂账等触发/永不拆（2026-10-26 同日续）**：提问"哪些该从 core 拆出去"，取证后裁决——
-- **取证三件**：① effect 实测足迹仅 `adapters/http.ts` + `adapters/subscription.ts` 两文件——schema 分层**允许** effect（layer-check 规则）但**事实零 import**（AGENTS.md 原文"依赖 effect"是允许方向非事实依赖，本轮勘误）；② `/testing` 出口（renderWithKit harness）隐含 `@testing-library/react` 依赖（不在 deps/peerDeps 声明）且**零外部消费者**——torchwood 用自建 TestRouter 未采纳；③ react 层 peer 面已收敛：bindings→query+router（URL 写入契约）、command→form+query、invalidate→query。源码分发 + subpath exports 下未 import 的层不进 bundle——拆包对体积零收益，收益全在 install 面与依赖声明诚实度。
-- **现在做（①）**：/testing 闭瑕疵 = 补 `@testing-library/react` optional peer 声明（≥16，0.3.1 发版落地）。**不拆包**：零外部消费者时拆 `@lynxland/uikit-testing` 会把未验证 API 固化成独立包公开面（虚假抽象的包形态变体）。
-- **挂账两件（触发即拆）**：② `kernel` → 独立包——触发 = 非 React 消费方出现（服务端共享 ApiError/CommandResult/CollectionQuery 契约类型、codegen、第二前端框架）；届时 kernel-only 消费者免装 effect（dependencies 唯一运行时依赖）。③ `schema` → 独立包——触发 = 服务端要解析/校验 CollectionQuery 线格式（"URL 即真相"的另一半消费者）。
-- **永不拆清单**：adapters+react 不拆对——订阅引擎（退避归零、runForEach+Queue.offer）与 useSubscription/useInvalidateOnFrame 帧语义是同一次裁决的两侧，拆开 = 版本对齐税；registry 永不进 npm 包（拷贝制分发是 §12 核心裁决，打包 = 推翻）；mock/mockTransport 留 adapters（demo 活文档与消费方 stub 驱动，非纯 dev-time 工具）。
-- **拆包通用成本（任一触发时认账）**：registry-build 的 CORE_PACKAGE 单源变多源；workspace 版本同步与发版节奏翻倍；消费方 import 再改一轮（torchwood 59 文件前车之鉴）。
-
-### 12.11 F1 数据面机制批：M1-M4 + M10（2026-10-29，fleetly 采纳复盘 M1-M10 驱动）
-
-来源：docs/2026-10-27-fleetly-adoption-retro.md（v4）机制缺口 M1-M10 的首批（F1 批组：消灭量最大——19 伴读钩子/38 解包/8 合并体/24 资源文件样板/2 bug 类）。六项开放问题已在 retro §7 用户裁定（namespace off+扁平前缀 / 投影匹配唯一 / ApiError 类化——M9 属 F2 / path 回调 / 亮档进 demo——M6 属 F3 / lint 三类全扫——M7 属 F3），本批消费其中四项裁决。裁决先行、逐项「根因→机制→验收」，实现期回写如下。
-
-**M1 读模型分层**（URL 绑定是可选层，不是读原语的属性）：
-- 落地面：`useCollectionData(resource, {scope?, predicate?, order?, size?, window?: QueryWindow | "all", staleTime?, refetchInterval?, enabled?, retry?, keepPrevious?})`（/react）——data 层零 URL、rows 直出；`useCollection` 重构为 data 层之上的装配（search 解码 + 写入契约 setter），语义不变；`useRecord` options 扩 refetchInterval/enabled/retry；`QueryEngineOptions`（三个 queryOptions 工厂）增 retry 直通。
-- 全量行访问取 `window: "all"` 侧（retro M1.3 的「fullRows 或 window:"all"」二选一裁决）：归一为超大 size 窗口，clientCollection 天然支持、无需适配器协议改动；total 附带。
-- namespace：`collectionQuerySchema({namespace: "tasks"})`（缺省 off，存量 URL 零变化）——encode/patch/toSearchSchema/resetPatch 读写**物理键**（tasks.q 扁平前缀，TanStack 序列化为普通字符串键）；decode 只读本命名空间键，他命名空间/无前缀键经 M3 passthrough 存活（namespace 依赖无损编解码，两机制咬合）。新增 `resetPatch()`（全清补丁单源——手写键清单在前缀形态下会漏）。
-- 实现期细节：FilterBar 初始文本改经谓词纯函数层回读（filterLeaves——encode 输出物理键不可直读，块对 namespace 透明）；`run` 的入参不注解会破坏 defineResource 的 C 推断（上下文敏感跳过——既有行为，本批测试实证，SKILL 适配器册无感）。
-- demo 消费面：/collections 双列表路由（tasks.q 与 schedules.q 并存互不携带 + 深链还原 + e2e 3 条）+ 统计条伴读点（window:"all" 全量行，列表过滤不影响）。
-
-**M2 命令-失效 scope 同源**（三份真源收敛为一份）：
-- `CommandDescriptor.scopeOf?: (input) => ResourceScope`；引擎在 **mutationFn 内**解析 `effectiveScope = options.scope ?? descriptor.scopeOf?.(input) ?? （声明采纳的 ResourceScopeProvider context）?? {}`，**同一份**既喂 `run(ctx)` 又喂失效匹配（就地失效——并发 mutation 各自携带不错位；context 采纳位次在 scopeOf 之后是本批实现裁决：descriptor 作者的显式派生强于环境注入，0.2.1 的声明采纳契约保持不破）。
-- `selectorMatches` 改**投影匹配为唯一语义**：比较轴 = 读键所属资源声明的 scope 键集（查询键新增第 4 段 scopeKeys），声明键上逐键相等即命中；命令 scope 携带声明外的多余键不阻断（fleetly git-hook 三写场景：scope {projectId, appId} 命中声明 ["projectId"] 的项目级读键）。未声明资源与旧形键宽容降级为键全集相等（等价旧全等——迁移期手工 setQueryData 不咬）。旧整对象全等不保留（retro §7-2 裁决：过宽=廉价 refetch / 漏失效=bug）。
-- 类型执法落「**传了就必须完整**」：defineResource 以 const 泛型把 spec.scope 字面量元组线程进 `__scopeKeys`；useCommand/useCommandForm 对声明了 scope 键的 descriptor，显式传入的 scope 必须覆盖全部声明键（partial/空对象编译红）。省略不报错——scopeOf/Provider 解析链是既有契约（retro 验收「零手传 scope 下绿」与 0.2.1 声明采纳的合并解释；若省略也红则 Provider 形态消亡，与验收矛盾）。
-- breaking：查询键形 `[kind, name, scope, scopeKeys, ...detail]`（record id 移至第 5 段）——手工拼键/断言键形状的消费方需跟进；投影匹配放宽（原全等 miss 的失效现在命中）。
-- 测试：投影矩阵（宽/窄/未声明/旧形键）+ 钩子级零手传 scope 命中声明资源读键 + `@ts-expect-error` 编译锚。
-
-**M3 search 编解码无损**：
-- 根因面实证：TanStack validateSearch 对输出是 spread-merge（未提及键存活），但 `search.strict` 的 fromSearch 路径**从零重建**（validatedSearch 从 {} 起）+ 消费方组合 validator 以 normalize 输出为基底——有损 normalize 在这些路径静默吞键（fleetly 8 路由手写合并体的根因）。
-- 落地面：normalize 缺省 passthrough（未知键原样保留、任意 JSON 值形态、幂等；自有键以归一化结果为准，无效条目/默认值等价形态不回填；undefined 值键不透传——TanStack 序列化语义）；严格丢弃降为显式 `toSearchSchema({unknownKeys: "drop"})`。FlatSearchParams 增索引签名（透传键类型面宽容）。
-- breaking：validate 输出含未知键——依赖「归一化即丢弃」的消费方需显式 drop。
-
-**M4 REST 适配工厂**：
-- `restCollection({path: (ctx) => string, envelope?, params?, total?, nextCursor?, notFound?, baseUrl?, headers?, fetch?})` 与 `restRecord`（path 收 `(id, ctx)`）同构——path 回调起步（retro §7-4：fan-out/动态 query/条件段回调零歧义全覆盖，模板插值糖后置）。
-- **零 Effect**（bring-your-own-fetch 主干——fleetly 全程未用 createHttp 实证；layer-check 下 rest.ts 无 effect import）；fetch 注入点缺省 globalThis.fetch；abort 放行（取消不是失败）；2xx 非 JSON → ApiError.decode。
-- 错误收敛单源抽出 `adapters/api-error.ts`（statusToApiError/extractErrorMessage/buildUrl）——http 管线与 rest 工厂共用同一 Response→ApiError 映射；QueryParams 放宽 undefined 值（条件参数常态，buildUrl 跳过）。
-- 信封默认 body 直收/body.rows + undefined/null 行过滤内置；total/nextCursor 默认抽 body.total/body.nextCursor 可覆写；`notFound: "null"`——record 404→null / collection 404→空段。
-- options 接口去泛型（T 只在工厂签名——幻影类型参数是 noUnusedLocals 违例源，§12.1 修复 #1 同类）。
-
-**M10 测试契约**：
-- 修复 /testing 出口 noUnusedLocals 违例（'rendered' 未读——消费方严格 tsc 下 /testing 不可用的根因）；**core tsconfig 增 noUnusedLocals/noUnusedParameters**——源码分发下消费方严格 flags 穿透检查 kit 源，本仓 typecheck 门以同等严格度前置拦截（「CI 纳入消费方严格度矩阵」的落地形态；本批新增面 rest.ts 的幻影 T 即被此门抓获）。
-- 新增 `createTestRouter({routes, initial})`（多路由测试路由器工厂——命令 onSettled navigate 的目标注册单源，§12.3 时序漂移坑的机制化）；renderWithKit 重构为其上的单路由 + Query/Router/Scope 三 Provider 形态。SKILL.md 增测试配方节 + 伴读数据/namespace/无损编解码/scopeOf 各条目。
-
-**验收与门禁**：`pnpm check` 全绿（layer-check + typecheck（严格度加严）+ size-check 20.9 kB ≤ 35 kB + 138 单测 + devtool）；demo e2e 28/28（新增 collections 3 条：键隔离/深链还原/伴读全量行）。版本面 0.4.0 候选（本批不发版——发版与 fleetly 回流另批）。
-
-**发版补记（2026-10-29，0.4.0 已发布）**：发版前 flaky 复审抓获真 bug——useRecord 的 query.enabled 未透传 queryOptions（M1 扩齐遗漏；旧测试 10ms 定时器翻 enabled 恰好与查询解析赛跑掩盖缺陷，改按钮驱动后确定性复现），修复后 5/5 稳定再发。`pnpm publish --no-git-checks` + publint + 净房冒烟全过；npm staged 版本传播本次约 5 分钟（registry 元数据可见 ≠ install 可解析——`npm view` 先见而 install 撞 ETARGET，净房换用独立 cache 目录绕过陈旧 packument 才装上；§12.10 的"约 1 分钟"窗口记录据此加宽）。
-
-**breaking 清单（0.4.0）**：① M2 投影匹配放宽 + 查询键形变更（scopeKeys 第 4 段，record id 第 5 段）；② M3 normalize 缺省 passthrough（validate 输出含未知键）；③ M10 core tsconfig 严格度加严只影响贡献方；QueryParams 放宽 undefined 为非破坏加宽。消费方升级面：手工拼 kit 键的测试需改用 collectionQueryOptions().queryKey 单源；依赖 normalize 丢键的路由需显式 unknownKeys:"drop"。
-
-**fleetly 回流预期**（升级 0.4.0 后可退役的消费方补丁对照）：19 伴读钩子 + 38 处 `.data?.rows` 解包 → useCollectionData 直消费；8 合并路由 validateSearch → 双 schema validate 组合或 namespace 形态；providers-view 裸 useQuery（30s 轮询）→ useRecord {query:{refetchInterval}}；kit/http.ts 微工厂 + 逐资源 fetch 样板（18 文件 toApiError 收敛）→ restCollection/restRecord；4 处 404→null 手写分支 → notFound:"null"；git hook 三写等手传 scope 补丁 → descriptor.scopeOf + 投影匹配（app-settings/panels 两测试锚零手传 scope 转绿）；backups 全量统计退场 → window:"all"。M5-M9（Transport 工厂/错误类化/token 单源/块契约）与 F4（漂移执法）不在本批。
-
-### 12.12 torchwood 消费 0.4.0——F1 破坏面适配批（2026-10-29 同日，第二消费者首升）
-
-torchwood console（全量 kit 化后的第一轮上游升级，0.3.0 → 0.4.0）。「破坏面清零 + 有实收益才采用，不为采用而采用」立场下的升级面取证：
-
-**破坏面三条适配**：
-- **键形变（scopeKeys 第 4 段）零适配成本**：仓内零手工拼 kit 键面（account 的 setQueryData 走非 kit 键 `["console-admin-me"]`），测试零键形断言——§12.11 预言的「手工拼键消费方」在 torchwood 不存在，单源取键纪律（SKILL 测试配方）提前兑现了升级免税。
-- **投影匹配放宽零断言转红**：唯一失效行为锚（documents 行删→列表 refetch）在投影语义下仍命中；「不失效」类锚零转红。实际放宽收益现身一处：collections schema 编辑器六动词 scope 携带声明外 collId，0.3.x 全等 miss（编辑器写路径从不刷新 db 集合列表）→ 0.4.0 投影命中——失效面变宽是有意裁决的实例。
-- **normalize passthrough 零依赖反转**：16 域 validateSearch + useListParams 平面 record 投影均无「归一化即丢键」依赖面，`unknownKeys:"drop"` 零引入。§12.11 的破坏点（fleetly 8 手写合并体）在 torchwood 形态不存在——合并体是 fleetly 的存量伤，不是 kit 契约的普遍需求。
-
-**类型执法 12 编译红与 scopeOf 裁决（本批核心取证）**：全集中在 collections 资源命令面（显式 scope 含 `projectId ?? undefined`）。**裁决：不迁 scopeOf，条件总体推导**——根因是 projectId 不在命令 input（torchwood 项目上下文走 axios header 单源），scopeOf 只能从 input 构出 `{dbId}` 半份 scope，而 M2 链式采纳（scopeOf 整体胜出 Provider，不合并）下投影匹配会漏 projectId 反造失效 miss；给每个 input 加 projectId 是纯噪音。真实教训：**scopeOf 的适用判据是「身份完整在 input/工厂闭包里」——部分在 input、部分在环境上下文的嵌套 scope 域，显式全量 scope 仍是正解**（half-scope 陷阱已录）。SKILL.md 的 scopeOf 条目宜补这句判据。
-
-**机制采用决策表**：M1 采用（Dashboard 四处 `useQuery+collectionQueryOptions+手工解包` → useCollectionData，`keepPrevious:false` 行为等价、`enabled` 语义门保留——scopeReady 把空串视为就绪，统计面「未选项目」不是 scope 未就绪；`window:"all"` 不用，keyset 服务端方言无整取语义）；M3 不采用（无双列表同路由形态，不主动引入 namespace 的 URL 行为变更）；M2 scopeOf 不采用（见上）；M4 拒（§12.9 阶段 5 裁决维持）；M10 裁决保留 TestRouter（normalizeTestPath 双方言归一 + AuthProvider 镜像是本地语义，kit createTestRouter 严格 tsc 可用但不迁移）。
-
-**legacyKeys 复核（退役 0）**：37 处声明前缀逐条扫消费面——全部仍有真实读者（手写键详情页/子视图：`["documents",dbId,collId,docId]`/`["groups",groupId]`/`["api-keys",id]` 等）。§12.10 的宽前缀声明在「全量 kit 化」后并非自动消亡：**legacy 键是否退役的判据是该前缀是否仍被手写 useQuery 消费，不是 kit 化进度**。反身缺口三处挂账（有消费无声明）：`["leaderboards-board"]`/`["leaderboards-settlement-detail"]`/`["asset-defs-all"]`——实际不可达或 staleTime 封顶，不属破坏面，等子视图 kit 化时自然消亡。
-
-**升级防线**：devtool `diff --all --check` 6 处漂移逐块行数与 §12.10 手工层登记吻合（11/14/1/13/1/17），零新增漂移；filter-bar 的 namespace 内部变更不在 torchwood 消费面（该块未 vendored）。门禁 tsc 0 / vitest 166 / eslint 0 error / build 过。
-
-**浏览器走查抓获一个存量缺陷（非 0.4.0 回归）**：api-keys 直调批量删路径（§12.3 裁决 8 的 N 命令聚合面）手打 legacy 前缀 `["api-keys"]` 失效——kit 键首段是 kind，该前缀任何版本都匹配不到 kit 集合键，批量删后列表不刷新。修复 = `collectionKey(resource, list.query).slice(0,4)` 四段前缀失效（kind/name/scope/scopeKeys，覆盖本 scope 全部游标页）+ legacy 前缀保留（详情读仍消费）。教训入册：**legacy 前缀失效桥只服务 legacy 键读者；对 kit 绑定视图的失效必须走 kit 键（单源 collectionKey/collectionQueryOptions），两套键形两套桥，混用即漏**。§12.10「直调批量路径保留 kit 键失效经命令式面复用」的意图据此才算真正落地。
-
-**走查面**：audit-logs（游标深链/换向回首页）、api-keys（reveal/批量删）、documents（OCC conflict→刷新重载→重提成功）、leaderboards（条目 lookup）、ListenPanel（两次断线自动重连、seq 跨重连单调）全过 + Dashboard（M1 迁移面）统计卡数据正确。dev 环境坑复用 §12.10 记录（stub 形状/protojson 键名/role:"owner"），新增一条：隐藏窗格下 playwright actionability 点击必超时，evaluate 注入 `el.click()` 稳定替代。
-
-### 12.13 F1 回流清偿批：restFetchAll（M4 第二形态）+ useRecord 句柄扩齐（2026-10-30，fleetly 0.4.0 回流批挂账清偿）
-
-来源：fleetly 回流批（8e5b7577..b4ff15ad，2026-10-29 上站）收官挂账的三条库面缺口全部来自实证——①整取方言不能直挂 restCollection（b4ff15ad 方言边界裁决：19 个 clientCollection kit 文件整取 + URL 谓词客户端求值，服务端端点无谓词下发）；②app-spec/deployment-detail 两处 `isFetching 不在 useRecord 句柄面——loading 态近似` 挂账注释；③迁移实测两坑（fetch 注入的鉴权闭环形态、多资源取键帮手五参泛型线程噪音）。与 F2/F3/F4（M5/M9/M6/M7/M8）互不阻塞。
-
-**restFetchAll（M4 第二形态，本批主体）**：
-
-```ts
-restFetchAll<T>({ path: (ctx) => string, envelope?, params?, baseUrl?, headers?, fetch? })
-  : (ctx: ResourceScope, signal?: AbortSignal) => Promise<ReadonlyArray<T>>
-// fleetly 消费形：clientCollection(restFetchAll({...}))——REST 整取 + 客户端求值
+- `FilterBar` 不推导 schema；schema 由页面显式定义。可由 `filterFieldsOf(view)`
+  纯函数辅助，但不是唯一来源。
+
+#### Pager
+
+```tsx
+<Pager
+  paging={page.paging}
+  onNext={() => ...}
+  onPrev={() => ...}
+  onPageSizeChange={(size) => ...}
+/>
 ```
 
-- **共用核心不造第二管线**：与 restCollection/restRecord 同一 `requestJson`（fetch 注入/abort 放行/Response→ApiError 收敛）+ 同一信封缺省（body 直收或 body.rows）+ 行过滤抽 `compactRows` 共享——size-check 不动（20.9 kB ≤ 35 kB）。
-- **裁决 1——params 签名 `(ctx)`，不带 query**：整取方言的定义就是 query 与服务端无关（谓词/排序/窗口全在客户端求值），对称签名 `(query, ctx)` 是携带永不使用参数的伪对称（幻觉诱饵）；取数上限类常态参数（limit=200）是常量/ctx 派生，闭包组装零损失。与输出签名 `(ctx, signal)` 对 clientCollection fetchAll 槽位同形，直挂。
-- **裁决 2——不设 notFound 选项**：整取面 404 的语义是父资源消失/端点错，不是空集合（fleetly 19 个整取文件零 `404 → []` 手写分支——restRecord 的 notFound 有 4 处实证需求，fetchAll 的没有）；空数组吞错会静默造"无数据"假象（错误通道失效比空态闪烁更贵）。真实空态用例现身前不设，现身再以实证加。
-- 测试面：信封/行过滤/params URL 组装/错误收敛同核（401→auth、非 JSON→decode、网络断层→network）/abort 放行+signal 透传/404 走失败通道（裁决锚）+ clientCollection 组合求值验收。
+- `Pager` 不调用 `window.history`；prev 的“历史栈”策略由页面/`useCollectionPage` 决定。
+- `Pager` 内部按 `paging.kind` 渲染 cursor/offset/all 三种形态；
+  不再有 `Pagination` + `KeysetPagination` 两个公开控件。
+- 空尾页仍渲染分页栏；Prev 在首页禁用。
+- 页大小切换保留游标/位置语义，由 `useCollectionPage` 实现。
 
-**RecordHandle 扩 `isFetching: boolean`**（result.isFetching 直通；与 status:"loading" 初载互补——后台刷新态）。**裁决 3——useBatch 不对齐，明确留白**：句柄族一致性不是"全部字段对齐"而是"每个字段有消费形态"——batch 的消费形态（列内显名/ReferenceSelect 下拉）从不渲染 fetching 过渡（空 Map.get 回 undefined 已是既定空态语义），fleetly/torchwood 零 isFetching 需求实证；且 BatchHandle 连 error/refetch 都未带（外键查找的最小句柄定位），单独补 isFetching 是半截工程。测试按钮驱动（§12.11 发版补记教训）：延迟 Promise 队列手动放行，零定时器赛跑——isFetching 初载 true → 放行落定 false → refetch 翻 true → 放行回 false 四段断言。
+#### Tabs
 
-**demo 换装（活文档）**：/collections 的 tasks/schedules 资源从 mockFetchAll 换装 `clientCollection(restFetchAll(...))`——新增 `apps/demo/src/lib/rest-demo.ts`（demo 的 REST 服务面：真 URL 路由 + 90ms 延迟；tasks 走默认信封 body.rows、schedules 走 envelope 方言覆写 + params limit——同一页对照两种信封形态）。e2e collections 3 条（键隔离/深链还原/伴读全量行）零改动过绿 = 换装零行为差的活文档证明。
+```tsx
+<Tabs
+  items={tabs}
+  value={current}
+  onChange={onChange}
+  variant="underline" | "pills" | "filter"
+/>
+```
 
-**SKILL.md 补记两则**：①适配器作者节——fetch 注入的鉴权/401 闭环配方（消费方 authFetch 形态：Bearer 头 + 401 全局闭环通知；错误体解析留给工厂 Response→ApiError 单源，authFetch 不判 res.ok 不抛错；torchwood axios 面同题——响应重组 Response 的薄壳）+ 整取方言条目（params (ctx) 签名与无 notFound 的裁决回链本节）；②测试配方节——多资源取键帮手类型写法（`Parameters<typeof collectionQueryOptions>[0]` 钉死参数类型，勿手拼 `Resource<T, ID, C, S, K>` 五参泛型——fleetly tasks.test 迁移实测坑）。另：scopeOf 适用判据补句（§12.12 half-scope 陷阱）与详情节 isFetching 复原锚。
+- 一个受控 Tabs 控件覆盖模块 tab、详情 tab、过滤分片 tab。
+- 写入律（push/replace）由调用点决定；Tabs 不 import Router。
+- 键盘/aria 在一个地方实现。
 
-**裁决 4——版本 0.5.0（minor 口径）**：新导出面（restFetchAll/RestFetchAllOptions）+ 句柄字段（isFetching）是新增能力，semver 下 minor——0.x 的补丁号只留给纯修复（0.4.x 系预留发版期 flaky 类修复）；纯加法零 breaking（现有消费方升级面 = 新可选能力全可选）。
+#### AsyncState
 
-**验收与门禁**：`pnpm check` 全绿（layer-check + typecheck + size-check 20.9 kB + 单测 + devtool）；demo e2e 全绿。
+```tsx
+<AsyncState
+  status={list.status}
+  error={list.error}
+  onRetry={list.refetch}
+  empty={{ title, description, action }}
+>
+  <DataTable ... />
+</AsyncState>
+```
 
-**下游预告（fleetly 次批，不阻塞发版）**：restFetchAll 落地后 fleetly 可全量铺开整取面——19 个 clientCollection kit 文件（alerts/app-specs/apps/audit/backups/databases/deployments/exec/githubapps/identity/networks/nodes/projects/registry/revisions/routes/storage/tasks/variables）的 fetchRows/qs 微工厂消费与逐资源 toApiError 样板归零（retro M4 的 kit 层 −40% 行数预期在此兑现）；kit/http.ts 的 fetchRows/rowsOf/qs 三帮手随之退役（authFetch 常驻为 rest 工厂注入点）；app-spec/deployment-detail 两处 isFetching loading 近似复原。升级时 pnpm-workspace.yaml minimumReleaseAgeExclude 同步 0.5.0。
+- `LoadingState` / `EmptyState` / `ErrorState` 仍可作为值视图单独用。
+- `AsyncState` 只做四态切换；不取数。
 
-**发版补记（2026-10-30，0.5.0 已发布）**：`pnpm publish --no-git-checks` + publint 全过（All good）。npm staged 传播窗口本次约 3 分钟（publish 后 `npm view` 仍报 0.4.0 latest、install 撞 ETARGET；3 分钟后 view 见 0.5.0，独立 cache 净房随即装上——较 §12.11 的 5 分钟缩短，窗口时长不稳定、按 ≥5 分钟预期操作）。净房冒烟口径记录：源码分发包的裸 Node 运行时导入不可行——Node 22 的 type stripping 设计性拒绝 node_modules 内 .ts（ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING），运行时契约是消费方 bundler 编译；冒烟 = 独立 cache install 解析 0.5.0 + publint exports 映射 + 发布物源码结构断言（restFetchAll 导出/RecordHandle.isFetching 在场）。
+#### Form / FieldInputs
 
-**发版补记（2026-11-02，0.6.0 已发布）**：组织改名批随版发布——GitHub 仓库与 npm 组织 lynx-go → lynxland 一次对齐（git remote / repository URL / 全仓包名与 import / devtool 生成头注释 / registry.json；npm 旧名 @lynx-go/uikit-core 的 0.5.0 及更早不迁移，@lynxland/uikit-core 以 0.6.0 为首版，下游按新名安装）。`pnpm publish --no-git-checks` + publint 全过；发版后 devtool 复跑（bump 后补验）抓获 registry.json core 单源漏改——`^0.5` 未随版，而新组织下该 range 不存在（首版即 0.6.0），块消费方必装不上；根治为 CORE_RANGE 从 packages/core/package.json 推导（与 devtool.test 版本断言同源，双处手工同步消亡）。staged 传播窗口本次约 90 秒（`npm view --prefer-online` 先见 0.0.0-stage 占位再翻 0.6.0，较前两次窗口进一步缩短）；独立 cache 净房 install 解析 0.6.0 + 发布物源码结构断言（六 exports 键齐全 / restFetchAll、useRecord 在场 / 发布物零 lynx-go 残留）全过。
+```tsx
+<Form form={form} submitting={form.submitting} result={form.result} onCancel={close}>
+  <FieldInputs form={form.form} fields={inputFields} />
+</Form>
+```
 
-### 12.14 G 批：双 console 统一 + 服务端契约 + 项目模板——总体裁决与批次规划（2026-10-31，调研先行）
+- `Form` 是提交壳（submit/error box/footer）；不创建表单。
+- `FieldInputs` 按 `FieldInput<I>[]` 渲染；不接收 Row 类型。
+- `TextField`/`SelectField`/`DateTimeInput`/`CheckboxField`/`ReferenceInput` 是控件；
+  日期时间由 UI adapter 自绘，不依赖浏览器原生 `datetime-local` 弹窗。
+- `ReferenceInput` 接受 `LookupSource` 或 `options` 回调，不内嵌 Resource。
 
-来源：用户目标「通过 uikit 统一 fleetly/torchwood 的使用模式 + 为后续同类项目（React 管理台）启动建立模板」，并补充裁决前提：**两后端为自有项目，可调整 API 以配合 kit 演化、可统一服务端模式**。三路调研先行：①torchwood 消费面全量盘点；②fleetly 消费面全量盘点（0.5.0 铺开批已落地：b4ff15ad 试点 + b80142c3 全量，kit/http.ts 仅剩 authFetch 11 行）；③九家竞品（shadcn/create-t3-app/TanStack Starters/refine/react-admin/RedwoodJS/Nest+Angular schematics+Rails/Modern.js+ice）。
+#### Values
 
-**调研结论（裁决依据）**：
+- `StatusBadge`、`RelativeTime`、`CopyButton`、`SecretReveal`、`DiffView`、
+  `JsonField`、`StatCard`、`MetricChart`、`FieldValue`、`LoadingState`/`EmptyState`/`ErrorState`。
+- 值视图只依赖 L2 类型或纯 props；不 import 数据层、Router、绑定。
 
-1. **「标准姿势」事实存在**：两仓独立演化收敛出同构目录契约（`src/api` 传输层 / `src/kit` 资源胶水层 / `src/components/kit` vendored 块 / 薄壳路由 + providers 栈）；分歧收敛为四个槽位——HTTP 管线（axios vs fetch）、分页方言（服务端 keyset vs 整取+clientCollection vs restCollection）、重复胶水、配置/门禁面（minimumReleaseAgeExclude 两种处理；antipattern 测试仅 fleetly 有；块漂移执法仅 torchwood 侧跑 `diff --all --check`）。
-2. **双份胶水是 kit 级资产非消费方政策**：两仓 `kit/errors.ts`（toApiError + runCommandMapped）近逐字相同、各自单源；fleetly 另有 `toast.ts` toastOnSettled 单源。政策性部分恰好都是注入参数（错误体映射、fetch 桥、toast 形态）——上收为注入式工厂不绑架消费方（与 §12.9 阶段 5「axios 管线保留」不冲突：桥仍是 torchwood 的槽内实现）。
-3. **服务端可调 ⇒ 客户端多数「方言」是后端历史形状的投影**，消解对照：torchwood OCC=400+message 前缀（`kit/documents.ts` 唯一域变体）→ 409+code 后域变体消亡；`SORT_ORDER_ASC/DESC` 枚举名与 repeated 序列化映射层（`api/pagination.ts`）→ 服务端直吃 codec 形后消亡；users ParseUserList DSL 组装+消毒（`kit/users.ts`）→ filter 参数化后消亡；fleetly 19 文件 envelope 逐域回调 → 信封归一后一行；fleetly 整取伪造游标 → 规范显式定义「有界整取」为合法小形态（按数据规模分流，非历史原因）。torchwood 后端内部已统一 `Page<T>{rows, nextPageToken}`（§12.9 取证 16 域同构）——规范信封非空中楼阁。
-4. **竞品分类学**：契约型（react-admin/refine）/拷贝型（shadcn）/生成型（schematics/微生成器）/模板型（create-t3-app/examples）四路线，成熟方案皆分层组合。可抄清单：shadcn preset 编码化+validate+migrate 窄通道、Nest spec 成对生成、ng update 迁移型生成器（感知用户改动，优于盲覆盖）、Modern.js 微生成器（存量项目持续收敛）、TanStack/Next examples 同仓共测、react-admin 组合子（withLifecycleCallbacks 按资源挂行为）。反面教训：suspenders（可升级部分必须依赖制——现有「core npm 包 + registry 拷贝」切分正确）、Blitz（生成物贴近普通代码才长寿）、T3（胶水应收进上游/生成器——两仓手写胶水正是该消灭的东西）。
+### 6.2 视图（L5 Views）
 
-**裁决**（用户 2026-10-31 拍板四项 + 依此推演）：
+视图是“绑定句柄 → 控件 props”的翻译层。它们可以 import 绑定句柄类型，
+但不能 import Router/URL，也不能渲染页面壳。
 
-1. **统一 = 三轴**：①客户端标准姿势（目录契约 + 胶水 + 块 + 配置门禁面）；②服务端契约规范（console API 规范，见裁决 3）；③模板与工具（同仓 starter + devtool 微生成器族）。
-2. **方言槽双态改判**：自有后端 = 过渡机制（服务端迁移完成即坍缩为默认值）；第三方后端 = **永久适配面**——rest 工厂注入点（envelope/params/fetch）的合法用途是接不可调整的第三方 API（react-admin dataProvider 的对应物）。适配器作者册成文时按双态写（规范默认态 / 第三方方言态）。
-3. **console API 规范 v1**（G2 成文 `docs/console-api.md`，Go 仓可引用）。骨架：
-   - 列表：`200 {rows: T[], next_cursor?: string, total_count?: number}`（snake_case，Go 自然形）；**游标分页为一等形态，有界整取（显式上限、无 next_cursor）为合法小形态**——与 kernel QueryWindow 游标代数及 clientCollection 求值两侧一一对应。
-   - 谓词/排序参数与 kit URL codec 同形（`sort=field:dir` / `filter=field:op:value` repeated 裸键 / `cursor` / `size`）；可过滤字段白名单仍是资源 schema 声明，服务端校验与其一致。
-   - 错误体：`{error: {code: string, message: string}}`（两后端已事实趋同，定死）；命令语义状态码归位：400=rejected（code 必填）/403/404/409=conflict（OCC/唯一性，code）/428=确认（code，fleetly E_CONFIRMATION 族为范本）/401=刷新后仍死会话才到调用方/5xx。torchwood OCC 错位是唯一大修项。
-   - int64=string（protojson 既有约定）。
-4. **共享 Go 件 console-gw**：契约之外抽共享 Go module（列表信封构造、cursor 编解码、错误码→HTTP 状态映射、filter/sort 参数解析），两后端都引——双仓实现必漂移，客户端双份胶水的教训服务端同样适用。落点（独立仓 / 某后端仓 pkg/）G2 批内定。
-5. **胶水上收 core**（G1）：toApiError/runCommandMapped/toastOnSettled/空 scope 守卫门 上收 /adapters 为**注入式工厂**（错误体映射、fetch、toast 均为参数）。名词预算审查：是 ApiError/CommandResult 的「形」非新名词，预算不动；命名按「适配器=动词」批内裁。**M9（ApiError 类化）自 F2 移入 G1 合流**，F2 缩为 M5 Transport 工厂单项。
-6. **客户端标准姿势成文**（G1/G4 间）：目录契约、kit 文件标准形态（服务端规范化后坍缩至 ~8 行/域：defineResource + restCollection({path, fetch})，envelope/params 全吃默认）、方言槽位表、配置面（minimumReleaseAgeExclude 约定）、门禁面（antipattern 测试模板化——torchwood 补课）。
-7. **模板 = 同仓 starter**（G4）：`apps/template-console`——标准目录 + 一个全形态示例域 + antipattern 测试 + 401 桩 + devtool 接线，随 `pnpm check` 共测（TanStack/Next examples 模式，模板永不腐烂）；新项目由 `devtool init` stamp。
-8. **devtool 微生成器化**（G4/G5）：`init`（stamp 模板 / 给存量项目铺 kit 骨架）、`doctor`（审计存量 console：块漂移/胶水单源在位/配置面/反模式面）、`scaffold <domain>`（配方级生成 kit 文件+路由+页面初稿——§8 B 类「Inferencer→脚手架」升格）、profile→preset 编码化（shadcn preset 方向，可部分应用）；`migrate` 窄通道挂账（ng update 模式，首个破坏性演进时启用）。
+#### CollectionView
 
-**G 批次表**：
+```tsx
+<CollectionView
+  list={list}
+  columns={columns}
+  filters={filterFields}
+  toolbar={<Button>Export</Button>}
+  selection={selection}
+  empty={{ title: "No widgets", action: <ResetFilters /> }}
+/>
+```
 
-| 批 | 仓 | 内容 | 依赖 |
+职责：
+
+- 组合 `AsyncState` + `FilterBar` + `DataTable` + `Pager` + 可选 tabs 槽。
+- 处理 `list.status` 四态。
+- 不渲染 h1、不提供宽度/衬垫、不 import Router。
+- 页面级动作（导出、失败注入）通过 `toolbar`/`actions` 槽注入。
+- 分页策略从 `list.page.paging.kind` 派生；页面可覆盖 `pager` 槽。
+
+#### RecordView
+
+```tsx
+<RecordView
+  record={record}
+  title={(row) => row.name}
+  meta={(row) => <StatusBadge status={row.status} />}
+  actions={(row) => <DeleteButton ... />}
+  tabs={[
+    { key: "overview", label: "Overview", render: (row) => <FieldGrid fields={viewFields} row={row} /> },
+  ]}
+  activeTab={tab}
+  onTabChange={setTab}
+/>
+```
+
+- `tabs[].render` 接收 row，**懒渲染**；不要提前创建 `content: ReactNode` 导致
+  页面到处 `record.data?` 判空。
+- `RecordView` 不渲染 `h1`；页头归 Chrome。hero 可以用 `h2`/`div`。
+- `FieldGrid` 是控件，可独立用于任意详情区块。
+
+#### FormView
+
+```tsx
+<FormView
+  form={form}
+  fields={inputFields}
+  submitLabel="Save"
+  resultAction={<ReloadButton />}
+/>
+```
+
+- `FormView` 消费 `useCommandForm` 的句柄；不创建表单、不弹窗。
+- `FormDialog`/`FormDrawer` 是页面模板（Page Template），不是视图；它们组合
+  `Dialog`/`Drawer` + `FormView`。
+- `FormDialog` 的 `values` 预填、`key` 重挂、关闭即卸载属于模式层。
+
+#### Stream views
+
+- `LogViewer`、`EventFeed`、`StageTimeline` 是视图；消费 `StreamHandle`。
+- 帧订阅在视图内完成（`subscribeFrames/getFrames`），页面级只读状态。
+- `LogViewer` 的跟随/暂停/下载/清空是视图内交互；虚拟滚动是视图内实现。
+
+### 6.3 壳（L6 Chrome）
+
+```tsx
+<PageLayout
+  title="Widgets"
+  description="..."
+  breadcrumb={<Breadcrumb items={[{ label: "Widgets", render: <Link to="/widgets">Widgets</Link> }, { label: "Widget" }]} />}
+  backLink={<Link to="/widgets">Back</Link>}
+  icon={BoxIcon}
+  actions={<Button>New</Button>}
+  tabs={moduleTabs}
+  currentTab={tab}
+  onTabChange={setTab}
+  lead={<FiringBanner />}
+  width="flow" | "narrow" | "wide"
+>
+  <CollectionView ... />
+</PageLayout>
+```
+
+**规则**：
+
+- `PageLayout` 是唯一渲染 `h1` 的层（或应用自有壳）。视图不渲染 h1。
+- `PageLayout` 不取数；`title` 由页面/页面模板传入。
+- **宽度三档**：`wide` = 72rem（列表/详情/日志/事件等数据页，默认）；
+  `narrow` = 48rem（表单/设置等阅读型页面）；`flow` = 不设 max-width。
+  preset 的 `FormPage`/`SettingsPage` 默认 `narrow`，其余默认 `wide`；
+  同一应用不要混用 `flow` 造成宽度漂移。
+- `PageLayout` 的 `tabs` 只是受控渲染；URL 接线归页面或 `useSearchState`。
+- `PageLayout` 可选；**kit 不强制消费方使用**。fleetly 的 `PageFrame`、
+  torchwood 的 `PageCard` 可以保留，只要它们遵守“唯一 h1/唯一页头”的规则。
+- `AppShell` 只管导航/高度链/Outlet；不取业务数据。
+  - `sidebarHeader` / `sidebarFooter` 是完整插槽（团队切换器、用户菜单等）；
+  - `header` 是主内容区顶部插槽（全局搜索/动作）；
+  - nav item 支持 `icon`/`badge`/`children`（嵌套可折叠分组）；
+  - `activePath` + `findActiveNavItem()` 做最长前缀 active 匹配；
+  - `collapsible` + `collapsed`/`defaultCollapsed`/`onCollapsedChange` 提供内置收起。
+- `Breadcrumb`、`SectionCard`、`ScopeSwitcher`、`Stepper`、`RouteErrorBoundary` 归 Chrome/App 面。
+
+```tsx
+<AppShell
+  sidebarHeader={<TeamSwitcher />}
+  sidebarFooter={<UserMenu />}
+  nav={nav}
+  activePath={pathname}
+  header={<GlobalActions />}
+  collapsible
+  collapsed={collapsed}
+  onCollapsedChange={setCollapsed}
+>
+  <Outlet />
+</AppShell>
+```
+
+### 6.4 页面组合（L7 Page Composition / Preset）
+
+> **命名说明**：`Recipe` → **Page Template（页面模板）**；L7 `Pattern` → **Page Composition（页面组合）**。
+> `Preset` = 可安装的默认页面/组件；`Page Template` = 可复制/可生成的特殊页面骨架；
+> `Page Composition` = 这两者的上层分类。名字直接说“是什么”，不用“配方/模式”这类隐喻。
+
+页面组合分两档，**开箱即用归 preset，不归 core**：
+
+#### A. Preset 页面（默认可运行，薄组合）
+
+这些是真实组件，放在 `packages/preset-console/src/pages/`，
+由 `PageLayout + View + 官方 binding` 组成。它们是**页面级 composition root**：
+允许调用 `useCollectionPage`/`useRecord`/`useCommandForm`/`useStream`，
+但不实现业务规则、不内嵌实体名、不自己写 fetch。
+它们是“开箱即用”的默认路径，但可以被 View/Control/headless 逐层替换。
+
+| Preset 页面 | 组合 | 退出方式 |
+|---|---|---|
+| `CollectionPage` | `PageLayout` + `CollectionView` + `useCollectionPage` | 用 `PageLayout + CollectionView` 手装 |
+| `RecordPage` | `PageLayout` + `RecordView` + `useRecord` | 用 `PageLayout + RecordView` 手装 |
+| `FormPage` | `PageLayout` + `FormView` + `useCommandForm` | 用 `PageLayout + FormView` 手装 |
+| `CrudPage` | `CollectionPage` + create/edit/delete 默认动作 + `CrudFields` | 用 `CollectionView` + 自己接命令 |
+| `SettingsPage` | `PageLayout` + `SectionCard × n` + `usePreference` | 手装 |
+| `WizardPage` | `PageLayout` + `Stepper` + `FormView`/Stream 等待步 | 手装 |
+| `EventsPage` | backlog `useCollection` 定锚 × `useStream` 续订 × `EventFeed` | 手装 |
+
+**`CrudPage` 的类型面（补充）**：不要再用 v2 `CommandDescriptor<any>` + `FieldDef<T>`。
+
+```ts
+interface CrudPageProps<Row, CreateInput, UpdateInput = CreateInput, DeleteInput = unknown> {
+  source: CollectionSource<Row>;
+  search: CollectionSearch<CollectionState>;
+  from: string;
+  columns: readonly Column<Row>[];
+  filters?: readonly FilterField[];
+  fields: CrudFields<Row, CreateInput, UpdateInput>;
+  create?: {
+    command: Command<CreateInput, Row>;
+    host?: "dialog" | "drawer" | "page";
+    title?: string;
+    defaults?: Partial<CreateInput>;
+  };
+  update?: {
+    command: Command<UpdateInput, Row>;
+    host?: "dialog" | "drawer" | "page";
+    title?: string;
+    toInput?: (row: Row) => Partial<UpdateInput>;
+  };
+  delete?: {
+    command: Command<DeleteInput, unknown>;
+    title?: string;
+    toInput?: (row: Row) => DeleteInput;
+  };
+  getRowId: (row: Row) => string;
+  empty?: ReactNode;
+  errors?: { describe?: (error: ApiError) => string };
+  /** Required when a host is "page"; navigate to a FormPage route. */
+  onPageHost?: (
+    request: { mode: "create" } | { mode: "edit"; row: Row },
+  ) => void;
+}
+
+// CrudFields 见 §6.5（view/create/update/filters + createDefaults/toUpdateInput）
+```
+
+**三种 host 一次定死**：
+
+- `dialog` / `drawer`：CrudPage 内置宿主；
+- `page`：CrudPage 调 `onPageHost`，应用导航到 `FormPage` 路由
+  （`/widgets/new`、`/widgets/:id/edit`）；preset 不内嵌路由约定。
+
+- create/update/delete 的 Input 类型独立；`toInput` 显式做 Row → Input。
+- 默认 delete input = `getRowId(row)`；默认 update input = row 本身（需显式 `toInput` 才安全）。
+- 字段集不同（创建有 password、更新没有）是常态，不强行 `FieldDef<T>`。
+- `CrudPage` 只组合默认 dialog/drawer 与 `CrudFields`；不内嵌业务规则。
+
+**Preset 页面的约束**：
+
+- 只做组合与默认值；不实现业务、不内嵌实体名。
+- **允许调用官方 binding**（`useCollectionPage`/`useRecord`/`useCommandForm`/`useStream`），
+  因为它是页面级 composition root；但不得自己写 fetch/协议/错误映射。
+- 所有 part 都是 ReactNode/函数槽；可以替换任意一段。
+- 允许薄配置（`source`/`search`/`from`/`columns`/`filters`/`crud`/`host`/`pageSize` 等），
+  但不允许 v2 `TablePage` 那种“列+过滤+分页+四态+CRUD+弹窗+动作”一锅端。
+- 可以被消费方 copy/fork；`preset` 与 `Page Template` 的边界是“是否默认可运行”。
+
+#### B. Page Template（文档/脚手架/可 fork）
+
+- `docs/page-templates/*.md`：手装步骤 + 代码。
+- `uikit init` / `docs/page-templates/**`：生成或复制到消费方。
+- 适用于 preset 不覆盖的特殊页面；不承诺 API。
+
+**为什么不是 `TablePage` 2.0？**
+
+| v2 `TablePage` | v3 preset `CollectionPage`/`CrudPage` |
+|---|---|
+| 在 registry 核心，和 DataTable/FieldDef 同级 | 在 preset 层，core 不含页面 |
+| 同时拥有列/过滤/分页/四态/CRUD/弹窗/动作 | 只组合 `PageLayout + CollectionView + useCollectionPage` |
+| `FieldDef<T>` 同时驱动 Row/Input/URL | `FieldView<Row>`/`FieldInput<Input>`/`FilterField` 三拆 |
+| 无法逐层退出，改一点要 fork 整页 | L0→L1→L2→L3→L4→L5→L6 逐层退出 |
+| 页壳/数据/字段/CRUD 焊死 | 壳可换、View 可换、字段可换、CRUD 可换 |
+
+**禁止**把 preset 页面放进 core 的 stable 导出；core 只认 View/Control/headless。
+preset 页面是“有观点的默认值”，不是“框架的页面类型系统”。
+
+### 6.5 字段模型
+
+**拆成三个类型，不再用一份 `FieldDef<T>` 焊死。**
+
+```ts
+export interface FieldView<T> {
+  name: keyof T & string;
+  kind: "text" | "number" | "boolean" | "datetime" | "enum" | "reference";
+  label?: string;
+  list?: {
+    sortable?: boolean;
+    filter?: "fuzzy" | "exact" | "enum" | "datetime";
+    hidden?: boolean;
+    width?: string;
+    render?: (row: T) => ReactNode;
+  };
+  detail?: {
+    section?: string;
+    monospace?: boolean;
+    render?: (row: T) => ReactNode;
+  };
+  options?: readonly { value: string; label: string }[]; // enum
+  /** reference 的读取配置（type-only；由 ReferenceValue 用 useLookup 执行） */
+  reference?: {
+    source: LookupSource<any, any>;
+    getLabel: (row: any) => string;
+    getValue: (row: any) => string;
+  };
+}
+
+export interface FieldInput<I> {
+  name: keyof I & string;
+  kind: "text" | "number" | "boolean" | "datetime" | "enum" | "reference";
+  label?: string;
+  placeholder?: string;
+  required?: boolean | string;
+  input?: (args: { form: FormApi<I>; name: keyof I & string; field: FieldInput<I> }) => ReactNode;
+  options?: readonly { value: string; label: string }[];
+  reference?: { source: LookupSource<any, any>; getLabel: (row: any) => string; getValue: (row: any) => string };
+}
+
+export interface FilterField {
+  field: string;
+  label?: string;
+  kind: "text" | "exact" | "enum" | "datetime";
+  op?: Operator;
+  options?: readonly { value: string; label: string }[];
+  as?: "input" | "select" | "tabs" | "range" | "presets";
+  presets?: readonly DatetimePreset[];
+}
+```
+
+可选便利层（用于 80% 的 CRUD）：
+
+```ts
+export interface CrudFields<Row, CreateInput, UpdateInput = CreateInput> {
+  view: readonly FieldView<Row>[];
+  create: readonly FieldInput<CreateInput>[];
+  update: readonly FieldInput<UpdateInput>[];
+  filters?: readonly FilterField[];
+  createDefaults?: Partial<CreateInput>;
+  toUpdateInput?: (row: Row) => Partial<UpdateInput>;
+}
+
+export function crudFields<Row, CreateInput, UpdateInput = CreateInput>(
+  spec: CrudFields<Row, CreateInput, UpdateInput>,
+): CrudFields<Row, CreateInput, UpdateInput>;
+```
+
+**规则**：
+
+- `FieldView` 只管列表/详情，不 import 数据层；`reference` 的解析组件在
+  `ReferenceValue` 中按 `lookup` 注入，不内嵌 Resource。
+- `FieldInput` 只管表单，`I` 是输入类型，可以与 Row 不同。
+- `FilterField` 只管过滤控件；URL schema 显式声明，不靠 `specOf` 反向推导。
+- 表单初值类型是 `Partial<CreateInput>` / `Partial<UpdateInput>`，不是
+  `Record<string, unknown>`；Row → Input 用显式 `toUpdateInput`。
+- 动态 schema 表单（torchwood documents）用自定义 `FormView` + `FieldInput[]`
+  的生成逻辑；核心不假设字段集静态。
+- `required` 只是快捷校验；复杂校验用 Standard Schema。
+
+### 6.6 控件/视图/壳的 props 原则
+
+1. **控件不拿绑定句柄**；拿 `rows/columns/value/onChange`。
+2. **视图拿绑定句柄**；负责把句柄翻译成控件 props。
+3. **壳不拿数据**；拿 `title/actions/tabs/children`。
+4. **所有 part 都是 ReactNode 槽**；结构性逃生舱保留。
+5. **不要为了“减少 props”隐藏数据获取**；隐藏取数会让测试和复用变难。
+6. **不要造 `*Panel` 作为 `*Page` 的另一半**；Panel 是 View，Page 是 preset/Page Template。
+7. **一个页面只有一个 h1 所有者**：preset `PageLayout` 或应用自有壳。
+8. **一个页面只有一个页头**；core View 不渲染 title/description/actions 页头。
+9. **定制 API 统一四件套**：
+   - `className` + `classNames`（关键 part 的类名槽）；
+   - `render`/`asChild`（替换节点/组合自定义组件）；
+   - ReactNode/函数槽（替换区域）；
+   - `data-*` 状态属性（供 CSS 选择器/测试）。
+   不要求消费者 fork 整个组件才能改一处样式/结构。
+
+---
+
+## 7. 分发、文档与质量门
+
+### 7.1 包与目录
+
+**目标：5 个运行时分包 + 1 个可选 UI adapter + 2 个工具包 + 1 个 meta 包。**
+
+```
+packages/
+  core/                @lynxland/uikit-core
+    src/kernel/        L2 契约（零依赖、零 React）
+    src/schema/        CollectionState URL codec（纯 TS + Standard Schema）
+    src/adapters/      L3 REST/client/mock/transport（零 React）
+    exports:           .  /kernel  /schema  /adapters
+
+  react/               @lynxland/uikit-react
+    src/               L4 数据/命令/流绑定（禁 Router）
+    src/router/        L4 URL 绑定（useSearchState/useCollectionPage）
+    exports:           .  /router
+
+  surfaces/            @lynxland/uikit-surfaces
+    src/values/        纯值视图
+    src/controls/      DataTable/FilterBar/Pager/Tabs/Form/FieldInputs/...
+    src/views/         CollectionView/RecordView/FormView/LogViewer/EventFeed/...
+    src/chrome/        PageLayout/AppShell/SectionCard/...
+    src/fields/        FieldView/FieldInput/FilterField/CrudFields
+    src/adapter.ts     UiAdapter 类型 + UiAdapterProvider
+    src/surfaces.css   语义结构类 + CSS 变量（无 Tailwind 依赖）
+    exports:           .  /surfaces.css
+
+  ui-shadcn/           @lynxland/uikit-ui-shadcn
+    src/primitives/    Base UI + shadcn 基元
+    src/tokens/        tokens.css（shadcn 语义名 + --status-* + --chart-*）
+    src/adapter.ts     shadcnAdapter（实现 surfaces 的 UiAdapter）
+    exports:           .  /tokens.css
+
+  preset-console/      @lynxland/uikit-preset-console
+    src/pages/         CollectionPage/RecordPage/FormPage/CrudPage...
+    src/index.ts       默认 preset（surfaces + ui-shadcn + 默认 fields/CRUD/actions）
+    exports:           .
+
+  testing/             @lynxland/uikit-testing
+  cli/                 @lynxland/uikit-cli
+  meta/                @lynxland/uikit（meta：一键安装/转发 preset）
+    exports:           .  /preset.css（surfaces.css + shadcn tokens）
+  ui-plain/            @lynxland/uikit-ui-plain（可选最小 UI adapter）
+
+apps/demo
+```
+
+**依赖方向**：
+
+```
+core (零 React)
+  ↑
+react (peer: React/TanStack)
+  ↑
+surfaces (deps: core + react; peer: React)
+  ↑                         ↑
+preset-console (deps: surfaces + ui-shadcn)
+  ↑
+@lynxland/uikit (meta, optional)
+
+ui-shadcn / ui-plain (peer: React; type-only import surfaces.UiAdapter)
+```
+
+**依赖矩阵**：
+
+| 包 | dependencies | peerDependencies | React? | UI? |
+|---|---|---|---|---|
+| `@lynxland/uikit-core` | 无 | 无 | 否 | 否 |
+| `@lynxland/uikit-react` | core | react, tanstack query/form/router | 是 | 否 |
+| `@lynxland/uikit-surfaces` | core, react | react | 是 | 仅 contract |
+| `@lynxland/uikit-ui-shadcn` | — | react, `@base-ui/react`, surfaces（type-only） | 是 | 是 |
+| `@lynxland/uikit-ui-plain` | — | react, surfaces（type-only） | 是 | 是 |
+| `@lynxland/uikit-preset-console` | core, react, surfaces, ui-shadcn | react | 是 | 是 |
+| `@lynxland/uikit-testing` | core, react | react, `@testing-library/react` | 是 | 否 |
+| `@lynxland/uikit-cli` | — | node | 否 | 否 |
+| `@lynxland/uikit` (meta) | core, react, surfaces, preset-console | react | 是 | 是 |
+
+**为什么这样分**：
+
+- `core` 保持无 React：服务端/脚本/非 React 消费方可以只用契约与适配器。
+- `react` 只依赖 TanStack/React：不带 UI、不带 preset。
+- `surfaces` 是**与 UI 库无关的呈现层**：values/controls/views/chrome/fields；
+  只依赖 `UiAdapter` contract，不 import 任何具体 UI 库。
+- `ui-shadcn` 只做视觉基元 + token：实现 `UiAdapter`，可被任何 preset 复用，也可单独替换。
+- `preset-console` 是开箱即用层：依赖 surfaces + ui-shadcn，提供默认页面/字段/CRUD/动作。
+- `testing`/`cli` 是可选工具，不进入运行时依赖链。
+- `@lynxland/uikit` meta 只做一键入口；高级用户直接 import 子包，避免“meta 包变成 god package”。
+
+**根包名 / meta 包**：
+
+- 当前根 `package.json` 名是 `@lynxland/uikit`（private）。v3 要发布同名 meta 包，
+  所以根包改名 **`@lynxland/uikit-workspace`**（private）。
+- `packages/meta` 才是 `@lynxland/uikit`（public，一键入口）。
+- 这是分包时必须先做的冲突消解；否则 meta 包无法发布。
+
+**eject / copy-owned 矩阵**：
+
+| 包 | 安装 | eject/copy-owned | 说明 |
 |---|---|---|---|
-| G1 胶水上收 | uikit | /adapters 注入式工厂 + M9 合流 + demo 换装试点 + 0.6.0 发版 | 无（先行） |
-| G2 规范与 Go 件 | uikit + Go 仓 | docs/console-api.md 定稿 + console-gw 骨架 + 两后端各一试点端点 | 无（与 G1 并行） |
-| G3 服务端迁移 | torchwood / fleetly（Go） | 按域分批迁移到规范；客户端方言槽先吃过渡形、端点迁移完即坍缩默认 | G2 |
-| G4 模板与 init | uikit | apps/template-console + devtool init + 标准姿势成文 | G1 |
-| G5 devtool 深化 | uikit | doctor + scaffold + preset 编码化 | G4 |
-| G6 下游收口 | torchwood / fleetly | 换 upstream 胶水、退过渡件、antipattern 统一、doctor 全绿 | G1+G3（各自侧） |
+| core / react | ✓ | ✗ | 运行时契约/绑定，保持 npm |
+| surfaces | ✓ | ✓ | 可拷进消费方，import 改本地 |
+| ui-shadcn / ui-plain | ✓ | ✗ | UI adapter 用 npm 或自定义包；不 eject 默认 adapter |
+| preset-console | ✓ | ✓ | 默认页面/字段/CRUD 可拷 |
+| testing / cli | ✓ | ✗ | 工具保持 npm |
 
-**执行方式与在途衔接**：uikit 仓批（G1/G2/G4/G5）本仓直做；消费方/Go 批（G3/G6）沿用「下游 prompt 交用户开消费方会话执行」惯例。在途 torchwood 适配批（axiosFetch 桥 + restCollection 换装，prompt 已交）**不推翻**——桥正是方言槽的 torchwood 形，其成果在 G3 服务端迁移前作为过渡件长存，迁移完成后排序/序列化映射层自然坍缩；fleetly 0.5.0 铺开已完成，其 G6 面仅剩 errors/toast 换 upstream 件。
+- eject surfaces/preset 后，import 改成消费方本地路径；`ui-shadcn` 仍是依赖。
+- 自定义 UI 设计：实现一个新的 `ui-*` 包或本地 adapter 模块，不 fork 默认 `ui-shadcn`。
+- copy-owned 由 `@lynxland/uikit-cli eject surfaces|preset-console` 直接拷贝包源码；
+  不再维护 `registry/` 第二份清单。
 
-**冻结与合流改道（2026-10-31 补记，用户裁决）**：服务端轴冻结——服务端模式正提取进 lynxland/lynx-start（Go 侧 shadcn 式基建：kernel 契约库含**错误码区段**与 **crud 分页方言** + 源码模块 registry + init/add/update/doctor CLI + preset 体系），提取完成前动 G2/G3 会与其冲突。待其完成后 G2 重启并改道：**console-gw 独立仓裁决作废——共享 Go 契约件 = lynx-start kernel**（错误码区段+分页方言已在其契约面内）；console API 规范改判为「lynx-start kernel 契约的客户端投影」（字段命名/状态码/错误体随其 kernel 定稿对齐）；鉴权统一大概率由 lynx-start session/access 模块形态决定而非自选 cookie vs Bearer。G3 改判为「两后端采用 lynx-start 模块/kernel」而非自定迁移。连带挂起至重启时点：在途 torchwood 换装批的处置（改按域原子切换 vs 照旧两段式）、规范字段命名（camelCase 倾向待核）。**客户端轴不受影响照常可做**：G1（胶水上收+M9）→ G4（模板+init）→ G5（devtool 深化）均纯 uikit 仓零冲突。联动备注：lynx-start 的 `update` 三方合并（本地/安装基线/upstream）是本仓 devtool migrate 挂账的成熟参照；两侧 preset 体系（devtool preset / lynx-start --preset）命名对齐点届时裁。
+**为什么 core 不再拆 kernel/schema/adapters**：
+
+- 三者都是零 React、体量小、共同构成“无头数据面”；拆成三包只会增加安装矩阵。
+- 用子路径 `/kernel`、`/schema`、`/adapters` 已能按需引入。
+- 触发再拆的条件：出现只想要 kernel 契约、连 schema/adapters 都不想装的服务端消费者。
+  在此之前，`core` 是“适当的包”，不是 god package。
+
+**为什么 router 不单独成包**：
+
+- `@lynxland/uikit-react/router` 是可选子路径，`@tanstack/react-router` 是可选 peer；
+  不装 Router 的消费者不会进入这条路径。
+- 单独成包会多一个版本对齐点，收益小于成本。
+
+**为什么 testing/cli 单独成包**：
+
+- `testing` 依赖 `@testing-library/react`；不能强塞给运行时。
+- `cli` 是 Node 工具，不进前端 bundle。
+
+**版本策略**：
+
+- **fixed group**：core/react/surfaces/preset-console 同版本发布，避免组合矩阵。
+- **独立版本**：`ui-shadcn`/`ui-plain`（跟 Base UI/shadcn 演进）、`testing`、`cli`；
+  它们用 peer range 对齐 core/surfaces contract。
+- `@lynxland/uikit` meta 跟 preset 同版本。
+- core 1.0 后遵守 semver；preset 可独立 minor/major，但 contract 版本跟 core。
+- 不再有“所有代码都在 core”的包；core 只保留 headless 层。
+
+**导出建议**：
+
+- `@lynxland/uikit-core` 根：契约 + schema + adapters（无 React）。
+- `@lynxland/uikit-core/kernel`、`/schema`、`/adapters`：显式子路径。
+- `@lynxland/uikit-react`：数据/命令/流绑定；`/router`：URL 绑定。
+- `@lynxland/uikit-surfaces`：values/controls/views/chrome/fields + `UiAdapter` 类型 + `/surfaces.css`。
+- `@lynxland/uikit-ui-shadcn`：默认 UI adapter；`/tokens.css`。
+- `@lynxland/uikit-preset-console`：默认 preset。
+- `@lynxland/uikit-testing`、`@lynxland/uikit-cli`。
+- `@lynxland/uikit`：meta 一键入口；不承载实现。
+- 旧 `@lynxland/uikit-core` 根导出 React hooks **同步删除**；不做兼容转发。
+
+### 7.2 UI adapter contract：适配不同 UI 设计
+
+> **命名说明**：不用 `Skin` / `Theme` / `Foundation`。
+> `Skin` 太像“纯视觉皮肤”；`Theme` 只覆盖 token；`Foundation` 与 Base UI 混淆。
+> **UI Adapter** 准确表达它的角色：把 uikit 的 surfaces 适配到某个 UI 库/设计系统，
+> 由第三方实现，包含 primitives + tokens + 受控行为。
+
+**问题**：当前 registry 块 import 消费方 `@/components/ui/*`（Button/Card/Badge/Input…），
+两家消费方的基元方言与版本不一致；`devtool` 只能靠 profile 做 token 类名重写，
+这是“分发适配器”在替“组件契约”擦屁股。v3 一步到位统一到 **Base UI + shadcn**，
+不再维护 Radix 默认分支。
+
+**v3 规则**：
+
+1. **UI adapter = 视觉基元 + token，不是完整组件库**。Control/View 只依赖 UI adapter contract，
+   不 import 消费方 `@/components/ui/*`。
+2. **UI adapter contract 最小面**（受控 wrapper，不是原始 UI 库 API）：
+   ```ts
+   interface UiAdapter {
+     Button: Component<ButtonProps>;
+     Input: Component<InputProps>;
+     Textarea: Component<TextareaProps>;
+     Select: Component<SelectProps>;
+     Checkbox: Component<CheckboxProps>;
+     DateTimeInput: Component<DateTimeInputProps>;
+     Switch: Component<SwitchProps>;
+     Field: Component<FieldProps>;
+     Popover: Component<PopoverProps>;
+     Menu: Component<MenuProps>;
+     Tabs: Component<TabsProps>;
+     Dialog: Component<DialogProps>;
+     Drawer: Component<DrawerProps>;
+     Badge: Component<BadgeProps>;
+     Card: Component<CardProps>;
+     Table: { Root; Header; Body; Row; Head; Cell; Caption };
+     icons: { ChevronDown; ChevronLeft; ChevronRight; ChevronUp; Check; X;
+              Search; Copy; Eye; EyeOff; MoreHorizontal; Loader };
+     cx?: (...values) => string;
+   }
+   ```
+   | 基元 | 受控 props（最小） | 说明 |
+   |---|---|---|
+   | Button | `variant/size/disabled/loading/onClick/children` | 受控按钮 |
+   | Input / Textarea | `value/onChange/placeholder/type/disabled` | 原生控件语义 |
+   | Select | `value/onValueChange/options/placeholder/disabled` | 不暴露 Base UI compound API |
+   | Checkbox | `checked/onCheckedChange/disabled` | `boolean \| "indeterminate"` |
+   | DateTimeInput | `value/onChange/disabled/min/max` | 值用 `YYYY-MM-DDTHH:mm`；adapter 自绘 picker，不依赖原生弹窗 |
+   | Switch | `checked/onCheckedChange/disabled` | 受控 |
+   | Field | `label/description/error/required/htmlFor` | label/说明/错误包装 |
+   | Popover | `open/onOpenChange/trigger/children` | trigger 作为元素渲染，不嵌套 button |
+   | Menu | `trigger/items/align/side` | 操作菜单；item 支持 icon/danger/separator |
+   | Dialog / Drawer | `open/onOpenChange/title/description/footer/children` | 内部处理 portal/focus/esc |
+   | Tabs | `items/value/onValueChange/variant` | 受控、键盘/a11y 内置 |
+   | Badge / Card / Table | `tone/variant/children/className` | 简单展示 |
+   | icons | 12 个受控 SVG | 不强制 lucide/具体图标库 |
+
+   - 具体类型可以按 UI 库调整，但**名字/语义**固定；不把 Base UI 的
+     `Root/Trigger/Portal` 直接泄漏给 surfaces。
+   - `UiAdapter` 类型与 `UiAdapterProvider` 住在 `@lynxland/uikit-surfaces`；
+     具体实现住在 `@lynxland/uikit-ui-shadcn`（导出 `shadcnAdapter`）。
+   - 不要求 UI adapter 提供业务组件（DataTable/FilterBar/Form 由 uikit surfaces 提供）。
+3. **Token contract**：
+   - 标准语义变量：`--background` / `--foreground` / `--card` / `--muted` /
+     `--muted-foreground` / `--border` / `--primary` / `--destructive`；
+   - 状态/图表扩展：`--status-neutral` / `--status-success` / `--status-warning` /
+     `--status-danger` / `--status-info` / `--chart-1..N`；
+   - 删除 kit 私有方言（`text-muted` / `bg-panel` / `border-line` / `text-fg` / `text-err`）。
+4. **默认 UI adapter = Base UI + shadcn**（一步到位）。shadcn 当前基础是 Base UI；
+   fleetly/torchwood 的 Radix 依赖同批迁移，不保留 Radix 默认分支。第三方 UI adapter 可以是
+   Mantine、Ant Design、纯 HTML、消费者自有设计系统。
+   - `ui-shadcn` 的复杂基元（Dialog/Drawer/Select/Tabs/Tooltip/Popover）用 Base UI；
+     简单基元（Button/Input/Card/Badge/Skeleton）保持普通 shadcn 结构。
+   - **不提供 Radix 兼容层**：消费方同批删除 `@radix-ui/*` 依赖，重生成 shadcn 组件，
+     改 import 到 `@lynxland/uikit-ui-shadcn`；Radix 仅作为第三方/过渡 adapter 存在。
+   - 这是一次性 cutover，不做“Radix/Base UI 双实现”。
+5. **UI adapter 基元规则**：
+   - 受控 props（`value`/`onChange`/`open`/`onOpenChange`），不拥有业务状态；
+   - 转发 `ref`/ARIA/键盘行为；包装第三方库时不破坏可访问性；
+   - 提供 `render`/`asChild` 或等价逃生口（可选但推荐）；
+   - 不 import 数据层/绑定层；不写 fetch/错误映射；
+   - 复杂基元（Dialog/Drawer/Tabs）由 UI adapter 负责行为，uikit 只负责组合。
+6. **逐实例覆盖**：Control/View 提供 `className`/`classNames`/`styles` 槽；
+   不允许只能 fork 整个块才能改一个间距。
+7. **Tailwind 不是 core 契约**：Tailwind 只是默认 UI adapter/preset 的样式实现。
+   `plain` UI adapter 可以用 CSS Modules/vanilla CSS；Control/View 不得硬编码颜色字面量，
+   结构 class 必须可被 `classNames` 槽覆盖。
+   **Light/Dark**：`ui-shadcn/tokens.css` 同时提供 `:root` 亮色与 `.dark` 覆盖；
+   surfaces Chrome 提供 `ThemeProvider` / `useTheme` / `ThemeToggle`（class + storage +
+   `themeScript()` 首屏脚本）。主题切换是应用策略，不是 core 原语。
+8. **v2 devtool/token profile 已删除**；copy-owned 改由 `uikit eject` 负责。
+   `doctor` 只校验 UI adapter contract 是否齐全、token 变量是否定义。
+9. **`StatusBadge`/`StatCard` 的 `tone`** 映射到 `ok/warn/err/neutral` 语义 token，
+   不再用 `tone` 字符串直接拼 class。
+10. **Surface styles contract（补充）**：
+    - `@lynxland/uikit-surfaces` 导出 **`surfaces.css`**：语义结构类 + CSS 变量，
+      不依赖 Tailwind；这是 surfaces 的默认布局/间距/状态样式。
+    - `@lynxland/uikit-ui-shadcn` 导出 `tokens.css`（shadcn 语义变量）与 primitives。
+    - `@lynxland/uikit-preset-console` 同时引入 `surfaces.css` + `tokens.css`。
+    - surfaces 的所有组件都接受 `className`/`classNames` 槽；`surfaces.css` 的类可被覆盖。
+    - 如果消费方用 Tailwind 且安装了 npm 包，需要把 `@lynxland/uikit-surfaces/src`
+      （以及 `ui-shadcn` 的源码）加入 Tailwind 的 `@source`/content 扫描；`doctor` 负责检测。
+    - `ui-plain`/自定义 UI adapter 可以不使用 Tailwind，只提供 primitives/tokens；
+      surfaces.css 仍然是默认结构样式。
+
+### 7.3 Preset：开箱即用层
+
+**Preset = 默认 L4–L7 组合 + 默认 fields/CRUD/actions + 默认 UI adapter 选择。**
+
+一个 console preset 至少包含：
+
+- `PageLayout` / `AppShell`（默认 Chrome）；
+- `CollectionView` / `RecordView` / `FormView`（默认 Views）；
+- `CollectionPage` / `RecordPage` / `FormPage` / `CrudPage`（默认页面）；
+- `FieldView` / `FieldInput` / `FilterField` / `CrudFields`（默认字段/过滤/CRUD）；
+- 默认 UI adapter（Base UI + shadcn）与 token；
+- `uikit init` 的 console starter；
+  可选 `uikit eject preset-console` 把页面/字段/CRUD 拷成 copy-owned；
+  UI adapter 不 eject（用 npm 或自定义 `ui-*` 包）。
+
+**约束**：
+
+- preset 页面是 composition root：可以调用官方 binding，但不实现业务、不内嵌实体名、
+  不自己写 fetch/协议/错误映射。
+- 每个 preset 组件都必须是“薄组合”：删除它，消费方可以用下层 View/Control 手装。
+- preset 不能成为新的 `TablePage` god component；允许的配置面只到
+  `source`/`search`/`from`/`columns`/`filters`/`crud`/`host`/`pageSize`/`slots`。
+- preset 默认以 npm 包分发（便于升级）；提供 `eject` 拷进消费方仓，
+  之后走 `diff` 升级。同一 preset 不混用 install + eject，
+  但 core 同时支持两种消费方式。
+- 第三方可以发布自己的 preset（如 `antd-admin`、`mantine-console`），
+  只要满足 core contracts + UI adapter contract。
+
+**第三方扩展**：
+
+- 第三方可以发布 `@scope/uikit-preset-*` / `@scope/uikit-ui-*`；
+  core 只依赖 contract，不依赖具体 preset/UI adapter。
+- preset/UI adapter 的 contract 版本跟 core semver；1.0 后破坏性变更走 major。
+- core 与默认 preset 不含业务实体名/业务枚举/业务文案；业务扩展留在消费方。
+- 默认 preset/UI adapter 是 MIT；第三方可以自由 fork/替换。
+
+**开箱即用形态（示意）**：
+
+```tsx
+// widgets.ts
+export const widgets = defineEntity({
+  name: "widgets",
+  key: (row) => row.id,
+  scope: ["projectId"],
+  collection: restCollection({ path: (ctx) => `/v1/projects/${ctx.projectId}/widgets` }),
+  commands: {
+    create: { run: createWidget, effects: [invalidate("widgets")] },
+    update: { run: updateWidget, effects: [invalidate("widgets")] },
+    delete: { run: deleteWidget, effects: [invalidate("widgets")] },
+  },
+});
+export const widgetsSearch = collectionSearch({ text: ["name", "id"], defaultSize: 20 });
+
+// routes/widgets.tsx
+function WidgetsPage() {
+  return (
+    <CollectionPage
+      source={widgets.collection}
+      search={widgetsSearch}
+      from={Route.id}
+      columns={widgetColumns}
+      filters={widgetFilters}
+      crud={{ create: widgets.commands.create, update: widgets.commands.update, delete: widgets.commands.delete }}
+    />
+  );
+}
+```
+
+**渐进退出（progressive disclosure）**：
+
+| 级别 | 用法 | 适用 |
+|---|---|---|
+| L0 | `<CollectionPage source search from columns />` | 80% 标准 CRUD 页面 |
+| L1 | `<PageLayout><CollectionView list ... /></PageLayout>` | 换壳/换页面结构 |
+| L2 | `<PageLayout><FilterBar/><DataTable/><Pager/></PageLayout>` | 换控件/自定义布局 |
+| L3 | `useCollectionPage(...) + 自绘 UI` | 换呈现/特殊交互 |
+| L4 | `useCollection(...) + 自写 URL adapter` | 非 Router/特殊状态 |
+| L5 | 实现 `CollectionSource/Command/StreamSource` | 换后端/协议 |
+| L6 | 换 UI adapter / primitives / token | 换 UI 设计系统 |
+
+每一级都必须可用，且**不要求先 fork 上一级**。这就是“开箱即用 + 可定制”的分层。
+
+**开箱即用验收**：
+
+- 新项目 `init` 后，能用 < 30 行代码跑出一个列表页（含 URL/四态/分页/过滤）。
+- 列表→详情→编辑→删除的主路径无需手写数据接线。
+- 换一个 UI adapter（不改页面代码）后，视觉基元整体变化。
+- 删除 preset 页面、改用 `PageLayout + CollectionView` 后，页面行为不回归。
+
+### 7.4 文档架构
+
+| 文件 | 职责 | 禁止 |
+|---|---|---|
+| `docs/philosophy.md` | 设计理念/取舍判据/竞品定位 | 不写具体 API 细节 |
+| `docs/design.md` | 当前规范（本文） | 不写日期化迁移日志 |
+| `docs/design-history.md` | draft-2 及历史裁决 | 不作为当前事实源 |
+| `docs/audits/*.md` | 审计证据 | 不作为规范 |
+| `docs/page-templates/*.md` | 页面模板（可复制代码） | 不承诺 API |
+| `docs/api/*.md` | API reference（可由源码生成） | 不写设计理由 |
+| `docs/adr/*.md` | 单条决策记录（日期/背景/取舍） | 不写多主题 |
+| `docs/migrations/*.md` | 批次迁移日志（旧 §12） | 不混入规范 |
+| `docs/SKILL.md` | Agent 操作手册（当前 API + 迁移提示） | 不写与 design 相反的规则 |
+| `AGENTS.md` | 仓库工作流/质量门 | 不重复设计摘要 |
+| `README`/`llms.txt` | 入口/地图/状态 | 不写详细设计 |
+
+**文档检查（已进 `pnpm check` / `scripts/doc-check.mjs`）**：
+
+- `README` 的版本号 = `packages/core/package.json` 的 version。
+- `docs/design.md` 有版本/日期/状态行。
+- `docs/SKILL.md` 顶部有“当前 API 版本 + design v3 指针”。
+- 禁止在 SKILL 出现已删除规则（如“Page 与 CRUD 页块互斥”）；
+  可用一个小的规则清单测试。
+- 所有 docs 内部链接存在。
+
+### 7.5 质量门
+
+1. **layer-check**：按 §2.1 的层级规则执法；registry 不再整体放行。
+   - `surfaces` 禁 import 具体 UI 库；`ui-shadcn` 禁 import `@radix-ui/*`（默认 adapter 用 Base UI）。
+2. **typecheck**：core 保持 `noUnusedLocals/noUnusedParameters`；控件不得用 `any`
+   接收命令 Input；`CrudPage` 的 create/update/delete Input 类型必须独立。
+3. **unit**：kernel 纯函数全覆盖；URL codec 往返；Effect 应用矩阵；
+   Scope 投影；Stream 终态分诊；Lookup。
+4. **e2e**：URL 前进/后退/深链；四态；过滤/tab/分页；表单三态；
+   stream gapped/resync；a11y（Tabs/DataTable/LogViewer）。
+5. **registry status gate**：`stable` 项必须有真实消费者引用；
+   `pilot` 项在 demo/一个真实页面；`template` 不进入 stable 导出。
+6. **size**：`/adapters` 预算；core/react/surfaces/preset 分包预算；UI adapter 独立预算；
+   不再有 effect 子路径预算。
+7. **doc-check**：见 §7.4。
+8. **preset 验收**：`init` 后列表页 < 30 行；列表→详情→编辑→删除主路径无手写数据接线；
+   换 UI adapter 不改页面代码；拆 preset 页面后行为不回归。
+9. **样式门**：Tailwind 消费方必须通过 `@source`/content 扫描 surfaces + ui-shadcn；
+   `doctor` 检测；`ui-plain` 作为非 Tailwind 验证。
+10. **Base UI a11y**：Dialog/Drawer/Select/Tabs 的焦点/Esc/键盘/ARIA 回归；
+    e2e 至少要覆盖 Tab 退出、Esc 关闭、方向键选择。
+11. **不引入**词表冻结、截图基线、登记制等重治理。
+
+### 7.6 开源发布就绪（补充）
+
+复审后已补 `LICENSE`（MIT）、`CONTRIBUTING.md`、`SECURITY.md`；
+v3 公开发布前还需补齐：
+
+- `CODE_OF_CONDUCT.md`。
+- `.github/`：issue/PR 模板、CI（typecheck/test/lint/build/e2e/publint/attw）、release workflow。
+- changesets 配置 + fixed group；`pnpm publish` 流程（npm 不解析 pnpm catalog）。
+- 每个包 `exports`/`files`/`peerDependencies`/`publishConfig` 审计；净房安装冒烟。
+- API reference 生成（从 `packages/*` 的公开导出）；`llms.txt`/`SKILL.md` 随包分发。
+- 浏览器/React/Node/TanStack 支持矩阵；Base UI + shadcn 版本范围。
+- 安全策略：`npm audit`/Dependabot；发布 provenance（可选）。
+- 代码行为准则：无业务实体名/业务枚举/业务文案进入 core/preset。
+- 发布前跑 `pnpm check` + `pnpm --filter demo e2e` + `publint` + 净房 install。
+- 1.0 之前允许 breaking；1.0 之后 core/react/surfaces 按 semver，preset/UI adapter
+  按独立版本 + contract 兼容窗。
+
+---
+
+## 8. Cutover 路线（无向后兼容）
+
+> **原则：直接替换、同批删除、不做双 API、不做运行时兼容层。**
+> uikit 仍在 dogfooding；v2 是可删除原型。回滚单位是 git branch，不是运行时 fallback。
+
+### Batch 0：文档与决策（本次）
+
+- 归档 draft-2 → `docs/design-history.md`。
+- 新增 `philosophy.md` / `design.md` / 审计 / ADR / cutover 计划。
+- 更新 `AGENTS.md`/`README`/`llms.txt`/`SKILL.md` 的版本边界。
+- **运行时代码不动**；但明确：下一批直接重写，不写兼容层。
+
+### Batch 1：core greenfield（直接删除旧实现）
+
+1. **重写 `packages/core/src/kernel`**：
+   - 新类型：`CollectionSource`/`RecordSource`/`LookupSource`/`Entity`/
+     `CollectionState`/`CollectionRequest`/`CollectionPage`/`CollectionWindow`/
+     `Command`/`Outcome`/`Effect`/`StreamSource`/`StreamHandle`/`ApiError` class。
+   - 删除 `Resource`、`ResourceSpec`、`CommandDescriptor` 的 `__` 字段、
+     `legacyKeys`、`scopeOf`、`AttachedCommands`、`SubscriptionDescriptor`。
+   - 查询键工厂只依赖 `Entity.name`/`scope` 与公开类型。
+2. **重写 `schema`**：
+   - `collectionSearch(spec)` 只产出 `CollectionState` 的 Standard Schema + codec；
+   - `toRequest(state)` 纯函数；不再从 `FieldDef`/`specOf` 反向推导。
+3. **重写 `adapters`**：
+   - rest/client/mock 统一输出 `CollectionPage`；
+   - `ApiError` 实例；一条错误收敛；
+   - `createHttp` 删除（或并入 rest 的 fetch 注入）；Effect 默认移除。
+4. **重写 `react`**：
+   - `useCollection`（数据）/ `useRecord` / `useLookup` / `useCommand` /
+     `useCommandForm` / `useStream`；
+   - **不 import Router**；不导出 `useCollectionData`/`useBatch`/`useSubscription`。
+5. **新建 `react-router`**：
+   - `useSearchState` / `useCollectionPage`；URL 写入契约只在这里。
+6. **重写 `testing`**：按能力 mock（source/command/stream），不再按 Resource。
+7. **测试同批重写**：删除旧契约测试，新增 source/command/stream/URL/effects 测试。
+8. **破坏性变更直接落地**：版本号升 major（v3.0.0）；不写 deprecated 注释。
+
+### Batch 2：registry greenfield（直接删除旧目录）
+
+- 删除 v2 `registry/{values,query,command,subscription,shell}` 与 `scripts/devtool.*`。
+- copy-owned 改由 `@lynxland/uikit-cli eject` 直接拷包源码，不再维护 registry 分层：
+  - `values/`：纯值视图；
+  - `controls/`：DataTable/FilterBar/Pager/Tabs/Form/FieldInputs/FieldGrid/AsyncState；
+  - `views/`：CollectionView/RecordView/FormView/LogViewer/EventFeed/StageTimeline；
+  - `chrome/`：PageLayout/AppShell/SectionCard/ScopeSwitcher/Stepper/RouteErrorBoundary；
+  - `templates/`：Page Template（不承诺 API）。
+- 新建 `packages/surfaces`（`@lynxland/uikit-surfaces`）：
+  values/controls/views/chrome/fields + `UiAdapter` contract/provider。
+- 新建 `packages/ui-shadcn`（`@lynxland/uikit-ui-shadcn`）：
+  Base UI + shadcn 基元；`shadcnAdapter`；token contract
+  （`--background`/`--card`/`--border`/`--status-*`/`--chart-*`）。
+- 新建 `packages/ui-plain`（可选最小 UI adapter）。
+- 新建 `packages/preset-console`（`@lynxland/uikit-preset-console`）：
+  `pages/`（CollectionPage/RecordPage/FormPage/CrudPage/SettingsPage/WizardPage/EventsPage）
+  + 默认 `surfaces`/`ui-shadcn` 组合 + 默认 fields/CRUD/actions。
+- 新建 `packages/meta`（`@lynxland/uikit`）一键转发 preset。
+- 删除 `Page`/`ListPage`/`ListPanel`/`TablePage`/`TablePanel`/`DetailPage`/`DetailPanel`/
+  `FormPage`/`FormPanel`/`FormDialog`/`FormDrawer`/`FieldDef`/`specOf`。
+- `DataTable`/`FilterBar`/`Pager`/`Tabs` 一次改成受控 props；**不保留 `list` props**。
+- token 一次切到标准语义名；`devtool` token profiles 已删除。
+- `registry.json`/preset 清单重生成；stable/pilot/template 一次标定。
+
+### Batch 3：demo + 两个 console 同批迁移
+
+- **demo**：全量重写为新 API，直接使用 `@lynxland/uikit-preset-console` 默认页面 + 默认 UI adapter；
+  另留一个“换 UI adapter/拆 preset”对照页，作为开箱即用与可定制性的活文档。
+- **fleetly**：默认采用 `@lynxland/uikit-preset-console` 的视图/页面；`PageFrame`/`ModulePage`
+  可以保留为应用 Chrome（替换 preset PageLayout），内容换成 `CollectionView`/`RecordView`/`FormView`；
+  `useCollectionPage` 替换旧 `useCollection`。
+- **torchwood**：默认采用 `preset/console`；`PageCard`/`PageHeader` 可保留为应用 Chrome；
+  keyset 列表换 `CollectionView` + `Pager`；表单换 `FormView` + `useCommandForm`。
+- 两个消费方与 uikit 同一批 PR/分支；不发布中间兼容版本。
+- 第一方应用保持“优先 preset 默认，必要时替换 Chrome/UI adapter”的 dogfooding 姿态；
+  不把 fleetly/torchwood 的业务词汇带进 core/preset。
+- 验收：
+  - 页面 LOC 下降或持平；
+  - 无 `any` 进入表单 Input；
+  - 后退/前进/深链行为不回归；
+  - 控件零 `useQuery`/`useNavigate`/`window.history`；
+  - `useCollection` 不再 import Router。
+
+### Batch 4：收口
+
+- 删除所有旧导出、旧 registry 项、旧文档段落。
+- `SKILL.md` 重写为 v3 API；v2 版本归档到 `docs/design-history.md` 或删除。
+- `README`/`llms` 以 v3 为唯一入口。
+- `pnpm check` 全绿；`doc-check` 确认无 v2 矛盾。
+
+### 一次性 codemod（不是兼容层）
+
+codemod 只用于**改写消费方源码**，不保留旧 API：
+
+| 旧 | 新 |
+|---|---|
+| `defineResource` | `defineEntity`（或裸 source） |
+| `useCollectionData` | `useCollection` |
+| `useCollection`（页面） | `useCollectionPage` |
+| `useBatch` | `useLookup` |
+| `useSubscription` | `useStream` |
+| `ListPage`/`ListPanel` | `CollectionView` |
+| `Page` + `ListPage` | `PageLayout` + `CollectionView` |
+| `TablePage`/`TablePanel` | preset `CrudPage` 或 Page Template 手装（人工） |
+| `DetailPage`/`DetailPanel` | `RecordView`/`RecordPage` |
+| `FormDialog`/`FormDrawer`/`FormPage` | `Dialog`/`Drawer`/`PageLayout` + `FormView` |
+| `FieldDef`/`specOf` | `FieldView`/`FieldInput`/`FilterField` + 显式 `collectionSearch`（人工） |
+
+**只自动改机械面**；Row/Input 拆分、CRUD 页面模板、字段语义必须人工判断。
+codemod 跑完即删除旧名，不生成 deprecated 包装。
+
+---
+
+## 9. 反模式与幻觉诱饵
+
+### 9.1 反模式
+
+1. **按数据能力给 UI 分族**（query/command/subscription 族）——UI 按呈现面分层。
+2. **把 preset 页面放进 core，或做成 `TablePage` 式 god component**——preset 页面是薄组合；
+   core 只认 View/Control/headless；特殊页面归 Page Template。
+3. **给控件传 `CollectionHandle`**——控件收受控 props；View 才拿句柄。
+4. **在控件里 `useQuery`/`useNavigate`/`window.history`**——控件零数据/零路由。
+5. **用 `FieldDef<T>` 同时驱动 Row 和 Input**——拆 `FieldView<Row>`/`FieldInput<Input>`。
+6. **用 `specOf(fields)` 反向生成 URL schema**——schema 显式声明；过滤控件读 `FilterField[]`。
+7. **把 `Resource` 当第四原语**——它是可选 Entity 分组。
+8. **在公开类型里放 `__resource`/`__scopeKeys`/`__id`**——隐藏协议不是契约。
+9. **用“有没有 policy”判别 descriptor/transport**——用 factory/object 类型判别，或分开 API。
+10. **把 `Subscription` 当 pub/sub**——它是带游标的 Stream。
+11. **在页面层缓存一份 URL 状态**（FilterBar Draft）——从 state 派生；仅允许瞬态输入 draft。
+12. **用 `window.history.back()` 实现 keyset prev**——分页策略归页面/`useCollectionPage`。
+13. **在 registry 块里写页容器类**（`mx-auto`/`p-6`）——壳归 Chrome。
+14. **给页面套两个壳**（`PageFrame` + `Page` + `ListPage` header）——一个 h1/一个页头。
+15. **在 UI adapter 里做 token 类名重写**——用 UI adapter contract；不要第三套方言。
+16. **用 demo 当第二消费者**——demo 是冒烟，不是采纳证据。
+17. **在 core 硬依赖 Effect**——Effect 是可选实现细节。
+18. **声称 “Effect Schema 单源” 但写手写 parser**——文档必须描述事实。
+19. **只做 headless、没有 preset**——开箱即用不成立；preset 是产品的一部分。
+20. **只支持一种 UI 库/一套 token 方言**——第三方与不同设计系统需要 UI adapter seam。
+21. **用 regex 重写消费方 token 类名**——这是分发适配器在替 UI adapter contract 擦屁股。
+
+### 9.2 幻觉诱饵（训练数据 → 正确姿势）
+
+| 你可能想写的 | 正确姿势 |
+|---|---|
+| react-admin `<Resource name list create>` | `Entity` 只分组能力；路由自己写 |
+| refine `useSubscription(channel, params, onEvent)` | `useStream(source/factory, { cursor, getCursor, onFrame })` 返回流句柄 |
+| refine `useTable` / `pagination.current` | `useCollectionPage` 的 state + `CollectionView` |
+| dataProvider `{pagination, sort, filter}` | `CollectionState` → `CollectionRequest`（显式转换） |
+| Zod `validateSearch`（旧习惯） | `collectionSearch(...).schema`（Standard Schema；内部纯 TS codec） |
+| `<TablePage fields crud>` | `CollectionView` + 页面级 CRUD 页面模板（或 scaffold 生成） |
+| `<FormDialog command fields>` | `Dialog` + `FormView` + `useCommandForm`（页面模板） |
+| `<Page title>` + `<ListPage title>` | 一个 `PageLayout` + 一个 `CollectionView` |
+| `FieldDef<T>` 驱动三视角 | `FieldView<Row>` + `FieldInput<Input>` + `FilterField` |
+| `list.setOrder` inside DataTable | `DataTable sorting/onSortingChange`；View 接线 |
+| `window.history.back()` in pager | 页面/`useCollectionPage` 决定 prev |
+| `Resource` 的 `invalidates` | `Effect[]` + `useCommand` 应用 |
+| `scopeOf` on command | `CommandOptions.scope`（绑定层） |
+| `ApiError` 是 plain object | `class ApiError extends Error` |
+| `useSubscription` 是 pub/sub | `Stream` 是游标帧流 |
+
+---
+
+## 10. 裁决与开放问题
+
+### 10.1 已裁决（v3 默认）
+
+1. **两条轴**：数据能力 ≠ UI 呈现层。
+2. **`Resource` 删除**：v3 不存在兼容别名；用 `Entity`（可选分组）或裸能力。
+3. **URL 绑定分离**：`useCollection` 数据；`useCollectionPage` 页面糖。
+4. **页面分层**：core 不含页面；preset 提供薄的可运行页面
+   （`CollectionPage`/`RecordPage`/`FormPage`/`CrudPage`）；Page Template 提供特殊页面组合。
+   `PageLayout` 在 preset；`CollectionView`/`RecordView`/`FormView` 是 View。
+5. **字段三拆**：`FieldView`/`FieldInput`/`FilterField`；`CrudFields` 可选。
+6. **控件受控**：`DataTable`/`FilterBar`/`Pager`/`Tabs` 不拿绑定句柄。
+7. **Stream 正名**：`useSubscription` → `useStream`；`StreamStatus` 增 `idle`。
+8. **ApiError 类化**。
+9. **token 单源**：标准语义名 + 状态色；devtool token profiles 已删除。
+10. **registry status**：`stable` 需真实消费者；`pilot`/`template` 明确标记。
+11. **无向后兼容**：旧 API 直接删除；codemod 只改源码，不留 deprecated 包装。
+12. **开箱即用归 preset**：core 不含页面；preset 提供默认可运行的页面/壳/字段/CRUD。
+13. **UI 适配归 UI adapter**：Control/View 只依赖 UI adapter contract + token contract；
+    不 import 消费方 ui 基元，不做 token 类名重写。
+14. **明确偏好但可退出**：默认 URL 真相/流一等/失败结果两分/字段基座；
+    每层都有逃生舱（progressive disclosure）。
+
+**非目标（延续旧设计的持证拒签项）**：
+
+- 不造路由抽象层/页面注册表/CRUD 路由生成；TanStack 文件路由是真相。
+- 不做 undo/乐观更新（默认同步等待；重启条件 = 真实消费者需求）。
+- 不做完整 i18n 语言包（messages 通道 + 消费方词条）。
+- 不做后端 adapter 动物园（自有后端；第三方 REST 方言用 rest 工厂注入点）。
+- 不做“组件数量竞赛”；stable 面按真实消费者收缩。
+
+### 10.2 已裁决（接受推荐）
+
+1. **URL serializer = A**：`collectionSearch.serializer` 输出 repeated key
+   （`filter=a:eq:1&filter=b:in:x,y`），挂 Router 的 `parseSearch/stringifySearch`。
+   未知键仍走默认序列化。
+2. **Effect = core 零 Effect**：订阅引擎纯 TS；未来如需，放
+   `@lynxland/uikit-core/effect` 可选子路径。
+3. **`Command` 保留**：不改名 `Action`；CQRS 语义清楚。
+4. **默认 preset = npm 包 + `eject`**：`@lynxland/uikit-preset-console` 默认安装，
+   `uikit eject preset-console` 后 copy-owned；同一 preset 不混用 install + eject。
+5. **契约版本 = 跟 core semver**：第三方 preset/UI adapter 的 contract 跟 core；
+   `ui-shadcn`/`ui-plain` 包版本可独立，core/react/surfaces/preset 走 fixed group。
+6. **Pagination = 判别联合**：`CollectionWindow` / `CollectionPage`，不用
+   `QueryWindow` + `Segment` 可选字段。
+7. **meta 包 = 只转发 preset**：`@lynxland/uikit` 只 re-export `preset-console`
+   + 必要的 core/react 类型；高级用户走子包。
+8. **Base UI 迁移 = uikit-rendered first**：先迁 uikit surfaces/ui-shadcn；
+   app-owned Radix（Avatar/DropdownMenu/ScrollArea/Switch 等）同批迁移或明确私有，
+   不混入 `ui-shadcn`。
+
+### 10.3 Cutover 完成的定义
+
+- `docs/SKILL.md` 只描述 v3 API，且与 `docs/design.md` 无矛盾。
+- `registry.json`/preset 的 stable 项全部有真实消费者引用。
+- 两个 console 至少各有一个页面使用 preset 默认页面（或 `PageLayout + View` 手装）。
+- `init` 后一个列表页 < 30 行；列表→详情→编辑→删除主路径无手写数据接线。
+- 换一个 UI adapter 不改页面代码；拆 preset 页面后行为不回归。
+- `pnpm layer-check` 能拦住“控件取数/控件碰 Router/视图碰 Chrome/控件 import 消费方 ui 基元”。
+- 一个静态数组可以渲染 `DataTable`；一个纯命令页面不需要 Entity；
+  一个纯流页面不需要 Entity；一个表单 Input 不需要 `any`。
+- `README`/`llms.txt` 版本与包版本一致。
+
+---
+
+## 附录 A：当前 → 目标映射
+
+| 当前 | 目标 | 处理 |
+|---|---|---|
+| `Resource` / `defineResource` | `Entity` / `defineEntity` | **删除旧名**；codemod |
+| `collection/record/batch` | `CollectionSource/RecordSource/LookupSource` | 重命名 + 类型收窄 |
+| `useCollection`（URL） | `useCollectionPage` | 旧名改为页面糖；数据语义归新 `useCollection` |
+| `useCollectionData` | `useCollection`（数据） | **删除旧名**；codemod |
+| `useRecord` / `useBatch` | `useRecord` / `useLookup` | **删除 `useBatch`**；codemod |
+| `useCommand` | `useCommand` | 保留；effects/scope 出 descriptor |
+| `useCommandForm` | `useCommandForm` | 保留；`FormSpec<I>` |
+| `useSubscription` | `useStream` | **删除旧名**；codemod |
+| `SubscriptionDescriptor` | `StreamFactory` | **删除 descriptor union** |
+| `CommandDescriptor.invalidates/legacyKeys/scopeOf` | `CommandOptions.effects/scope` | 迁出 |
+| `ApiError` plain object | `class ApiError extends Error` | 类化 |
+| `QueryWindow` + `Segment` | `CollectionWindow` + `CollectionPage` | 判别联合 |
+| `FieldDef<T>` | `FieldView<Row>` + `FieldInput<Input>` + `FilterField` | 三拆 |
+| `specOf` | 显式 `collectionSearch` + `FilterField[]` | 删除 |
+| `DataTable list` | `DataTable rows/columns/sorting/...` | 受控化 |
+| `FilterBar list/fields` | `FilterBar fields/value/onChange` | 受控化 |
+| `Pagination` + `KeysetPagination` | `Pager` | 合并 |
+| `Page` | `PageLayout` | 可选 Chrome |
+| `ListPage` / `ListPanel` | `CollectionView` | View |
+| `TablePage` / `TablePanel` | `CrudCollectionPage` 页面模板 | Page Composition |
+| `DetailPage` / `DetailPanel` | `RecordView` + `RecordPage` 页面模板 | View/Page Composition |
+| `FormPage` / `FormPanel` / `Form` | `FormView` + `Form` 控件 | View/Control |
+| `FormDialog` / `FormDrawer` | `Dialog`/`Drawer` + `FormView` 页面模板 | Page Composition |
+| `values/` 族 | `values/`（纯值） | 拆出 model/controls |
+| `query/` 族 | `controls/` + `views/` | 按呈现层拆 |
+| `command/` 族 | `controls/` + `views/` + `templates/` | 按呈现层拆 |
+| `subscription/` 族 | `views/` | 重命名 |
+| `shell/` 族 | `chrome/` | 重命名 |
+| `createHttp` | 可选 `fetch` 增强器 | 降级 |
+| `effect` 硬依赖 | 已移除（订阅引擎纯 TS） | 完成 |
+| token profiles | UI adapter contract + token contract | 删除 token 重写 |
+| `registry/query` 等五族 | `surfaces/` + `preset-console` + `ui-*` | 已删除；CLI eject 拷源码 |
+| 无 preset | `@lynxland/uikit-preset-console` 默认页面/壳/字段/CRUD | 新增（开箱即用） |
+| 无 UI adapter 抽象 | `packages/ui-shadcn` 默认 + UI adapter contract | 新增（UI 适配） |
+
+## 附录 B：一句话记忆
+
+> **数据面：Query / Command / Stream 是能力，Entity 是可选分组。**
+> **呈现面：Value / Control / View / Chrome 是层，Preset 是默认组合，Page Template 是可复制/可生成的特殊页面骨架。**
+> **URL 是可选策略，不是读原语的属性。**
+> **开箱即用归 preset，UI 适配归 UI adapter，壳可替换，页面模板可 fork。**

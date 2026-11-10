@@ -1,180 +1,152 @@
 # @lynxland/uikit
 
-Headless core + copy-owned UI blocks for data-dense console UIs — **Query / Command / Subscription** over TanStack engines.
+Opinionated, headless-first toolkit for data-dense console UIs — **Query / Command / Stream**
+data capabilities composed through explicit React bindings, UI-agnostic surfaces, a replaceable
+UI adapter and a runnable console preset.
 
-[简体中文](README_ZH.md)
+[简体中文](README_ZH.md) · [Design](docs/design.md) · [Philosophy](docs/philosophy.md) · [API guide](docs/SKILL.md)
 
-## The idea
+> **v3 · `3.0.0` · greenfield cutover.** v3 is intentionally **not backward compatible**:
+> `Resource`, `FieldDef`, `Page`, `*Panel`, `TablePage`, `useCollectionData`, `useBatch` and
+> `useSubscription` are deleted, with no aliases or runtime compatibility layers.
+> See the [execution plan](docs/migrations/v3-execution-plan.md) for the consumer codemod.
+> v2 history is archived in [docs/design-history.md](docs/design-history.md).
 
-A console page is three interaction primitives plus one interaction surface, and none of them need a new engine:
+## Why
 
-| Noun | Role | What you get |
-| --- | --- | --- |
-| **Query** | look | Filtered / paginated collections whose window state lives in the URL |
-| **Command** | do | Named verbs returning `CommandResult` branches, with declarative cache invalidation |
-| **Subscription** | listen | Cursor-located **Frame** delivery — backlog → follow, resync after gaps, backoff → polling |
-| **Resource** | surface | The noun the other three attach to; one `defineResource` wires queries, commands and scopes |
+A console page needs three **data capabilities** and a small number of **presentation layers**.
+None of them needs a new engine:
 
-Design principles, held mechanically (not aspirationally):
+| Capability | Role |
+|---|---|
+| **Query** | Cached reads: collections, records, lookups |
+| **Command** | Named writes returning `Outcome` branches, with explicit invalidation effects |
+| **Stream** | Cursor-positioned **frames** — backlog → follow, resync after gaps, backoff/polling |
 
-- **TanStack native.** Router (typed routes + `validateSearch`), Query, Table, Form are the engines. uikit binds them; it does not re-wrap them.
-- **The URL is the truth.** Every query window is URL state. Setters are functional: pagination pushes (history is the paging stack), predicates/sort replace and reset the cursor.
-- **Failure ≠ result.** `ApiError` is a closed set and throws at the transport seam; `CommandResult` comes back as value branches (`ok` / `rejected` / `conflict`) — expected outcomes never travel as exceptions.
-- **Frames, not events.** Subscriptions deliver positioned frames with cursors — resumable, reorderable into buffers, and degradable to polling — not opaque pub/sub callbacks.
-- **Effect lives in the seams.** The kernel is zero-dependency, zero-React algebra. Effect-TS is confined to the schema/adapters layer; `react/` and the block registry cannot even import it (enforced by `pnpm layer-check`).
+**Entity** is an optional grouping for keys/scope/invalidation. It is not a fourth primitive.
 
-## Package & distribution
+Presentation is layered so every part can be replaced:
 
-Two channels, deliberately different:
-
-- **`@lynxland/uikit-core`** (`packages/core`) — the headless core: kernel contracts + URL codec + HTTP pipeline/subscription engine + React bindings + testing harness. Published to npm, source-distributed.
-- **`registry/`** — five families of UI blocks, shadcn-style: you *copy* them, you own the code. Blocks contain no business entities and fetch nothing; they only consume binding output.
-
-```bash
-npm install @lynxland/uikit-core
-# peers: react >=19 · @tanstack/react-query >=5.100 · @tanstack/react-router >=1.120 (optional) · @tanstack/react-form >=1.30 (optional)
 ```
+Value → Control → View → Chrome → Page Composition
+```
+
+- **Controls** are controlled props only: no fetching, no Router, no `window.history`.
+- **Views** translate binding handles into control props; they never render `h1`.
+- **Chrome** owns the page shell and is the only `h1` owner.
+- **Preset pages** are thin compositions; **Page Templates** are copyable special pages.
+
+## Packages
+
+| Package | Role |
+|---|---|
+| `@lynxland/uikit-core` | Headless kernel / URL schema / REST-client-mock-stream adapters. **Zero React, zero Effect.** |
+| `@lynxland/uikit-react` | Data / command / stream bindings. URL lives only in `/router`. |
+| `@lynxland/uikit-surfaces` | Values, controls, views, chrome, fields + the `UiAdapter` contract. |
+| `@lynxland/uikit-ui-shadcn` | Default UI adapter: Base UI + shadcn primitives and semantic tokens. |
+| `@lynxland/uikit-ui-plain` | Optional minimal adapter proving the contract is replaceable. |
+| `@lynxland/uikit-preset-console` | Default runnable pages: Collection / Record / Form / CRUD / Settings / Wizard / Events. |
+| `@lynxland/uikit-testing` | `renderWithKit`, `createTestRouter`, capability-shaped mocks. |
+| `@lynxland/uikit` | One-install meta entry; forwards the console preset. |
+
+The root package is the private workspace `@lynxland/uikit-workspace`; `packages/meta` owns
+the public `@lynxland/uikit` name.
 
 ## Quick start
 
-Declare a Resource, share one search schema between route and bindings, read the collection:
+```bash
+pnpm add @lynxland/uikit @tanstack/react-query @tanstack/react-router \
+  @tanstack/react-form @tanstack/react-table
+```
 
 ```tsx
-// lib/projects.ts
-import { mockCollection } from "@lynxland/uikit-core/adapters";
-import { defineResource } from "@lynxland/uikit-core/kernel";
-import { collectionQuerySchema } from "@lynxland/uikit-core/schema";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createRouter, RouterProvider } from "@tanstack/react-router";
+import { PresetProvider } from "@lynxland/uikit";
+import "@lynxland/uikit/preset.css";
 
-export interface Project {
-  id: string;
-  name: string;
-  createdAt: string;
-}
+const queryClient = new QueryClient();
+const router = createRouter({ routeTree });
 
-const mock = mockCollection<Project>(
-  [
-    { id: "p1", name: "edge-1", createdAt: "2026-01-04T09:00:00Z" },
-    { id: "p2", name: "edge-2", createdAt: "2026-01-11T09:00:00Z" },
-  ],
-  { dialect: "offset", latencyMs: 80 },
+createRoot(root).render(
+  <QueryClientProvider client={queryClient}>
+    <PresetProvider>
+      <RouterProvider router={router} />
+    </PresetProvider>
+  </QueryClientProvider>,
 );
-
-export const projectsResource = defineResource({
-  name: "projects",
-  getId: (row) => row.id,
-  collection: mock.collection,
-  commands: {
-    rename: {
-      run: async (input: { id: string; name: string }) => {
-        const rows = mock.handle.rows();
-        const row = rows.find((p) => p.id === input.id);
-        if (!row) return { status: "rejected", message: "project not found" };
-        mock.handle.replaceRows(
-          rows.map((p) => (p.id === input.id ? { ...p, name: input.name } : p)),
-        );
-        return { status: "ok", payload: { ...row, name: input.name } };
-      },
-    },
-  },
-});
-
-// Query window state lives in the URL — route and bindings share one schema instance.
-export const projectsSearch = collectionQuerySchema({ defaultSize: 20 });
 ```
+
+A URL-backed list page with filtering, sorting, paging, empty/error states and row actions:
 
 ```tsx
-// routes/projects.index.tsx — TanStack Router file route
-import { useCollection } from "@lynxland/uikit-core";
-import { createFileRoute } from "@tanstack/react-router";
-import { projectsResource, projectsSearch } from "@/lib/projects";
-
-export const Route = createFileRoute("/projects/")({
-  validateSearch: projectsSearch.toSearchSchema(),
-  component: ProjectsPage,
-});
-
-function ProjectsPage() {
-  // Window (page / filters / sort) comes from the URL; setters are functional.
-  const list = useCollection(projectsResource, { from: Route.id, search: projectsSearch });
-
-  if (list.status === "loading") return <p>Loading…</p>;
-
-  return (
-    <ul>
-      {list.rows.map((project) => (
-        <li key={project.id}>{project.name}</li>
-      ))}
-    </ul>
-  );
-}
+<CrudPage
+  title="Widgets"
+  source={widgets}
+  search={widgetsSearch}
+  from="/widgets"
+  fields={widgetFields}
+  filters={widgetFilters}
+  create={{ command: createWidget, host: "dialog" }}
+  update={{ command: updateWidget, host: "drawer", toInput: (row) => ({ ...row }) }}
+  delete={{ command: deleteWidget }}
+  getRowId={(row) => row.id}
+/>
 ```
 
-Commands are the same story with value-branch results and default invalidation (every query of the same resource refetches on settle):
+Or drop one layer and hand-wire the same parts:
 
 ```tsx
-const form = useCommandForm(projectsResource.commands.rename, {
-  defaultValues: { name: "" },
-  onSettled: (result) => {
-    if (result?.status === "ok") closeDialog();
-    // "rejected" carries message + fieldErrors — render them, don't catch them
-  },
-});
+const page = useCollectionPage(widgets, { search: widgetsSearch, from: "/widgets" });
+return (
+  <PageLayout title="Widgets">
+    <CollectionView
+      list={page}
+      columns={columns}
+      filters={filterFields}
+      filterState={{ text: page.state.q ?? "", filters: page.state.filters ?? [] }}
+      onFilterChange={({ text, filters }) => page.patchState({ q: text, filters })}
+      sort={page.state.sort}
+      onSortChange={(sort) => page.setSort(sort.length ? sort : null)}
+      pagerModel={page.pager}
+    />
+  </PageLayout>
+);
 ```
 
-Subscriptions deliver positioned frames you can resume, buffer, or let degrade to polling:
+## Principles
 
-```tsx
-const sub = useSubscription(eventsStream, {
-  cursor,                        // resume exactly where you left off
-  getCursor: (frame) => frame.seq,
-  onFrame: appendLiveEvent,
-});
-```
+- **TanStack native.** Router, Query, Table and Form are the engines; uikit binds them.
+- **Two axes, never mirrored.** Data capabilities are not UI families.
+- **URL is an optional policy.** Data bindings never import Router; URL binding lives in
+  `@lynxland/uikit-react/router`.
+- **Failure ≠ result.** `ApiError` is the failure channel; `Outcome` is the result channel.
+- **Frames, not events.** Streams deliver cursor-positioned frames, not opaque pub/sub.
+- **No hidden protocol.** No `__resource` / `__scopeKeys` / `__id`; effects are explicit `Effect[]`.
+- **Out-of-the-box belongs to the preset.** Core stays headless; every layer can be exited.
 
-Swap `mockCollection` for `clientCollection` (HTTP pipeline, offset/keyset dialects, NDJSON/SSE transports) when a real backend exists — the binding layer does not change.
-
-## UI blocks: copy, don't depend
-
-Blocks are not npm dependencies; they are copied into your repo with token-dialect adaptation, and you own them from then on:
+## Development
 
 ```bash
-node scripts/devtool.mjs copy query/list-page --to ../your-console --profile your-profile
-node scripts/devtool.mjs diff --all --dir src/components/kit --check   # drift gate after upgrades
+pnpm install
+pnpm check        # layer-check + doc-check + typecheck + size-check + tests + v3 spike
+pnpm --filter demo dev
+pnpm --filter demo e2e
 ```
 
-| Family | Presents | Examples |
-| --- | --- | --- |
-| `values` | a value | `status-badge`, `relative-time`, `stat-card`, `metric-chart`, `states` |
-| `query` | a collection | `list-page`, `data-table`, `filter-bar`, `pagination`, `keyset-pagination`, `detail-page` |
-| `command` | a verb | `form`, `fields`, `delete-button`, `confirm-dialog` |
-| `subscription` | a stream | `event-feed`, `log-viewer`, `stage-timeline` |
-| `shell` | the page | `app-shell`, `page`, `stepper`, `scope-switcher`, `route-error-boundary` |
+The demo is a strict Dokploy UI clone at `/dashboard/*` (home, projects,
+environments, application/database/compose details, deployments, Traefik,
+Docker, Requests, Schedules and settings), built only from the v3 packages.
+Fidelity notes and remaining gaps live in
+[docs/audits/2026-11-08-dokploy-dogfood.md](docs/audits/2026-11-08-dokploy-dogfood.md).
 
-`registry/registry.json` is shadcn-CLI compatible; the devtool adds consumer token-dialect profiles and vendored headers so later upgrades stay diffable.
-
-## Repo layout
-
-```
-packages/core   @lynxland/uikit-core  kernel / schema / adapters / react / testing
-registry/       UI blocks, five families (copy-based distribution)
-apps/demo       living documentation — every recipe is a runnable page
-docs/           design.md (decisions & history) · SKILL.md (page-author guide) · llms.txt
-scripts/        layer-check · registry-build · devtool (copy/diff) · size-check
-```
-
-Layering is enforced, not encouraged: kernel has zero runtime deps and zero React imports; dependencies flow one way; `react/` and `registry/` cannot import Effect.
-
-## Documentation
-
-- [docs/design.md](docs/design.md) — the full design document: every decision with its evidence and a dated change log (in Chinese).
-- [docs/SKILL.md](docs/SKILL.md) — the page-author's guide, written for AI agents and humans writing console pages.
-- [apps/demo](apps/demo) — runnable recipes: list/detail pages, wizards, scoped resources, streams, failure states.
-- [docs/llms.txt](docs/llms.txt) — machine-facing index.
-
-## Status
-
-Pre-1.0 (`0.3.x`), driving internal production consoles. Expect breaking changes between minors; they are recorded as dated batches in [docs/design.md](docs/design.md).
+See [AGENTS.md](AGENTS.md) for the repo map and layer invariants,
+[docs/design.md](docs/design.md) for the normative architecture,
+[docs/SKILL.md](docs/SKILL.md) for the current API guide, and
+[docs/versions.md](docs/versions.md) for the supported version matrix.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE). Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md);
+community expectations follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md);
+security reports follow [SECURITY.md](SECURITY.md).

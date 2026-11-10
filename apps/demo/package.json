@@ -11,16 +11,17 @@
   },
   "dependencies": {
     "@lynxland/uikit-core": "workspace:*",
+    "@lynxland/uikit-preset-console": "workspace:*",
+    "@lynxland/uikit-react": "workspace:*",
+    "@lynxland/uikit-surfaces": "workspace:*",
+    "@lynxland/uikit-ui-shadcn": "workspace:*",
+    "@tanstack/react-form": "catalog:default",
     "@tanstack/react-query": "catalog:default",
     "@tanstack/react-router": "catalog:default",
     "@tanstack/react-table": "catalog:default",
-    "class-variance-authority": "catalog:default",
-    "clsx": "catalog:default",
     "lucide-react": "catalog:default",
     "react": "catalog:default",
-    "react-dom": "catalog:default",
-    "tailwind-merge": "catalog:default",
-    "@tanstack/react-form": "catalog:default"
+    "react-dom": "catalog:default"
   },
   "devDependencies": {
     "@playwright/test": "catalog:default",

@@ -1,37 +1,21 @@
 @import "tailwindcss";
-
-/* registry 块在 demo 根之外——Tailwind v4 自动检测扫不到，显式声明源（相对本文件） */
-@source "../../../registry";
-
-@theme {
-  --color-bg: oklch(0.145 0 0);
-  --color-panel: oklch(0.185 0 0);
-  --color-panel-2: oklch(0.225 0 0);
-  --color-line: oklch(0.28 0 0);
-  --color-fg: oklch(0.97 0 0);
-  --color-muted: oklch(0.62 0 0);
-  --color-accent: oklch(0.68 0.16 250);
-  --color-ok: oklch(0.72 0.17 155);
-  --color-warn: oklch(0.78 0.15 85);
-  --color-err: oklch(0.68 0.2 25);
-  /* 图表序列色（MetricChart 按输入序循环取色；暗色底挑的 5 色） */
-  --color-chart-1: oklch(0.72 0.15 250);
-  --color-chart-2: oklch(0.75 0.14 155);
-  --color-chart-3: oklch(0.8 0.14 85);
-  --color-chart-4: oklch(0.7 0.16 320);
-  --color-chart-5: oklch(0.72 0.13 200);
-}
-
-html,
-body,
-#root {
-  height: 100%;
-}
+@import "@lynxland/uikit-ui-shadcn/tokens.css";
+@import "@lynxland/uikit-surfaces/surfaces.css";
+@import "../theme.css";
 
 body {
-  background: var(--color-bg);
-  color: var(--color-fg);
+  background: var(--background);
+  color: var(--foreground);
   font-family:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   font-size: 14px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+::placeholder {
+  color: color-mix(in oklab, var(--muted-foreground) 82%, var(--foreground));
 }

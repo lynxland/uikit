@@ -5,9 +5,8 @@
     "types": ["vite/client"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@blocks/*": ["../../registry/*"]
+      "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "../../registry", "e2e", "playwright.config.ts", "vite.config.ts"]
+  "include": ["src", "e2e", "playwright.config.ts", "vite.config.ts"]
 }

@@ -1,0 +1,37 @@
+name: Feature request
+description: Propose a capability or API change
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to build? What is missing or awkward today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: API shape, layer (core/react/surfaces/ui adapter/preset), and escape hatch.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Include the layer you would exit to (control/view/headless).
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Layer
+      options:
+        - core (kernel/schema/adapters)
+        - react bindings or /router
+        - surfaces (values/controls/views/chrome/fields)
+        - UI adapter (ui-shadcn/ui-plain/custom)
+        - preset-console pages
+        - CLI / tooling
+        - docs
+    validations:
+      required: true

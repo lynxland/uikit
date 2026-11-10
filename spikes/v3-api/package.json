@@ -1,0 +1,10 @@
+{
+  "name": "@lynxland/uikit-v3-spike",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "pnpm build && node --test test/*.test.mjs"
+  }
+}

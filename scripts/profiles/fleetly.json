@@ -1,7 +1,0 @@
-{
-  "name": "fleetly",
-  "note": "fleetly console（~/workspace/qiulin/fleetly/console）——2026-10-26 起采纳 demo 视觉：demo token 体系（bg/panel/panel-2/line/fg/muted/accent/ok/warn/err/chart-*）已在消费方 styles.css @theme 原生定义，tokenMap 恒等（不再映射 shadcn 方言）",
-  "cnImport": "@/lib/utils",
-  "cnNote": "消费方 cn 实现是 npm 包 cn；src/lib/utils.ts 已建 shim 转发（两世界单源），块统一 @/lib/utils",
-  "tokenMap": {}
-}

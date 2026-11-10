@@ -1,0 +1,53 @@
+{
+  "name": "@lynxland/uikit",
+  "version": "3.0.0",
+  "description": "One-install entry for @lynxland/uikit v3 — re-exports the default console preset",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lynxland/uikit.git",
+    "directory": "packages/meta"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./preset.css": "./src/preset.css"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@lynxland/uikit-core": "workspace:*",
+    "@lynxland/uikit-preset-console": "workspace:*",
+    "@lynxland/uikit-surfaces": "workspace:*",
+    "@lynxland/uikit-ui-shadcn": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=19",
+    "react-dom": ">=19",
+    "@tanstack/react-form": ">=1.30",
+    "@tanstack/react-query": ">=5.100",
+    "@tanstack/react-router": ">=1.120",
+    "@tanstack/react-table": ">=9.0"
+  },
+  "devDependencies": {
+    "@tanstack/react-form": "catalog:default",
+    "@tanstack/react-query": "catalog:default",
+    "@tanstack/react-router": "catalog:default",
+    "@tanstack/react-table": "catalog:default",
+    "@types/react": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "typescript": "catalog:default"
+  }
+}

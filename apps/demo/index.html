@@ -1,9 +1,17 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@lynxland/uikit demo</title>
+    <title>Dokploy clone · @lynxland/uikit demo</title>
+    <script>
+      // Apply the persisted theme before first paint (no flash).
+      (() => {
+        const stored = localStorage.getItem("uikit.demo.theme");
+        const dark = stored === null ? true : stored === "dark";
+        document.documentElement.classList.toggle("dark", dark);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

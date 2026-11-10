@@ -1,0 +1,58 @@
+{
+  "name": "@lynxland/uikit-surfaces",
+  "version": "3.0.0",
+  "description": "UI-library-agnostic presentation layer for @lynxland/uikit v3 — values, controls, views, chrome, fields, and the UiAdapter contract",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lynxland/uikit.git",
+    "directory": "packages/surfaces"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./adapter": {
+      "types": "./src/adapter.ts",
+      "default": "./src/adapter.ts"
+    },
+    "./surfaces.css": "./src/surfaces.css"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@lynxland/uikit-core": "workspace:*",
+    "@lynxland/uikit-react": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=19",
+    "@tanstack/react-query": ">=5.100",
+    "@tanstack/react-table": ">=9.0"
+  },
+  "devDependencies": {
+    "@tanstack/react-form": "catalog:default",
+    "@tanstack/react-query": "catalog:default",
+    "@tanstack/react-table": "catalog:default",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "jsdom": "^28.0.0",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "typescript": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

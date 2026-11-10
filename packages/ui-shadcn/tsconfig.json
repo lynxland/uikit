@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["react"],
+    // 消费方严格度穿透：源码分发下 noUnusedLocals/noUnusedParameters 由消费方
+    // tsc 检查 kit 源（fleetly 实咬）——本仓 typecheck 门以同等严格度常驻执法（M10）。
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["src", "test"]
+}

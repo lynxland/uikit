@@ -1,0 +1,42 @@
+{
+  "name": "@lynxland/uikit-cli",
+  "version": "3.0.0",
+  "description": "Node CLI for @lynxland/uikit v3 — init, eject surfaces/preset-console, doctor",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lynxland/uikit.git",
+    "directory": "packages/cli"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "uikit": "./bin/uikit.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/cli.d.ts",
+      "default": "./dist/cli.js"
+    }
+  },
+  "files": [
+    "bin",
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm build && node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@lynxland/uikit-preset-console": "workspace:*",
+    "@lynxland/uikit-surfaces": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:default",
+    "typescript": "catalog:default"
+  }
+}

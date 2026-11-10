@@ -1,180 +1,148 @@
 # @lynxland/uikit
 
-数据密集 console UI 的无头核心 + 拷贝制 UI 块——架在 TanStack 引擎上的 **Query / Command / Subscription**。
+面向数据密集 console UI 的、有观点但可逐层退出的工具包——**Query / Command / Stream**
+三种数据能力，经显式 React 绑定、UI 无关的 surfaces、可替换的 UI adapter 和默认可运行的
+console preset 组合起来。
 
-[English](README.md)
+[English](README.md) · [设计规范](docs/design.md) · [设计理念](docs/philosophy.md) · [API 手册](docs/SKILL.md)
 
-## 是什么
+> **v3 · `3.0.0` · greenfield cutover。** v3 **不向后兼容**：
+> `Resource`、`FieldDef`、`Page`、`*Panel`、`TablePage`、`useCollectionData`、`useBatch`、
+> `useSubscription` 已删除，没有别名，也没有运行时兼容层。
+> 消费方迁移见[执行计划](docs/migrations/v3-execution-plan.md)；
+> v2 历史归档在 [docs/design-history.md](docs/design-history.md)。
 
-一个 console 页面 = 三个交互原语 + 一个交互面，且都不需要重造引擎：
+## 为什么
 
-| 名词 | 角色 | 你得到什么 |
-| --- | --- | --- |
-| **Query** | 看 | 过滤/分页集合，窗口状态住在 URL 里 |
-| **Command** | 做 | 具名动词返回 `CommandResult` 结果分支 + 声明式缓存失效 |
-| **Subscription** | 听 | 按游标定位的**帧**递送——backlog → follow、断档重同步、退避转轮询 |
-| **Resource** | 交互面 | 另外三者挂靠的名词；一个 `defineResource` 接通查询、命令与 scope |
+一个 console 页面需要三种**数据能力**和少量**呈现层**，都不需要重造引擎：
 
-设计原则是机械强制的，不是口号：
+| 能力 | 角色 |
+|---|---|
+| **Query** | 缓存读：collection / record / lookup |
+| **Command** | 具名写：返回 `Outcome` 结果分支 + 显式失效效果 |
+| **Stream** | 按游标定位的**帧流**——backlog → follow、断档重同步、退避/轮询 |
 
-- **TanStack 原生。** Router（typed routes + `validateSearch`）、Query、Table、Form 就是引擎层。uikit 只做绑定，不在引擎上再包一层。
-- **URL 即真相。** 一切查询窗口都是 URL 状态。setter 全部函数式：翻页 push（历史栈就是分页栈）、谓词/排序 replace 并清游标。
-- **失败 ≠ 结果。** `ApiError` 是封闭集，在 transport 缝上 throw；`CommandResult` 以值分支（`ok` / `rejected` / `conflict`）返回——预期内结果绝不走异常通道。
-- **帧，不是事件。** 订阅递送携带游标的位置化帧——可续读、可重排进缓冲、可降级轮询——不是不透明的 pub/sub 回调。
-- **Effect 只住在缝里。** kernel 是零依赖、零 React 的纯代数；Effect-TS 被限制在 schema/adapters 层，`react/` 与 registry 块连 import 都做不到（`pnpm layer-check` 强制）。
+**Entity** 只是 key/scope/失效的可选分组，不是第四原语。
 
-## 包与分发
+呈现层按依赖单向分层，每一层都可替换：
 
-两个通道，刻意不同：
-
-- **`@lynxland/uikit-core`**（`packages/core`）——无头核心：kernel 契约 + URL 编解码 + HTTP 管线/订阅引擎 + React 绑定 + 测试 harness。发 npm，源码分发。
-- **`registry/`**——五族 UI 块，shadcn 式：**拷贝**进你的仓，代码归你所有。块不含业务实体、不自带数据获取，只消费绑定输出。
-
-```bash
-npm install @lynxland/uikit-core
-# peers: react >=19 · @tanstack/react-query >=5.100 · @tanstack/react-router >=1.120（可选）· @tanstack/react-form >=1.30（可选）
+```
+Value → Control → View → Chrome → Page Composition
 ```
 
-## 快速上手
+- **Control** 只收受控 props：不取数、不碰 Router、不读 `window.history`。
+- **View** 把绑定句柄翻译成控件 props；不渲染 `h1`。
+- **Chrome** 拥有页壳，是唯一的 `h1` 所有者。
+- **Preset 页面**是薄组合；**Page Template** 是可复制/可生成的特殊页面骨架。
 
-声明一个 Resource，路由与绑定共享同一个 search schema，读集合：
+## 包
+
+| 包 | 角色 |
+|---|---|
+| `@lynxland/uikit-core` | 无头 kernel / URL schema / REST-client-mock-stream adapters。**零 React、零 Effect。** |
+| `@lynxland/uikit-react` | 数据/命令/流绑定；URL 只住在 `/router`。 |
+| `@lynxland/uikit-surfaces` | values/controls/views/chrome/fields + `UiAdapter` contract。 |
+| `@lynxland/uikit-ui-shadcn` | 默认 UI adapter：Base UI + shadcn 基元与语义 token。 |
+| `@lynxland/uikit-ui-plain` | 可选最小 adapter，证明契约可替换。 |
+| `@lynxland/uikit-preset-console` | 默认可运行页面：Collection / Record / Form / CRUD / Settings / Wizard / Events。 |
+| `@lynxland/uikit-testing` | `renderWithKit`、`createTestRouter`、按能力 mock。 |
+| `@lynxland/uikit` | 一键安装 meta；转发 console preset。 |
+
+根包是私有的 `@lynxland/uikit-workspace`；`packages/meta` 才拥有公开的
+`@lynxland/uikit` 名字。
+
+## 快速开始
+
+```bash
+pnpm add @lynxland/uikit @tanstack/react-query @tanstack/react-router \
+  @tanstack/react-form @tanstack/react-table
+```
 
 ```tsx
-// lib/projects.ts
-import { mockCollection } from "@lynxland/uikit-core/adapters";
-import { defineResource } from "@lynxland/uikit-core/kernel";
-import { collectionQuerySchema } from "@lynxland/uikit-core/schema";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createRouter, RouterProvider } from "@tanstack/react-router";
+import { PresetProvider } from "@lynxland/uikit";
+import "@lynxland/uikit/preset.css";
 
-export interface Project {
-  id: string;
-  name: string;
-  createdAt: string;
-}
+const queryClient = new QueryClient();
+const router = createRouter({ routeTree });
 
-const mock = mockCollection<Project>(
-  [
-    { id: "p1", name: "edge-1", createdAt: "2026-01-04T09:00:00Z" },
-    { id: "p2", name: "edge-2", createdAt: "2026-01-11T09:00:00Z" },
-  ],
-  { dialect: "offset", latencyMs: 80 },
+createRoot(root).render(
+  <QueryClientProvider client={queryClient}>
+    <PresetProvider>
+      <RouterProvider router={router} />
+    </PresetProvider>
+  </QueryClientProvider>,
 );
-
-export const projectsResource = defineResource({
-  name: "projects",
-  getId: (row) => row.id,
-  collection: mock.collection,
-  commands: {
-    rename: {
-      run: async (input: { id: string; name: string }) => {
-        const rows = mock.handle.rows();
-        const row = rows.find((p) => p.id === input.id);
-        if (!row) return { status: "rejected", message: "project not found" };
-        mock.handle.replaceRows(
-          rows.map((p) => (p.id === input.id ? { ...p, name: input.name } : p)),
-        );
-        return { status: "ok", payload: { ...row, name: input.name } };
-      },
-    },
-  },
-});
-
-// 查询窗口状态住在 URL 里——路由与绑定共享同一 schema 实例。
-export const projectsSearch = collectionQuerySchema({ defaultSize: 20 });
 ```
+
+带 URL、过滤、排序、分页、四态与行操作的列表页：
 
 ```tsx
-// routes/projects.index.tsx —— TanStack Router 文件路由
-import { useCollection } from "@lynxland/uikit-core";
-import { createFileRoute } from "@tanstack/react-router";
-import { projectsResource, projectsSearch } from "@/lib/projects";
-
-export const Route = createFileRoute("/projects/")({
-  validateSearch: projectsSearch.toSearchSchema(),
-  component: ProjectsPage,
-});
-
-function ProjectsPage() {
-  // 窗口（页码/过滤/排序）来自 URL；setter 全部函数式。
-  const list = useCollection(projectsResource, { from: Route.id, search: projectsSearch });
-
-  if (list.status === "loading") return <p>Loading…</p>;
-
-  return (
-    <ul>
-      {list.rows.map((project) => (
-        <li key={project.id}>{project.name}</li>
-      ))}
-    </ul>
-  );
-}
+<CrudPage
+  title="Widgets"
+  source={widgets}
+  search={widgetsSearch}
+  from="/widgets"
+  fields={widgetFields}
+  filters={widgetFilters}
+  create={{ command: createWidget, host: "dialog" }}
+  update={{ command: updateWidget, host: "drawer", toInput: (row) => ({ ...row }) }}
+  delete={{ command: deleteWidget }}
+  getRowId={(row) => row.id}
+/>
 ```
 
-命令是同一套故事：结果走值分支，缺省失效（同资源全部查询 settle 后重取）：
+也可以退一层，用同样的零件手装：
 
 ```tsx
-const form = useCommandForm(projectsResource.commands.rename, {
-  defaultValues: { name: "" },
-  onSettled: (result) => {
-    if (result?.status === "ok") closeDialog();
-    // "rejected" 携带 message + fieldErrors——渲染它们，而不是 catch 它们
-  },
-});
+const page = useCollectionPage(widgets, { search: widgetsSearch, from: "/widgets" });
+return (
+  <PageLayout title="Widgets">
+    <CollectionView
+      list={page}
+      columns={columns}
+      filters={filterFields}
+      filterState={{ text: page.state.q ?? "", filters: page.state.filters ?? [] }}
+      onFilterChange={({ text, filters }) => page.patchState({ q: text, filters })}
+      sort={page.state.sort}
+      onSortChange={(sort) => page.setSort(sort.length ? sort : null)}
+      pagerModel={page.pager}
+    />
+  </PageLayout>
+);
 ```
 
-订阅递送可续读、可缓冲、可降级轮询的位置化帧：
+## 原则
 
-```tsx
-const sub = useSubscription(eventsStream, {
-  cursor,                        // 从你上次停下的地方精确续读
-  getCursor: (frame) => frame.seq,
-  onFrame: appendLiveEvent,
-});
-```
+- **TanStack 原生。** Router / Query / Table / Form 是引擎；uikit 只做绑定。
+- **两条轴不许互相镜像。** 数据能力不是 UI 家族。
+- **URL 是可选策略。** 数据绑定不 import Router；URL 绑定住在
+  `@lynxland/uikit-react/router`。
+- **失败 ≠ 结果。** `ApiError` 走失败通道；`Outcome` 走返回值。
+- **流是帧，不是事件。** 帧带游标，可续订、可重同步，不是不透明 pub/sub。
+- **无隐藏协议。** 没有 `__resource` / `__scopeKeys` / `__id`；失效是显式 `Effect[]`。
+- **开箱即用归 preset。** core 保持无头；每一层都能退出。
 
-接真实后端时把 `mockCollection` 换成 `clientCollection`（HTTP 管线，offset/keyset 双方言，NDJSON/SSE transport）——绑定层一行不改。
-
-## UI 块：拷贝，不依赖
-
-块不是 npm 依赖；它经 token 方言适配拷进你的仓，从此归你所有：
+## 开发
 
 ```bash
-node scripts/devtool.mjs copy query/list-page --to ../your-console --profile your-profile
-node scripts/devtool.mjs diff --all --dir src/components/kit --check   # 升级后的漂移门禁
+pnpm install
+pnpm check        # layer-check + doc-check + typecheck + size-check + tests + v3 spike
+pnpm --filter demo dev
+pnpm --filter demo e2e
 ```
 
-| 族 | 呈现 | 示例 |
-| --- | --- | --- |
-| `values` | 一个值 | `status-badge`、`relative-time`、`stat-card`、`metric-chart`、`states` |
-| `query` | 一个集合 | `list-page`、`data-table`、`filter-bar`、`pagination`、`keyset-pagination`、`detail-page` |
-| `command` | 一个动词 | `form`、`fields`、`delete-button`、`confirm-dialog` |
-| `subscription` | 一条流 | `event-feed`、`log-viewer`、`stage-timeline` |
-| `shell` | 页面 | `app-shell`、`page`、`stepper`、`scope-switcher`、`route-error-boundary` |
+demo 是严格复刻的 Dokploy UI，路由在 `/dashboard/*`（home / projects /
+environments / application、database、compose 详情 / deployments / Traefik /
+Docker / Requests / Schedules / settings），只用 v3 包实现。
+保真记录与剩余缺口见
+[docs/audits/2026-11-08-dokploy-dogfood.md](docs/audits/2026-11-08-dokploy-dogfood.md)。
 
-`registry/registry.json` 兼容 shadcn CLI；devtool 在其上补消费方 token 方言 profile 与 vendored 头，让后续升级可机械 diff。
+仓库结构与分层不变量见 [AGENTS.md](AGENTS.md)；规范见 [docs/design.md](docs/design.md)；
+当前 API 见 [docs/SKILL.md](docs/SKILL.md)；版本矩阵见 [docs/versions.md](docs/versions.md)。
 
-## 仓库结构
+## License
 
-```
-packages/core   @lynxland/uikit-core  kernel / schema / adapters / react / testing
-registry/       UI 块五族（拷贝制分发）
-apps/demo       活文档——每个配方一个可运行页面
-docs/           design.md（决策与历史）· SKILL.md（页面作者册）· llms.txt
-scripts/        layer-check · registry-build · devtool（copy/diff）· size-check
-```
-
-分层是被强制的，不是被鼓励的：kernel 零运行时依赖、零 React import；依赖单向流动；`react/` 与 `registry/` 无法 import Effect。
-
-## 文档
-
-- [docs/design.md](docs/design.md)——完整设计文档：每条决策带证据，附带日期的批次变更史。
-- [docs/SKILL.md](docs/SKILL.md)——页面作者册，面向写 console 页面的 AI agent 与人类。
-- [apps/demo](apps/demo)——可运行配方：列表/详情页、向导、scoped 资源、流、失败态。
-- [docs/llms.txt](docs/llms.txt)——机器侧索引。
-
-## 状态
-
-Pre-1.0（`0.3.x`），驱动内部生产 console。minor 之间可能有破坏性变更；全部以带日期的批次记录在 [docs/design.md](docs/design.md)。
-
-## 许可
-
-MIT
+MIT — 见 [LICENSE](LICENSE)。贡献见 [CONTRIBUTING.md](CONTRIBUTING.md)；
+社区准则见 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)；安全问题见 [SECURITY.md](SECURITY.md)。

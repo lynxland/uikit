@@ -1,6 +1,13 @@
-import type { CollectionQuery, FieldValue, Order, Predicate, QueryWindow, Segment } from "./types";
+import type {
+  CollectionPage,
+  CollectionRequest,
+  CollectionWindow,
+  FieldValue,
+  Predicate,
+  Sort,
+} from "./types";
 
-// ============ 谓词求值（纯函数） ============
+// ============ Predicate evaluation (pure) ============
 
 function fieldOf(row: unknown, field: string): unknown {
   return (row as Record<string, unknown>)[field];
@@ -25,7 +32,7 @@ export function evalPredicate(predicate: Predicate | undefined, row: unknown): b
   if (predicate === undefined) return true;
   if ("all" in predicate) return predicate.all.every((p) => evalPredicate(p, row));
   if ("any" in predicate) return predicate.any.some((p) => evalPredicate(p, row));
-  const value = fieldOf(row, predicate.field as string);
+  const value = fieldOf(row, predicate.field);
   switch (predicate.op) {
     case "eq":
       return value === predicate.value;
@@ -45,19 +52,21 @@ export function evalPredicate(predicate: Predicate | undefined, row: unknown): b
       return compare(value, predicate.value) <= 0;
     case "exists":
       return value !== undefined && value !== null;
+    default:
+      return false;
   }
 }
 
-/** 文本搜索谓词：q 在白名单字段上的 contains 之 OR（FilterBar/schema 工厂共用）。 */
-export function textPredicate(fields: ReadonlyArray<string>, q: string): Predicate | undefined {
-  if (!q.trim() || fields.length === 0) return undefined;
+/** Text search: q is an OR of contains across the whitelisted fields. */
+export function textPredicate(fields: readonly string[], q: string): Predicate | undefined {
+  const text = q.trim();
+  if (text === "" || fields.length === 0) return undefined;
   return {
-    any: fields.map((field) => ({ field, op: "contains" as const, value: q.trim() })),
+    any: fields.map((field) => ({ field, op: "contains" as const, value: text })),
   };
 }
 
-// ============ 客户端伪造游标（客户端求值方言） ============
-// "游标进 URL、历史即分页栈"在整取方言上的兑现：offset 编进不透明 token。
+// ============ Client-side cursor algebra ============
 
 export function encodeClientCursor(offset: number): string {
   return `c${offset.toString(36)}`;
@@ -65,89 +74,121 @@ export function encodeClientCursor(offset: number): string {
 
 export function decodeClientCursor(cursor: string): number | null {
   if (!cursor.startsWith("c")) return null;
-  const n = Number.parseInt(cursor.slice(1), 36);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  const value = Number.parseInt(cursor.slice(1), 36);
+  return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-function offsetOf(window: QueryWindow): number {
-  if (window.cursor !== undefined) return decodeClientCursor(window.cursor) ?? 0;
-  return window.range?.offset ?? 0;
+function offsetOf(window: CollectionWindow): number {
+  if (window.kind === "offset") return window.offset;
+  if (window.kind === "cursor" && window.cursor !== undefined) {
+    return decodeClientCursor(window.cursor) ?? 0;
+  }
+  return 0;
 }
 
-// ============ 客户端求值（派生概念的纯函数核心） ============
+// ============ Client-side query evaluation ============
 
-/**
- * evaluate(CollectionQuery, rows) —— 求值策略，非概念。
- * window.cursor 存在时保持游标模式（伪造 token）；否则暴露 total（range/客户端翻页用）。
- */
-export function evaluateQuery<T>(query: CollectionQuery, rows: ReadonlyArray<T>): Segment<T> {
-  const filtered = query.predicate
-    ? rows.filter((row) => evalPredicate(query.predicate, row))
+/** Evaluate a request locally over the full row set (clientCollection core). */
+export function evaluateQuery<T>(
+  request: CollectionRequest,
+  rows: readonly T[],
+): CollectionPage<T> {
+  const filtered = request.where
+    ? rows.filter((row) => evalPredicate(request.where, row))
     : [...rows];
-  const ordered = query.order?.length
+
+  const ordered = request.order?.length
     ? [...filtered].sort((a, b) => {
-        for (const o of query.order ?? []) {
-          const c = compare(fieldOf(a, o.field as string), fieldOf(b, o.field as string));
-          if (c !== 0) return o.dir === "desc" ? -c : c;
+        for (const sort of request.order ?? []) {
+          const result = compare(fieldOf(a, sort.field), fieldOf(b, sort.field));
+          if (result !== 0) return sort.dir === "desc" ? -result : result;
         }
         return 0;
       })
     : filtered;
 
-  const w = query.window;
-  const offset = offsetOf(w);
-  const slice = ordered.slice(offset, offset + w.size);
-  const segment: Segment<T> = { rows: slice };
+  const window = request.window;
 
-  if (w.cursor !== undefined) {
-    if (offset + w.size < ordered.length) {
-      segment.nextCursor = encodeClientCursor(offset + w.size);
-    }
-  } else {
-    segment.total = ordered.length;
+  if (window.kind === "all") {
+    return { rows: ordered, paging: { kind: "all", total: ordered.length } };
   }
-  return segment;
+
+  if (window.kind === "offset") {
+    const size = Math.max(0, window.size);
+    const offset = Math.max(0, window.offset);
+    return {
+      rows: ordered.slice(offset, offset + size),
+      paging: { kind: "offset", total: ordered.length, offset, size },
+    };
+  }
+
+  const size = Math.max(0, window.size);
+  const offset = offsetOf(window);
+  const nextOffset = offset + size;
+  return {
+    rows: ordered.slice(offset, nextOffset),
+    paging: {
+      kind: "cursor",
+      ...(nextOffset < ordered.length ? { nextCursor: encodeClientCursor(nextOffset) } : {}),
+    },
+  };
 }
 
-// ============ 游标代数 ============
+// ============ Cursor advance ============
 
 /**
- * 游标推进。返回 null = 不可算：
- * - keyset（服务端不透明游标 / leaderboards 型 token+total）的 prev 走浏览器历史；
- * - 唯一能本地算 prev 的是 offset 方言与客户端求值方言（伪造游标含 offset）。
+ * Compute the next/previous request window.
+ *
+ * Server-issued opaque cursors cannot be decoded locally, so cursor prev
+ * returns null; URL bindings delegate that case to browser history.
  */
 export function advance(
-  window: QueryWindow,
-  segment: Segment<unknown>,
+  window: CollectionWindow,
+  page: CollectionPage<unknown>,
   dir: "next" | "prev",
-): QueryWindow | null {
+): CollectionWindow | null {
+  if (window.kind === "all") return null;
+
   if (dir === "next") {
-    // 服务端续读令牌优先（keyset 无 total / leaderboards 型 token+total）；
-    // 客户端求值的 range 模式不产 nextCursor，自然落回 range 分支。
-    if (segment.nextCursor !== undefined) {
-      return { ...window, cursor: segment.nextCursor };
+    if (page.paging.kind === "cursor") {
+      if (page.paging.nextCursor === undefined) return null;
+      return { kind: "cursor", size: window.size, cursor: page.paging.nextCursor };
     }
-    if (window.cursor !== undefined) {
-      return null; // 游标模式下无令牌 = 到底
+    if (page.paging.kind === "offset") {
+      const currentOffset = window.kind === "offset" ? window.offset : page.paging.offset;
+      const offset = currentOffset + window.size;
+      if (offset >= page.paging.total) return null;
+      return { kind: "offset", size: window.size, offset };
     }
-    const offset = offsetOf(window);
-    const next = offset + window.size;
-    if (segment.total !== undefined && next >= segment.total) return null;
-    return { ...window, range: { offset: next } };
+    return null;
   }
+
+  if (window.kind === "offset") {
+    if (window.offset <= 0) return null;
+    return {
+      kind: "offset",
+      size: window.size,
+      offset: Math.max(0, window.offset - window.size),
+    };
+  }
+
   const offset = offsetOf(window);
-  if (offset < window.size) return null;
-  const prev = { ...window };
-  if (window.cursor !== undefined) prev.cursor = encodeClientCursor(offset - window.size);
-  else prev.range = { offset: offset - window.size };
-  return prev;
+  if (window.cursor === undefined || offset < window.size) return null;
+  return {
+    kind: "cursor",
+    size: window.size,
+    cursor: encodeClientCursor(offset - window.size),
+  };
 }
 
-export function orderEquals(a?: ReadonlyArray<Order>, b?: ReadonlyArray<Order>): boolean {
+export function orderEquals(
+  a: readonly Sort[] | undefined,
+  b: readonly Sort[] | undefined,
+): boolean {
   if (a === b) return true;
   if (!a || !b || a.length !== b.length) return false;
-  return a.every((o, i) => {
-    const other = b[i];
-    return !!other && o.field === other.field && o.dir === other.dir;
+  return a.every((sort, index) => {
+    const other = b[index];
+    return other !== undefined && sort.field === other.field && sort.dir === other.dir;
   });
 }

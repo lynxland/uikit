@@ -1,28 +1,22 @@
 export {
   buildUrl,
   extractErrorMessage,
+  type FetchLike,
   type QueryParams,
   statusToApiError,
 } from "./api-error";
 export {
+  type ClientCollectionOptions,
   clientCollection,
   decodeClientCursor,
   encodeClientCursor,
   evaluateQuery,
-} from "./evaluate";
-export {
-  createHttp,
-  type Http,
-  HttpFailure,
-  type HttpOptions,
-  type HttpRequest,
-  NetworkFailure,
-  runApi,
-} from "./http";
+} from "./client";
 export {
   type MockCollection,
   type MockCollectionOptions,
   type MockDialect,
+  type MockFetchAll,
   type MockHandle,
   mockCollection,
   mockFetchAll,
@@ -35,7 +29,6 @@ export {
   mockTransport,
 } from "./mock-transport";
 export {
-  type FetchLike,
   type RestCollectionOptions,
   type RestFetchAllOptions,
   type RestRecordOptions,
@@ -45,10 +38,9 @@ export {
 } from "./rest";
 export {
   createSubscriptionEngine,
-  type SubscriptionEngine,
-  type SubscriptionEngineOptions,
-  type SubscriptionHandle,
-  type SubscriptionState,
+  type StreamEngine,
+  type StreamEngineOptions,
+  type StreamState,
 } from "./subscription";
 export {
   type NdjsonTransportOptions,

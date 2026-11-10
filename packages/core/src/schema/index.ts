@@ -1,18 +1,23 @@
+export type {
+  CollectionState,
+  FilterValue,
+  Operator,
+  PageState,
+  Predicate,
+  Sort,
+} from "../kernel";
+export { type AnyStandardSchema, combineSearch, type SearchPart } from "./combine";
+export { eqFilter, filterLeaves, filterValues, predicateOf } from "./filters";
 export {
-  collectionQuerySchema,
+  type CollectionSearch,
+  type CollectionSearchSchema,
+  type CollectionSearchSpec,
+  collectionSearch,
   type FilterFieldDef,
   type FlatPatch,
   type FlatSearchParams,
-  type QuerySchemaSpec,
-  type QuerySearchSchema,
+  parseSearch,
+  type SearchSerializer,
   type StandardSchemaV1,
-  type ToSearchSchemaOptions,
-  type UnknownKeysMode,
-} from "./codec";
-export {
-  eqFilter,
-  type FilterLeaf,
-  filterLeaves,
-  filterValues,
-  predicateOf,
-} from "./filters";
+  stringifySearch,
+} from "./search";

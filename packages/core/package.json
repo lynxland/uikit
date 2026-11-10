@@ -1,7 +1,7 @@
 {
   "name": "@lynxland/uikit-core",
-  "version": "0.6.0",
-  "description": "Headless core for data-dense console UIs — Query / Command / Subscription over TanStack engines",
+  "version": "3.0.0",
+  "description": "Headless v3 contracts, schema, and adapters for @lynxland/uikit — zero React, zero Effect",
   "type": "module",
   "license": "MIT",
   "sideEffects": false,
@@ -15,8 +15,8 @@
   },
   "exports": {
     ".": {
-      "types": "./src/react/index.ts",
-      "default": "./src/react/index.ts"
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
     },
     "./kernel": {
       "types": "./src/kernel/index.ts",
@@ -29,57 +29,17 @@
     "./adapters": {
       "types": "./src/adapters/index.ts",
       "default": "./src/adapters/index.ts"
-    },
-    "./react": {
-      "types": "./src/react/index.ts",
-      "default": "./src/react/index.ts"
-    },
-    "./testing": {
-      "types": "./src/testing/index.ts",
-      "default": "./src/testing/index.ts"
     }
   },
   "files": [
-    "src",
-    "dist"
+    "src"
   ],
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
-    "build": "tsup"
-  },
-  "dependencies": {
-    "effect": "catalog:default"
-  },
-  "peerDependencies": {
-    "react": ">=19",
-    "@tanstack/react-query": ">=5.100",
-    "@tanstack/react-router": ">=1.120",
-    "@tanstack/react-form": ">=1.30",
-    "@testing-library/react": ">=16"
-  },
-  "peerDependenciesMeta": {
-    "@tanstack/react-router": {
-      "optional": true
-    },
-    "@tanstack/react-query": {
-      "optional": true
-    },
-    "@testing-library/react": {
-      "optional": true
-    }
+    "test": "vitest run"
   },
   "devDependencies": {
-    "@tanstack/react-query": "catalog:default",
-    "@tanstack/react-router": "catalog:default",
-    "@types/react": "catalog:default",
-    "react": "catalog:default",
     "typescript": "catalog:default",
-    "vitest": "catalog:default",
-    "@tanstack/react-form": "catalog:default",
-    "jsdom": "^28.0.0",
-    "@testing-library/react": "^16.3.0",
-    "react-dom": "catalog:default",
-    "@types/react-dom": "catalog:default"
+    "vitest": "catalog:default"
   }
 }

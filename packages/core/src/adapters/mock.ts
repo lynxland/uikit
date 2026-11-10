@@ -1,173 +1,222 @@
-import type { ApiError, CollectionQuery, ResourceScope, Segment } from "../kernel";
-import { decodeClientCursor, encodeClientCursor, evaluateQuery, isApiError } from "../kernel";
+import type {
+  ApiError,
+  CollectionPage,
+  CollectionReader,
+  CollectionRequest,
+  LookupReader,
+  RecordReader,
+  Scope,
+} from "../kernel";
+import { decodeClientCursor, encodeClientCursor, evaluateQuery } from "../kernel";
 
 /**
- * mockResource —— Resource/Transport 契约的内存实现。
- * 双职责：测试工具（延迟/失败注入/三态）+ demo 数据源（双方言演示）。
+ * In-memory adapters for tests and demos: latency/failure injection plus
+ * both paging dialects.
  */
 
-export type MockFetchAll<T> = ((
-  ctx: ResourceScope,
-  signal?: AbortSignal,
-) => Promise<ReadonlyArray<T>>) &
-  MockHandle<T>;
-
 export interface MockHandle<T> {
-  /** 当前行快照（demo 命令闭包用：create/delete 基于现值改写） */
-  rows(): ReadonlyArray<T>;
-  /** 替换全部行（demo 动态数据 / 测试重置） */
-  replaceRows(rows: ReadonlyArray<T>): void;
-  /** 下一次 collection/record/batch 调用按给定失败 reject（三态与闭环测试） */
+  rows(): readonly T[];
+  replaceRows(rows: readonly T[]): void;
+  /** The next collection/record/lookup call rejects with this error. */
   failNext(error: ApiError): void;
-  /** 当前行数 */
   readonly count: number;
 }
 
-export type MockDialect = "keyset" | "offset";
+export type MockDialect = "offset" | "keyset";
 
 export interface MockCollectionOptions {
   dialect?: MockDialect;
   latencyMs?: number;
 }
 
-function delay(ms: number): Promise<void> {
-  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+export interface MockCollection<T> {
+  collection: CollectionReader<T>;
+  record: RecordReader<T>;
+  lookup: LookupReader<T>;
+  handle: MockHandle<T>;
 }
 
-async function maybeFail<T>(
-  handle: { takeFailure(): ApiError | undefined },
-  work: () => Promise<T>,
-): Promise<T> {
-  const failure = handle.takeFailure();
-  if (failure) throw failure;
-  return work();
-}
-
-class MockHandleImpl<T> implements MockHandle<T> {
-  failureQueue: ApiError[] = [];
+class MockStore<T> {
   private store: T[];
-  constructor(rows: ReadonlyArray<T>) {
+  private failures: ApiError[] = [];
+
+  constructor(rows: readonly T[]) {
     this.store = [...rows];
   }
-  rows(): ReadonlyArray<T> {
+
+  rows(): readonly T[] {
     return [...this.store];
   }
-  replaceRows(rows: ReadonlyArray<T>): void {
+
+  replaceRows(rows: readonly T[]): void {
     this.store = [...rows];
   }
+
   failNext(error: ApiError): void {
-    this.failureQueue.push(error);
+    this.failures.push(error);
   }
+
   takeFailure(): ApiError | undefined {
-    return this.failureQueue.shift();
+    return this.failures.shift();
   }
+
   get count(): number {
     return this.store.length;
   }
 }
 
-export interface MockCollection<T> {
-  collection: (
-    query: CollectionQuery,
-    ctx: ResourceScope,
-    signal?: AbortSignal,
-  ) => Promise<Segment<T>>;
-  record: (id: string, ctx: ResourceScope) => Promise<T>;
-  batch: (ids: ReadonlyArray<string>, ctx: ResourceScope) => Promise<ReadonlyArray<T>>;
-  handle: MockHandle<T>;
+function delay(ms: number): Promise<void> {
+  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
 }
 
-/**
- * 服务端方言模拟（keyset / offset）。谓词与排序照常求值（模拟服务端过滤），
- * 分页按方言切片：keyset 发不透明 token（空页停发），offset 附带 total。
- */
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted === true) {
+    throw new DOMException("Aborted", "AbortError");
+  }
+}
+
+interface FailureQueue {
+  takeFailure(): ApiError | undefined;
+}
+
+async function withFailure<T>(
+  store: FailureQueue,
+  latencyMs: number,
+  signal: AbortSignal | undefined,
+  work: () => Promise<T>,
+): Promise<T> {
+  throwIfAborted(signal);
+  const failure = store.takeFailure();
+  if (failure !== undefined) throw failure;
+  await delay(latencyMs);
+  throwIfAborted(signal);
+  return work();
+}
+
+function pageOf<T>(
+  request: CollectionRequest,
+  rows: readonly T[],
+  dialect: MockDialect,
+): CollectionPage<T> {
+  const window = request.window;
+  if (window.kind === "all") {
+    return { rows, paging: { kind: "all", total: rows.length } };
+  }
+
+  const offset =
+    window.kind === "offset"
+      ? Math.max(0, window.offset)
+      : window.cursor !== undefined
+        ? (decodeClientCursor(window.cursor) ?? 0)
+        : 0;
+  const size = Math.max(0, window.size);
+  const pageRows = rows.slice(offset, offset + size);
+
+  if (dialect === "offset") {
+    return {
+      rows: pageRows,
+      paging: { kind: "offset", total: rows.length, offset, size },
+    };
+  }
+
+  const next = offset + size;
+  return {
+    rows: pageRows,
+    paging: {
+      kind: "cursor",
+      ...(next < rows.length ? { nextCursor: encodeClientCursor(next) } : {}),
+    },
+  };
+}
+
 export function mockCollection<T extends { id: string }>(
-  initialRows: ReadonlyArray<T>,
+  initialRows: readonly T[],
   options: MockCollectionOptions = {},
 ): MockCollection<T> {
-  const handle = new MockHandleImpl(initialRows);
-  const { dialect = "offset", latencyMs = 0 } = options;
-
-  const collection = async (query: CollectionQuery): Promise<Segment<T>> => {
-    return maybeFail(handle, async () => {
-      await delay(latencyMs);
-      // 先全量求值谓词/排序（模拟服务端），再按方言切窗口
-      const w = query.window;
-      let offset: number;
-      if (w.cursor !== undefined) {
-        const decoded = decodeClientCursor(w.cursor);
-        offset = decoded ?? 0;
-      } else {
-        offset = w.range?.offset ?? 0;
-      }
-      const serverQuery: CollectionQuery =
-        dialect === "keyset" || w.cursor !== undefined
-          ? { ...query, window: { size: w.size, cursor: encodeClientCursor(offset) } }
-          : { ...query, window: { size: w.size } };
-      const segment = evaluateQuery(serverQuery, handle.rows());
-      const out: Segment<T> = { rows: segment.rows };
-      if (dialect === "offset") out.total = segment.total ?? handle.rows().length;
-      else if (segment.rows.length === w.size && offset + w.size < handle.rows().length)
-        out.nextCursor = encodeClientCursor(offset + w.size);
-      return out;
-    });
-  };
-
-  const record = async (id: string): Promise<T> => {
-    return maybeFail(handle, async () => {
-      await delay(latencyMs);
-      const row = handle.rows().find((r) => r.id === id);
-      if (!row) throw { kind: "not-found" } satisfies ApiError;
-      return row;
-    });
-  };
-
-  const batch = async (ids: ReadonlyArray<string>): Promise<ReadonlyArray<T>> => {
-    return maybeFail(handle, async () => {
-      await delay(latencyMs);
-      const byId = new Map(handle.rows().map((r) => [r.id, r]));
-      return ids.flatMap((id) => {
-        const row = byId.get(id);
-        return row ? [row] : [];
-      });
-    });
-  };
+  const store = new MockStore(initialRows);
+  const dialect = options.dialect ?? "offset";
+  const latencyMs = options.latencyMs ?? 0;
 
   return {
-    collection,
-    record,
-    batch,
+    collection: {
+      async read(
+        request: CollectionRequest,
+        _ctx: Scope,
+        signal?: AbortSignal,
+      ): Promise<CollectionPage<T>> {
+        return withFailure(store, latencyMs, signal, async () => {
+          // Server-side filter/sort simulation, then dialect-specific slicing.
+          const filtered = evaluateQuery(
+            { ...request, window: { kind: "all" } },
+            store.rows(),
+          ).rows;
+          return pageOf(request, filtered, dialect);
+        });
+      },
+    },
+    record: {
+      async read(id: string, _ctx: Scope, signal?: AbortSignal): Promise<T | null> {
+        return withFailure(store, latencyMs, signal, async () => {
+          return store.rows().find((row) => row.id === id) ?? null;
+        });
+      },
+    },
+    lookup: {
+      async read(ids: readonly string[], _ctx: Scope, signal?: AbortSignal): Promise<readonly T[]> {
+        return withFailure(store, latencyMs, signal, async () => {
+          const byId = new Map(store.rows().map((row) => [row.id, row]));
+          const seen = new Set<string>();
+          const out: T[] = [];
+          for (const id of ids) {
+            const row = byId.get(id);
+            if (row !== undefined && !seen.has(id)) {
+              seen.add(id);
+              out.push(row);
+            }
+          }
+          return out;
+        });
+      },
+    },
     handle: {
-      rows: () => handle.rows(),
-      replaceRows: (rows) => handle.replaceRows(rows),
-      failNext: (error) => handle.failNext(error),
+      rows: () => store.rows(),
+      replaceRows: (rows) => store.replaceRows(rows),
+      failNext: (error) => store.failNext(error),
       get count() {
-        return handle.count;
+        return store.count;
       },
     },
   };
 }
 
-/** 整取数据源（clientCollection 的 fetchAll）。 */
-export function mockFetchAll<T>(
-  initialRows: ReadonlyArray<T>,
-  options: { latencyMs?: number } = {},
-): MockFetchAll<T> {
-  const handle = new MockHandleImpl([...initialRows]);
-  const fn = async (): Promise<ReadonlyArray<T>> => {
-    const failure = handle.takeFailure();
-    if (failure) throw failure;
-    await delay(options.latencyMs ?? 0);
-    return handle.rows();
-  };
-  return Object.assign(fn, {
-    rows: () => handle.rows(),
-    replaceRows: (rows: ReadonlyArray<T>) => handle.replaceRows(rows),
-    failNext: (error: ApiError) => handle.failNext(error),
-    get count() {
-      return handle.count;
-    },
-  }) as MockFetchAll<T>;
+export interface MockFetchAll<T> {
+  (ctx: Scope, signal?: AbortSignal): Promise<readonly T[]>;
+  rows(): readonly T[];
+  replaceRows(rows: readonly T[]): void;
+  failNext(error: ApiError): void;
+  readonly count: number;
 }
 
-export { isApiError };
+/** Whole-list mock source for `clientCollection`. */
+export function mockFetchAll<T>(
+  initialRows: readonly T[],
+  options: { latencyMs?: number } = {},
+): MockFetchAll<T> {
+  const store = new MockStore(initialRows);
+  const latencyMs = options.latencyMs ?? 0;
+
+  const fetchAll = async (_ctx: Scope, signal?: AbortSignal): Promise<readonly T[]> =>
+    withFailure(store, latencyMs, signal, async () => store.rows());
+
+  const withHandle = Object.assign(fetchAll, {
+    rows: () => store.rows(),
+    replaceRows: (rows: readonly T[]) => store.replaceRows(rows),
+    failNext: (error: ApiError) => store.failNext(error),
+  }) as MockFetchAll<T>;
+
+  Object.defineProperty(withHandle, "count", {
+    get: () => store.count,
+    enumerable: true,
+  });
+  return withHandle;
+}

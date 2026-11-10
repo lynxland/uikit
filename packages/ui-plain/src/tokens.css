@@ -1,0 +1,59 @@
+/* =========================================================================
+   @lynxland/uikit-ui-plain — neutral token contract
+
+   Minimal semantic variables used by the plain primitives and by
+   surfaces.css fallbacks. No Tailwind, no brand palette: override any value
+   on `:root` (or a scoped element) to re-theme the adapter.
+
+   Required semantic names (design.md §7.2):
+     --background / --foreground / --card / --muted / --muted-foreground /
+     --border / --primary / --destructive
+   Extended:
+     --input / --ring / --radius / --status-* / --chart-1..5
+   ========================================================================= */
+
+:root {
+  color-scheme: light;
+
+  --background: #ffffff;
+  --foreground: #181a1f;
+
+  --card: #ffffff;
+  --card-foreground: #181a1f;
+
+  --popover: #ffffff;
+  --popover-foreground: #181a1f;
+
+  --muted: #f3f4f6;
+  --muted-foreground: #626a77;
+
+  --border: #d9dce2;
+  --input: #c9ced7;
+
+  --primary: #2f5bd7;
+  --primary-foreground: #ffffff;
+
+  --secondary: #eef1f7;
+  --secondary-foreground: #253046;
+
+  --accent: #e8edfa;
+  --accent-foreground: #1d2b4f;
+
+  --destructive: #c3282f;
+  --destructive-foreground: #ffffff;
+
+  --ring: #2f5bd7;
+  --radius: 0.5rem;
+
+  --status-neutral: #626a77;
+  --status-success: #1d7f4b;
+  --status-warning: #a4610a;
+  --status-danger: #c3282f;
+  --status-info: #2367a8;
+
+  --chart-1: #2f5bd7;
+  --chart-2: #1d7f4b;
+  --chart-3: #a4610a;
+  --chart-4: #8b3fc6;
+  --chart-5: #2367a8;
+}
