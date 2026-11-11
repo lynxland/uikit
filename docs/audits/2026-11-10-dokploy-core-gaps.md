@@ -109,6 +109,34 @@ Profile/Audit Logs/AI/Certificates/Registry/S3 Destinations/License.
 This matters for planning: the remaining "strict clone" work is not mainly
 more core primitives; a large part is page composition and real data/commands.
 
+## 5.1 Deferral rationale and unblock triggers
+
+"Deferred" means the UI would either be fake, require a missing data/command/
+transport model, add a heavy/security-sensitive dependency, or prematurely
+freeze a preset API without a second consumer. It does not mean "won't do".
+
+| Deferred item | Why deferred | Unblock trigger |
+|---|---|---|
+| Terminal | Needs xterm/a pty, duplex transport (current Stream is server→client frames), auth, resize and command lifecycle; a UI-only terminal would be a fake. | A real terminal/exec transport contract and a consumer that needs it. |
+| ContextMenu | Not present in the cloned screenshots; row actions already use explicit buttons/Menu. | A product requirement for right-click actions; then add adapter ContextMenu and keyboard semantics. |
+| Dropzone | No implemented screen uploads files; needs file constraints, progress, retries and upload transport. | Volume/backup/import flow with a real upload source. |
+| Editable/multi Combobox | `CommandMenu` covers the current searchable single-select (environment/provider) with checked state. True Combobox needs editable input, chips/multi, async search, create-new and ARIA listbox rules. | A form that needs editable or multi-value search, or async option loading. |
+| CollectionPage card-grid preset | Preset `CollectionPage` is table-first. A card layout needs product decisions on grid, selection, toolbar and empty states; the demo's Projects page is the only concrete design. | A second console consumer with the same card-grid shape. |
+| `FieldInput.meta` | `hidden` now covers non-rendered fields. `meta` needs a field-descriptor/permission model and would expand the form contract without a concrete use. | A schema-driven form that must pass metadata through the field pipeline. |
+| Swarm | Needs node roles/TLS/availability, service/task/container nested data and cluster commands; static mock would be large and non-functional. | Swarm data/commands or a genuine Docker Swarm consumer. |
+| Templates / create-from-template | Separate catalog feature: remote template metadata, search/tags/base URL, icons, pagination and a create-service integration. | A template catalog source and service-creation contract. |
+| SSO | OIDC/SAML provider configuration, secrets, callback URLs, validation and auth flows are security-sensitive and backend-owned. | Auth provider integration and security review. |
+| Whitelabeling | Tied to license/organization branding and asset storage; no current data model. | Branding/license model and an actual white-label consumer. |
+| Build-log modal | Deployment logs already work in the drawer; the official build-log modal is a variant with a different toolbar/line model. | Build pipeline data and a need to inspect build logs separately from deployment logs. |
+| Create Backup / Create Custom Role dialogs | Backups need S3 destinations, cron/retention and restore semantics; custom roles need a permission matrix. A form without these is fake. | Destination model + backup commands; role/permission matrix. |
+| Application Preview/Schedules/Volume Backups/Patches | Each is a feature, not a tab label: PR previews/domains, cron commands, volume mount + backup destination, patch lifecycle. The tabs are honest placeholders. | The corresponding data model and commands for each tab. |
+| Database Backups/Advanced | Backups need destination/schedule/retention/restore; Advanced needs cluster/registry/replica settings. | Backup + cluster settings models and commands. |
+| Compose extra tabs | Containers/Backups/Schedules/Volume Backups need compose runtime/service data, not just a YAML editor. | Compose runtime model and the same backup/schedule primitives. |
+| Project Environment management dialog | Current dialog is read-only because environment CRUD/branch/delete commands do not exist. | Environment commands and failure/partial-success semantics. |
+| Bulk delete | Needs multi-service transaction/partial-failure handling, confirmation and cross-entity invalidation; the selection UI alone would be misleading. | A batch command/Outcome contract and delete policy. |
+| Settings Sessions/Deployments/Tags | Sessions need an auth-session model; deployment settings need queue/cleanup config; tags need CRUD and cross-entity references. | The corresponding settings models/commands. |
+| Visual regression + axe/Lighthouse | Needs a baseline policy (official screenshots are external artifacts), CI budget and tool choice; current e2e is behavioral only. | A stable local/CI screenshot and a11y pipeline. |
+
 ## 6. Core backlog
 
 ### P0 — blocks shell/layout parity or repeats on every page
